@@ -1,0 +1,9 @@
+# Lint
+lint:
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.0 run
+.PHONY: lint
+
+# Build
+build:
+	go build -o basin cmd/basin/*
+.PHONY: build
