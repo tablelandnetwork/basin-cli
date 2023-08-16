@@ -7,3 +7,8 @@ lint:
 build:
 	go build -o basin cmd/basin/*
 .PHONY: build
+
+# Test
+test: 
+	go test ./... -short -race
+.PHONY: test

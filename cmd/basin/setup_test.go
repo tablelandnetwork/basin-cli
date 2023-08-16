@@ -52,7 +52,7 @@ func TestInitCommand(t *testing.T) {
 
 		args := os.Args[0:1] // Name of the program.
 
-		return cliApp.Run(append(args, "init"))
+		return cliApp.Run(append(args, "setup"))
 	})
 }
 

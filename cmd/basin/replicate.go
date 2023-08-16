@@ -39,10 +39,10 @@ func newReplicatecommand() *cli.Command {
 				log.Fatal(err)
 			}
 
-			feed, _ := r.StartReplication()
-			for wal := range feed {
-				process(wal)
-				_ = r.SendFeedback(wal.Pos)
+			feed, _ := r.StartReplication(cCtx.Context)
+			for tx := range feed {
+				processTx(tx)
+				_ = r.Commit(cCtx.Context, tx.CommitLSN)
 			}
 
 			return nil
@@ -50,10 +50,7 @@ func newReplicatecommand() *cli.Command {
 	}
 }
 
-func process(wal pgrepl.Wal) {
-	if wal.Payload.Action != "B" && wal.Payload.Action != "C" {
-		fmt.Println(wal.Pos)
-		v, _ := json.MarshalIndent(wal, "", " ")
-		fmt.Println(string(v))
-	}
+func processTx(tx *pgrepl.Tx) {
+	v, err := json.MarshalIndent(tx, "", " ")
+	fmt.Println(string(v), err)
 }
