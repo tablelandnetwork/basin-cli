@@ -16,13 +16,13 @@ type Conn struct {
 
 // FetchPublicationTables fetches all tables that needs replication from publications.
 func (c *Conn) FetchPublicationTables(ctx context.Context) ([]string, error) {
-	// TODO: adapt query for CREATE PUBLICATION pub FOR ALL TABLES; case.
 	rows, err := c.Query(ctx,
-		`SELECT 
-			schemaname, tablename 
-		FROM pg_publication p
-		JOIN pg_publication_tables pt ON p.pubname = pt.pubname
-	`)
+		`
+			SELECT schemaname, tablename 
+			FROM pg_publication p
+			JOIN pg_publication_tables pt ON p.pubname = pt.pubname
+		`,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return []string{}, nil
 	} else if err != nil {

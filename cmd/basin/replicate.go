@@ -1,11 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"path"
 
+	"github.com/tablelandnetwork/basin-cli/internal/app"
+	"github.com/tablelandnetwork/basin-cli/pkg/basinprovider"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"github.com/urfave/cli/v2"
 )
@@ -39,18 +40,12 @@ func newReplicatecommand() *cli.Command {
 				log.Fatal(err)
 			}
 
-			feed, _ := r.StartReplication(cCtx.Context)
-			for tx := range feed {
-				processTx(tx)
-				_ = r.Commit(cCtx.Context, tx.CommitLSN)
+			basinStreamer := app.NewBasinStreamer(r, &basinprovider.BasinProvider{})
+			if err := basinStreamer.Run(cCtx.Context); err != nil {
+				log.Fatal(err)
 			}
 
 			return nil
 		},
 	}
-}
-
-func processTx(tx *pgrepl.Tx) {
-	v, err := json.MarshalIndent(tx, "", " ")
-	fmt.Println(string(v), err)
 }
