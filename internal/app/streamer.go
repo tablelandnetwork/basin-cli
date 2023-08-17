@@ -18,7 +18,7 @@ type Replicator interface {
 
 // BasinProvider ...
 type BasinProvider interface {
-	Push([]byte) error
+	Push(context.Context, []byte) error
 }
 
 // BasinStreamer contains logic of streaming Postgres changes to Basin Provider.
@@ -57,7 +57,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 			return fmt.Errorf("sign: %s", err)
 		}
 
-		if err := b.provider.Push(signedPayload); err != nil {
+		if err := b.provider.Push(ctx, signedPayload); err != nil {
 			return fmt.Errorf("push: %s", err)
 		}
 

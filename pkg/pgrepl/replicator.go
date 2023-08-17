@@ -16,23 +16,36 @@ import (
 )
 
 const (
+	// The logical decoder we're using.
+	// https://github.com/eulerto/wal2json
 	outputPlugin = "wal2json"
 )
 
 // PgReplicator is a component that replicates Postgres data.
 type PgReplicator struct {
-	pgConn *pgconn.PgConn
-	feed   chan *Tx
-
 	slot   string
+	pgConn *pgconn.PgConn
+
+	// channel of replicated Txs.
+	feed chan *Tx
+
+	// The tables that will be replicated.
+	// We get them by querying pg_publication.
 	tables []string
 
-	commitLSN    pglogrepl.LSN
-	committedLSN pglogrepl.LSN
-	commitSync   sync.Mutex
+	// The commitLSN is the LSN used to start the replication.
+	// It either comes from the confirmed_flush_lsn of an existing replication slot
+	// or a recently created replication slot.
+	commitLSN pglogrepl.LSN
 
-	// sync
-	once sync.Once
+	// The committedLSN is the last commited LSN, updated by the Commit method
+	// and used in the KeepAlive message.
+	committedLSN pglogrepl.LSN
+
+	// Sync to help synchronize the Commit method and the KeepAlive access to the committedLSN.
+	commitSync sync.Mutex
+
+	closeOnce sync.Once
 }
 
 // New creates a new Postgres replicator.
@@ -205,7 +218,7 @@ func (r *PgReplicator) Commit(ctx context.Context, lsn pglogrepl.LSN) error {
 
 // Shutdown stops the replication by closing the Postgres connection and the feed channel.
 func (r *PgReplicator) Shutdown() {
-	r.once.Do(func() {
+	r.closeOnce.Do(func() {
 		close(r.feed)
 	})
 }

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/tablelandnetwork/basin-cli/pkg/basinprovider";
+
+package basinprovider;
+
+
+service BasinProvider {
+  rpc Push(Data) returns (google.protobuf.Empty);
+}
+
+message Data {
+  bytes payload = 1;
+}
