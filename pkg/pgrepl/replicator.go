@@ -27,7 +27,6 @@ type PgReplicator struct {
 	slot   string
 	tables []string
 
-	timeline     int32
 	commitLSN    pglogrepl.LSN
 	committedLSN pglogrepl.LSN
 	commitSync   sync.Mutex
@@ -136,38 +135,48 @@ func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, error) {
 
 	go func() {
 		records := []Record{}
-		commitLSN := pglogrepl.LSN(0)
+		var commitLSN string
 
 		// Consume all records between BEGIN and COMMIT inside a Transaction
 		for {
 			record, err := r.consumeRecord(ctx)
 			if err != nil {
+				// TODO: better logging
 				log.Println(err)
 				continue
 			}
 
 			// Empty records that came from KeepAlive messages
-			if record.Payload.Action == "" {
+			if record.Action == "" {
 				continue
 			}
 
 			// BEGIN
-			if record.Payload.Action == "B" {
-				_ = commitLSN.Scan(record.Payload.EndLsn)
+			if record.Action == "B" {
+				commitLSN = record.EndLsn
 				continue
 			}
 
 			// COMMIT
-			if record.Payload.Action == "C" {
+			if record.Action == "C" {
+				// commit and begin end_lsn should match
+				if record.EndLsn != commitLSN {
+					// TODO: handle this in a better way
+					log.Fatalf("commit and begin end_lsn don't match: (%s, %s)", commitLSN, record.EndLsn)
+				}
+
+				var lsn pglogrepl.LSN
+				_ = lsn.Scan(commitLSN)
+
 				if len(records) > 0 {
 					r.feed <- &Tx{
-						CommitLSN: commitLSN,
+						CommitLSN: lsn,
 						Records:   records,
 					}
 				}
 
 				records = []Record{}
-				commitLSN = pglogrepl.LSN(0)
+				commitLSN = ""
 				continue
 			}
 
@@ -241,15 +250,12 @@ func (r *PgReplicator) consumeRecord(ctx context.Context) (Record, error) {
 			return Record{}, fmt.Errorf("ParseXLogData failed: %s", err)
 		}
 
-		var p Payload
-		if err := json.Unmarshal(xld.WALData, &p); err != nil {
+		var r Record
+		if err := json.Unmarshal(xld.WALData, &r); err != nil {
 			return Record{}, fmt.Errorf("unmarshal: %s", err)
 		}
 
-		return Record{
-			Timeline: r.timeline,
-			Payload:  p,
-		}, nil
+		return r, nil
 	}
 
 	return Record{}, nil

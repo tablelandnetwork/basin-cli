@@ -112,8 +112,8 @@ func TestReplication(t *testing.T) {
 
 	tx := <-feed
 	require.Equal(t, 5, len(tx.Records))
-	require.Equal(t, tx.Records[0].Payload.Table, "t")
-	require.Equal(t, tx.Records[0].Payload.Columns, []Column{
+	require.Equal(t, tx.Records[0].Table, "t")
+	require.Equal(t, tx.Records[0].Columns, []Column{
 		{
 			Name:  "id",
 			Type:  "integer",

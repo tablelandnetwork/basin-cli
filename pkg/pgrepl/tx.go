@@ -4,18 +4,12 @@ import "github.com/jackc/pglogrepl"
 
 // Tx is an slice of records.
 type Tx struct {
-	CommitLSN pglogrepl.LSN
-	Records   []Record
+	CommitLSN pglogrepl.LSN `json:"commit_lsn"`
+	Records   []Record      `json:"records"`
 }
 
-// Record is a record replicated from Postgres.
+// Record is the WAL record information encoded in JSON.
 type Record struct {
-	Timeline int32
-	Payload  Payload
-}
-
-// Payload is the WAL record information encoded in JSON.
-type Payload struct {
 	Action     string       `json:"action"`
 	XID        int64        `json:"xid"`
 	Lsn        string       `json:"lsn"`
