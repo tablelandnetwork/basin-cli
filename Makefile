@@ -12,3 +12,12 @@ build:
 test: 
 	go test ./... -short -race
 .PHONY: test
+
+# Helpers for running
+replicate:
+	go run $(shell ls -1 cmd/basin/*.go | grep -v _test.go) replicate 
+.PHONY: replicate
+
+setup:
+	go run $(shell ls -1 cmd/basin/*.go | grep -v _test.go) setup 
+.PHONY: setup 
