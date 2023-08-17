@@ -22,17 +22,6 @@ func newSetupCommand(s terminal.Stdio) *cli.Command {
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
-			dir, err := defaultConfigLocation(cCtx.String("dir"))
-			if err != nil {
-				return fmt.Errorf("default config location: %s", err)
-			}
-
-			cfg := config{}
-			f, err := os.Create(path.Join(dir, "config.yaml"))
-			if err != nil {
-				return fmt.Errorf("os create: %s", err)
-			}
-
 			answers := struct {
 				Host     string
 				Port     int
@@ -82,6 +71,17 @@ func newSetupCommand(s terminal.Stdio) *cli.Command {
 
 			if err := survey.Ask(qs, &answers, survey.WithStdio(s.In, s.Out, s.Err)); err != nil {
 				return fmt.Errorf("survey ask: %s", err)
+			}
+
+			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			if err != nil {
+				return fmt.Errorf("default config location: %s", err)
+			}
+
+			cfg := config{}
+			f, err := os.Create(path.Join(dir, "config.yaml"))
+			if err != nil {
+				return fmt.Errorf("os create: %s", err)
 			}
 
 			cfg.DBS.Postgres.Host = answers.Host
