@@ -38,7 +38,7 @@ type PgReplicator struct {
 	// or a recently created replication slot.
 	commitLSN pglogrepl.LSN
 
-	// The committedLSN is the last commited LSN, updated by the Commit method
+	// The committedLSN is the last committed LSN, updated by the Commit method
 	// and used in the KeepAlive message.
 	committedLSN pglogrepl.LSN
 

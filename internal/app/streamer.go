@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"capnproto.org/go/capnp/v3"
 	"github.com/jackc/pglogrepl"
+	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
@@ -16,9 +18,17 @@ type Replicator interface {
 	Shutdown()
 }
 
+type (
+	// TxData is the tx encoded data.
+	TxData []byte
+
+	// Signature is the signature of TxData.
+	Signature []byte
+)
+
 // BasinProvider ...
 type BasinProvider interface {
-	Push(context.Context, []byte) error
+	Push(context.Context, TxData, Signature) (uint64, error)
 }
 
 // BasinStreamer contains logic of streaming Postgres changes to Basin Provider.
@@ -44,22 +54,44 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	}
 
 	for tx := range txs {
-		v, err := json.MarshalIndent(tx, "", " ")
-		fmt.Println(string(v), err)
+		data, _ := json.MarshalIndent(tx, "", "    ")
+		fmt.Println(string(data))
 
-		payload, err := b.encode(tx)
+		arena := capnp.SingleSegment(nil)
+		msg, seg, err := capnp.NewMessage(arena)
 		if err != nil {
-			return fmt.Errorf("encode: %s", err)
+			return fmt.Errorf("capnp new message: %s", err)
 		}
 
-		signedPayload, err := b.sign(payload)
+		capnpTx, err := basincapnp.NewRootTx(seg)
+		if err != nil {
+			return fmt.Errorf("capnp new tx: %s", err)
+		}
+
+		// right now i'm just setting this field for testing
+		capnpTx.SetCommitLSN(uint64(tx.CommitLSN))
+
+		// txData, err := capnp.Canonicalize(capnpTx.ToPtr().Struct())
+		// if err != nil {
+		// 	return fmt.Errorf("canonicalize: %s", err)
+		// }
+
+		txData, err := msg.Marshal()
+		if err != nil {
+			return fmt.Errorf("marshal: %s", err)
+		}
+
+		signature, err := b.sign(txData)
 		if err != nil {
 			return fmt.Errorf("sign: %s", err)
 		}
 
-		if err := b.provider.Push(ctx, signedPayload); err != nil {
+		response, err := b.provider.Push(ctx, txData, signature)
+		if err != nil {
 			return fmt.Errorf("push: %s", err)
 		}
+
+		fmt.Println(response)
 
 		if err := b.replicator.Commit(ctx, tx.CommitLSN); err != nil {
 			return fmt.Errorf("commit: %s", err)
@@ -67,11 +99,6 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (b *BasinStreamer) encode(tx *pgrepl.Tx) ([]byte, error) {
-	// TODO: implement this
-	return []byte{}, nil
 }
 
 func (b *BasinStreamer) sign([]byte) ([]byte, error) {

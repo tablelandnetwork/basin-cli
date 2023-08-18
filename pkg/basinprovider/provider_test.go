@@ -2,62 +2,56 @@ package basinprovider
 
 import (
 	"context"
-	"log"
-	"net"
 	"testing"
 
+	capnp "capnproto.org/go/capnp/v3"
+	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/stretchr/testify/require"
-	grpc "google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"google.golang.org/grpc/test/bufconn"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 func TestBasinProvider_Push(t *testing.T) {
-	bp, closer := server(context.Background())
-	defer closer()
+	// in this test we create a tx with the value 33,
+	// sent to the server, the server deserialize it and send the value back
 
-	err := bp.Push(context.Background(), []byte{})
+	bp := newServer()
+	txData := newTx(t, 333)
+
+	response, err := bp.Push(context.Background(), txData, []byte{})
 	require.NoError(t, err)
+	require.Equal(t, uint64(333), response)
 }
 
-func server(ctx context.Context) (*BasinProvider, func()) {
+func newTx(t *testing.T, v uint64) []byte {
+	msg, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	require.NoError(t, err)
+
+	capnpTx, err := basincapnp.NewRootTx(seg)
+	require.NoError(t, err)
+
+	// right now i'm just setting this field for testing
+	capnpTx.SetCommitLSN(v)
+
+	// txData, err := capnp.Canonicalize(capnpTx.ToPtr().Struct())
+	// require.NoError(t, err)
+
+	txData, err := msg.Marshal()
+	require.NoError(t, err)
+
+	return txData
+}
+
+func newServer() *BasinProvider {
 	buffer := 101024 * 1024
 	lis := bufconn.Listen(buffer)
 
-	baseServer := grpc.NewServer()
-	RegisterBasinProviderServer(baseServer, &basinServer{})
+	srv := BasinProviderClient_ServerToClient(&BasinServerMock{})
+	bootstrapClient := capnp.Client(srv)
 
 	go func() {
-		if err := baseServer.Serve(lis); err != nil {
-			log.Printf("error serving server: %v", err)
-		}
+		_ = rpc.Serve(lis, bootstrapClient)
 	}()
 
-	conn, err := grpc.DialContext(ctx, "",
-		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
-			return lis.Dial()
-		}), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Printf("error connecting to server: %v", err)
-	}
-
-	closer := func() {
-		err := lis.Close()
-		if err != nil {
-			log.Printf("error closing listener: %v", err)
-		}
-		baseServer.Stop()
-	}
-
-	client := NewBasinProviderClient(conn)
-	return New(client), closer
+	return New(srv)
 }
-
-type basinServer struct{}
-
-func (s *basinServer) Push(context.Context, *Data) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
-}
-
-func (s *basinServer) mustEmbedUnimplementedBasinProviderServer() {}
