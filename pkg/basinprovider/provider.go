@@ -3,6 +3,9 @@ package basinprovider
 import (
 	"context"
 	"fmt"
+
+	grpc "google.golang.org/grpc"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // BasinProvider implements the app.BasinProvider interface.
@@ -10,7 +13,7 @@ type BasinProvider struct {
 	client BasinProviderClient
 }
 
-func NewBasinProvider(c BasinProviderClient) *BasinProvider {
+func New(c BasinProviderClient) *BasinProvider {
 	return &BasinProvider{
 		client: c,
 	}
@@ -22,4 +25,10 @@ func (bp *BasinProvider) Push(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("push: %s", err)
 	}
 	return nil
+}
+
+type ClientMock struct{}
+
+func (c *ClientMock) Push(ctx context.Context, in *Data, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
 }

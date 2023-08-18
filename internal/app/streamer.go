@@ -47,7 +47,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 		v, err := json.MarshalIndent(tx, "", " ")
 		fmt.Println(string(v), err)
 
-		payload, err := b.encode()
+		payload, err := b.encode(tx)
 		if err != nil {
 			return fmt.Errorf("encode: %s", err)
 		}
@@ -69,10 +69,12 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	return nil
 }
 
-func (b *BasinStreamer) encode() ([]byte, error) {
+func (b *BasinStreamer) encode(tx *pgrepl.Tx) ([]byte, error) {
+	// TODO: implement this
 	return []byte{}, nil
 }
 
 func (b *BasinStreamer) sign([]byte) ([]byte, error) {
+	// TODO: implement this
 	return []byte{}, nil
 }

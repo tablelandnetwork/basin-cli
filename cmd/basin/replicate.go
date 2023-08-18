@@ -40,7 +40,7 @@ func newReplicatecommand() *cli.Command {
 				log.Fatal(err)
 			}
 
-			basinStreamer := app.NewBasinStreamer(r, &basinprovider.BasinProvider{})
+			basinStreamer := app.NewBasinStreamer(r, basinprovider.New(&basinprovider.ClientMock{}))
 			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				log.Fatal(err)
 			}

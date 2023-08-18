@@ -51,7 +51,7 @@ func server(ctx context.Context) (*BasinProvider, func()) {
 	}
 
 	client := NewBasinProviderClient(conn)
-	return NewBasinProvider(client), closer
+	return New(client), closer
 }
 
 type basinServer struct{}
