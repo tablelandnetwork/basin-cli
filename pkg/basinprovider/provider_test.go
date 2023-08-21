@@ -7,6 +7,7 @@ import (
 	capnp "capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/stretchr/testify/require"
+	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"google.golang.org/grpc/test/bufconn"
 )
@@ -18,6 +19,11 @@ func TestBasinProvider_Push(t *testing.T) {
 	bp := newServer()
 	txData := newTx(t, &pgrepl.Tx{
 		CommitLSN: 333,
+		Records: []pgrepl.Record{
+			{
+				Action: "I",
+			},
+		},
 	})
 
 	response, err := bp.Push(context.Background(), txData, []byte{})
@@ -26,7 +32,7 @@ func TestBasinProvider_Push(t *testing.T) {
 }
 
 func newTx(t *testing.T, tx *pgrepl.Tx) []byte {
-	_, msg, err := tx.ToCapNProto()
+	_, msg, err := basincapnp.FronPgReplTx(tx)
 	require.NoError(t, err)
 
 	txData, err := msg.Marshal()

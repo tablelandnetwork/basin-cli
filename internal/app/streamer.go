@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pglogrepl"
+	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
@@ -55,7 +56,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 		data, _ := json.MarshalIndent(tx, "", "    ")
 		fmt.Println(string(data))
 
-		_, msg, err := tx.ToCapNProto()
+		_, msg, err := basincapnp.FronPgReplTx(tx)
 		if err != nil {
 			return fmt.Errorf("to capnproto: %s", err)
 		}
