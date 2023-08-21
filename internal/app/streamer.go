@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"capnproto.org/go/capnp/v3"
 	"github.com/jackc/pglogrepl"
-	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
@@ -57,24 +55,10 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 		data, _ := json.MarshalIndent(tx, "", "    ")
 		fmt.Println(string(data))
 
-		arena := capnp.SingleSegment(nil)
-		msg, seg, err := capnp.NewMessage(arena)
+		_, msg, err := tx.ToCapNProto()
 		if err != nil {
-			return fmt.Errorf("capnp new message: %s", err)
+			return fmt.Errorf("to capnproto: %s", err)
 		}
-
-		capnpTx, err := basincapnp.NewRootTx(seg)
-		if err != nil {
-			return fmt.Errorf("capnp new tx: %s", err)
-		}
-
-		// right now i'm just setting this field for testing
-		capnpTx.SetCommitLSN(uint64(tx.CommitLSN))
-
-		// txData, err := capnp.Canonicalize(capnpTx.ToPtr().Struct())
-		// if err != nil {
-		// 	return fmt.Errorf("canonicalize: %s", err)
-		// }
 
 		txData, err := msg.Marshal()
 		if err != nil {

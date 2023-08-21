@@ -14,12 +14,12 @@ type Tx capnp.Struct
 const Tx_TypeID = 0xe9135d071d75f95f
 
 func NewTx(s *capnp.Segment) (Tx, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 1})
 	return Tx(st), err
 }
 
 func NewRootTx(s *capnp.Segment) (Tx, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 1})
 	return Tx(st), err
 }
 
@@ -63,12 +63,36 @@ func (s Tx) SetCommitLSN(v uint64) {
 	capnp.Struct(s).SetUint64(0, v)
 }
 
+func (s Tx) Records() (Tx_Record_List, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return Tx_Record_List(p.List()), err
+}
+
+func (s Tx) HasRecords() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Tx) SetRecords(v Tx_Record_List) error {
+	return capnp.Struct(s).SetPtr(0, v.ToPtr())
+}
+
+// NewRecords sets the records field to a newly
+// allocated Tx_Record_List, preferring placement in s's segment.
+func (s Tx) NewRecords(n int32) (Tx_Record_List, error) {
+	l, err := NewTx_Record_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return Tx_Record_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(0, l.ToPtr())
+	return l, err
+}
+
 // Tx_List is a list of Tx.
 type Tx_List = capnp.StructList[Tx]
 
 // NewTx creates a new list of Tx.
 func NewTx_List(s *capnp.Segment, sz int32) (Tx_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 1}, sz)
 	return capnp.StructList[Tx](l), err
 }
 
@@ -80,20 +104,446 @@ func (f Tx_Future) Struct() (Tx, error) {
 	return Tx(p.Struct()), err
 }
 
-const schema_8c49da2775b6e7db = "x\xda\x12\x08r`1\xe4\xdd\xcf\xc8\xc0\x14(\xc2\xca" +
-	"\xf6?\xfeg\xa9,{\xac\xf0K\x86@aF\xc6\xff" +
-	"\xb7\x9fo+U\xbf\xe5\xd9\xc3\xc0\xc2\xce\xc0 xt" +
-	"\x93\xe0Y\x10}\xd2\x9eA\xf7\x7fAv\xba~rb" +
-	"A\x1ec\x81~I\x85^rb\x81|^\x81UH" +
-	"E\x00#c \x0b3\x0b\x03\x03\x0b#\x03\x83 o" +
-	"\x10\x03C \x0f3c\xa0\x04\x13\xe3\xff\xe4\xfc\xdc\xdc" +
-	"\xcc\x12\x9f`\x06F?FN\x06&FN\x06F@" +
-	"\x00\x00\x00\xff\xff\xd1\xb1\x1f\xc6"
+type Tx_Record capnp.Struct
+
+// Tx_Record_TypeID is the unique identifier for the type Tx_Record.
+const Tx_Record_TypeID = 0xadfa24e64cb4fa48
+
+func NewTx_Record(s *capnp.Segment) (Tx_Record, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 6})
+	return Tx_Record(st), err
+}
+
+func NewRootTx_Record(s *capnp.Segment) (Tx_Record, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 6})
+	return Tx_Record(st), err
+}
+
+func ReadRootTx_Record(msg *capnp.Message) (Tx_Record, error) {
+	root, err := msg.Root()
+	return Tx_Record(root.Struct()), err
+}
+
+func (s Tx_Record) String() string {
+	str, _ := text.Marshal(0xadfa24e64cb4fa48, capnp.Struct(s))
+	return str
+}
+
+func (s Tx_Record) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Tx_Record) DecodeFromPtr(p capnp.Ptr) Tx_Record {
+	return Tx_Record(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Tx_Record) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Tx_Record) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Tx_Record) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Tx_Record) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Tx_Record) Action() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Tx_Record) HasAction() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Tx_Record) ActionBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record) SetAction(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Tx_Record) Timestamp() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Tx_Record) HasTimestamp() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Tx_Record) TimestampBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record) SetTimestamp(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s Tx_Record) Schema() (string, error) {
+	p, err := capnp.Struct(s).Ptr(2)
+	return p.Text(), err
+}
+
+func (s Tx_Record) HasSchema() bool {
+	return capnp.Struct(s).HasPtr(2)
+}
+
+func (s Tx_Record) SchemaBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(2)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record) SetSchema(v string) error {
+	return capnp.Struct(s).SetText(2, v)
+}
+
+func (s Tx_Record) Table() (string, error) {
+	p, err := capnp.Struct(s).Ptr(3)
+	return p.Text(), err
+}
+
+func (s Tx_Record) HasTable() bool {
+	return capnp.Struct(s).HasPtr(3)
+}
+
+func (s Tx_Record) TableBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(3)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record) SetTable(v string) error {
+	return capnp.Struct(s).SetText(3, v)
+}
+
+func (s Tx_Record) Colums() (Tx_Record_Column_List, error) {
+	p, err := capnp.Struct(s).Ptr(4)
+	return Tx_Record_Column_List(p.List()), err
+}
+
+func (s Tx_Record) HasColums() bool {
+	return capnp.Struct(s).HasPtr(4)
+}
+
+func (s Tx_Record) SetColums(v Tx_Record_Column_List) error {
+	return capnp.Struct(s).SetPtr(4, v.ToPtr())
+}
+
+// NewColums sets the colums field to a newly
+// allocated Tx_Record_Column_List, preferring placement in s's segment.
+func (s Tx_Record) NewColums(n int32) (Tx_Record_Column_List, error) {
+	l, err := NewTx_Record_Column_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return Tx_Record_Column_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(4, l.ToPtr())
+	return l, err
+}
+func (s Tx_Record) PrimaryKey() (Tx_Record_PrimaryKey_List, error) {
+	p, err := capnp.Struct(s).Ptr(5)
+	return Tx_Record_PrimaryKey_List(p.List()), err
+}
+
+func (s Tx_Record) HasPrimaryKey() bool {
+	return capnp.Struct(s).HasPtr(5)
+}
+
+func (s Tx_Record) SetPrimaryKey(v Tx_Record_PrimaryKey_List) error {
+	return capnp.Struct(s).SetPtr(5, v.ToPtr())
+}
+
+// NewPrimaryKey sets the primaryKey field to a newly
+// allocated Tx_Record_PrimaryKey_List, preferring placement in s's segment.
+func (s Tx_Record) NewPrimaryKey(n int32) (Tx_Record_PrimaryKey_List, error) {
+	l, err := NewTx_Record_PrimaryKey_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return Tx_Record_PrimaryKey_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(5, l.ToPtr())
+	return l, err
+}
+
+// Tx_Record_List is a list of Tx_Record.
+type Tx_Record_List = capnp.StructList[Tx_Record]
+
+// NewTx_Record creates a new list of Tx_Record.
+func NewTx_Record_List(s *capnp.Segment, sz int32) (Tx_Record_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 6}, sz)
+	return capnp.StructList[Tx_Record](l), err
+}
+
+// Tx_Record_Future is a wrapper for a Tx_Record promised by a client call.
+type Tx_Record_Future struct{ *capnp.Future }
+
+func (f Tx_Record_Future) Struct() (Tx_Record, error) {
+	p, err := f.Future.Ptr()
+	return Tx_Record(p.Struct()), err
+}
+
+type Tx_Record_Column capnp.Struct
+
+// Tx_Record_Column_TypeID is the unique identifier for the type Tx_Record_Column.
+const Tx_Record_Column_TypeID = 0xdaf0d54cc25988fc
+
+func NewTx_Record_Column(s *capnp.Segment) (Tx_Record_Column, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return Tx_Record_Column(st), err
+}
+
+func NewRootTx_Record_Column(s *capnp.Segment) (Tx_Record_Column, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return Tx_Record_Column(st), err
+}
+
+func ReadRootTx_Record_Column(msg *capnp.Message) (Tx_Record_Column, error) {
+	root, err := msg.Root()
+	return Tx_Record_Column(root.Struct()), err
+}
+
+func (s Tx_Record_Column) String() string {
+	str, _ := text.Marshal(0xdaf0d54cc25988fc, capnp.Struct(s))
+	return str
+}
+
+func (s Tx_Record_Column) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Tx_Record_Column) DecodeFromPtr(p capnp.Ptr) Tx_Record_Column {
+	return Tx_Record_Column(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Tx_Record_Column) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Tx_Record_Column) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Tx_Record_Column) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Tx_Record_Column) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Tx_Record_Column) Name() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Tx_Record_Column) HasName() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Tx_Record_Column) NameBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record_Column) SetName(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Tx_Record_Column) Type() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Tx_Record_Column) HasType() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Tx_Record_Column) TypeBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record_Column) SetType(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s Tx_Record_Column) Value() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(2)
+	return []byte(p.Data()), err
+}
+
+func (s Tx_Record_Column) HasValue() bool {
+	return capnp.Struct(s).HasPtr(2)
+}
+
+func (s Tx_Record_Column) SetValue(v []byte) error {
+	return capnp.Struct(s).SetData(2, v)
+}
+
+// Tx_Record_Column_List is a list of Tx_Record_Column.
+type Tx_Record_Column_List = capnp.StructList[Tx_Record_Column]
+
+// NewTx_Record_Column creates a new list of Tx_Record_Column.
+func NewTx_Record_Column_List(s *capnp.Segment, sz int32) (Tx_Record_Column_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3}, sz)
+	return capnp.StructList[Tx_Record_Column](l), err
+}
+
+// Tx_Record_Column_Future is a wrapper for a Tx_Record_Column promised by a client call.
+type Tx_Record_Column_Future struct{ *capnp.Future }
+
+func (f Tx_Record_Column_Future) Struct() (Tx_Record_Column, error) {
+	p, err := f.Future.Ptr()
+	return Tx_Record_Column(p.Struct()), err
+}
+
+type Tx_Record_PrimaryKey capnp.Struct
+
+// Tx_Record_PrimaryKey_TypeID is the unique identifier for the type Tx_Record_PrimaryKey.
+const Tx_Record_PrimaryKey_TypeID = 0x9722004316c0ea9f
+
+func NewTx_Record_PrimaryKey(s *capnp.Segment) (Tx_Record_PrimaryKey, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return Tx_Record_PrimaryKey(st), err
+}
+
+func NewRootTx_Record_PrimaryKey(s *capnp.Segment) (Tx_Record_PrimaryKey, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	return Tx_Record_PrimaryKey(st), err
+}
+
+func ReadRootTx_Record_PrimaryKey(msg *capnp.Message) (Tx_Record_PrimaryKey, error) {
+	root, err := msg.Root()
+	return Tx_Record_PrimaryKey(root.Struct()), err
+}
+
+func (s Tx_Record_PrimaryKey) String() string {
+	str, _ := text.Marshal(0x9722004316c0ea9f, capnp.Struct(s))
+	return str
+}
+
+func (s Tx_Record_PrimaryKey) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Tx_Record_PrimaryKey) DecodeFromPtr(p capnp.Ptr) Tx_Record_PrimaryKey {
+	return Tx_Record_PrimaryKey(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Tx_Record_PrimaryKey) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Tx_Record_PrimaryKey) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Tx_Record_PrimaryKey) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Tx_Record_PrimaryKey) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Tx_Record_PrimaryKey) Name() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Tx_Record_PrimaryKey) HasName() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Tx_Record_PrimaryKey) NameBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record_PrimaryKey) SetName(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Tx_Record_PrimaryKey) Type() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Tx_Record_PrimaryKey) HasType() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Tx_Record_PrimaryKey) TypeBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Tx_Record_PrimaryKey) SetType(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+// Tx_Record_PrimaryKey_List is a list of Tx_Record_PrimaryKey.
+type Tx_Record_PrimaryKey_List = capnp.StructList[Tx_Record_PrimaryKey]
+
+// NewTx_Record_PrimaryKey creates a new list of Tx_Record_PrimaryKey.
+func NewTx_Record_PrimaryKey_List(s *capnp.Segment, sz int32) (Tx_Record_PrimaryKey_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	return capnp.StructList[Tx_Record_PrimaryKey](l), err
+}
+
+// Tx_Record_PrimaryKey_Future is a wrapper for a Tx_Record_PrimaryKey promised by a client call.
+type Tx_Record_PrimaryKey_Future struct{ *capnp.Future }
+
+func (f Tx_Record_PrimaryKey_Future) Struct() (Tx_Record_PrimaryKey, error) {
+	p, err := f.Future.Ptr()
+	return Tx_Record_PrimaryKey(p.Struct()), err
+}
+
+const schema_8c49da2775b6e7db = "x\xda|\x92\xcdk\xd4l\x14\xc5\xcfyn\xd2i\xa1" +
+	"}\xfb\x86\x0c}\xdfM\xa9\x94BU\xec\x97u5\x9b" +
+	")\xadB\x8b\xa3\xcc\xd3V\xa4\x05\x918\x06\x1d\x9c\xcc" +
+	"\x84i\xc6vVn]\xb8\x14DP\xecB\xa1\x82\xc5" +
+	"\x0f\xc4\x9dPE\xf0/\xe8\xa6\x0a\xee\x14\x0b\x82\x1b\x17" +
+	"\x16%\x92\xa9I\xa3\x88\xbb<7\x97{\xce\xf9\xdd;" +
+	":\xc7\x09c\xac\xeb\xb5\x82\xd2\xfb\xcc\xb6ww\xb67" +
+	"z\xa6\xfaoX\xbd\x0c\xa7w\x9e\x16\xde\x0f\xec\xac\xc3" +
+	"T\x19`|\x86\x93\xb4\x17\x98\x01\xecS\\F\xea\xbf" +
+	"\xd5\xc3\xf0\xec\xd7Fo\xe6\x8c\xfd\x11f[\xd4\xf1\x98" +
+	"\xdb\xf6s\x0e\x02\xe3\x9b<M0\xfcvu\xe1ea" +
+	"\xf3\xf3\x16~\x9d,\xad\xc9\xd2O{AZ\x93\xe5!" +
+	"R\xc3\xb4M\x86o><k\x0cn\xcd\\\x83\xd9\x12" +
+	"\xff$O\xec/\xf2\x1f`\x7f\x97e\x0c\x85\xfe\xa5\x0b" +
+	"#%\xc7\xaf\x1a\xfeH\xb02\x1c}\xf9\xb9\xf9\x95\xe1" +
+	"Y\xb7T\xab\x9f\x1f.\xd6\xcb\x9eSo\x1ew\x9b(" +
+	"\x92\xba]\x0c\xc0 `\x1d8\x08\xe8\x01\xa1\x1eU\xb4" +
+	"\xc8,\xa3\xe2PT\xdc/\xd4G\x14\xbb\xab\x8e\xe7\xb2" +
+	"\x13\x8a\x9d`w\xd0\xf4\x93G\"\xa9~\x97\xec\x8e4" +
+	"u;\xd3y;r\x09Ts1?U\xab4\xbcj" +
+	"\x18\xdb\x82\xb8M\xfd\x7fb\xeaf\x0e\xd0\xd7\x85z5" +
+	"e\xea\xf6,\xa0o\x09\xf5\x9a\xa2\xa5T\x96\x0a\xb0\xee" +
+	"E\x9d\xabB\xfd@\xd1\x12\xc9R\x00\xeb\xfea@\xdf" +
+	"\x15\xeaG\x8a\x96adi\x00\xd6z\xd4\xb9&\xd4\xaf" +
+	"\x14-\xd3\xcc\xd2\x04\xac\x17\x8b\x80\xde\x10\xea\xb7\x8ay" +
+	"\xa7\x14\x94k\xd5$]P\xf6\xdc\xa5\xc0\xf1@?\xae" +
+	"\xe5\x97J\x17]\xcf\x89\x9f}\x81s\xae\x92\xe0\xc8\x97" +
+	"\xa2LK\xfc\x07,\x0a\xf9\xef^v0*\x86~*" +
+	"l\xd2\x15C\x89{~\"\x95?nq\xaaV\xc94" +
+	"\xbcj\xb4\xc1\xce\x04\xd6\xb1hY\x13B]H\xc1\x9a" +
+	"\x89\x8aG\x85\xba\x98\x82u\"\xe22-\xd4\xf3\x7f[" +
+	"k\xdfe\xa7\xd2p\xd9\x05\xc5\xae\x94#\xc6\x8e\xfaZ" +
+	"\x96\xb4\xc1\xf4\xe93\x97\xdf\xf5\x98>\xad\xd9\xbd+\x8a" +
+	"}\x8dM\x02\xfa\x90PO+\x86\xa5\x9a\xe7\x95\x83\xc2" +
+	"\x1cx\x92\x1dP\xec\x00\xaf\xd4[SR\x14\x13\x8d]" +
+	"B?\x02\x00\x00\xff\xff1p\xe4a"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_8c49da2775b6e7db,
 		Nodes: []uint64{
+			0x9722004316c0ea9f,
+			0xadfa24e64cb4fa48,
+			0xdaf0d54cc25988fc,
 			0xe9135d071d75f95f,
 		},
 		Compressed: true,

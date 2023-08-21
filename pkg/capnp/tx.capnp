@@ -5,6 +5,25 @@ $Go.import("pkg/capnp");
 
 struct Tx {
     commitLSN @0 :UInt64;
+    records @1 :List(Record);
 
-    # TODO: add the rest of the fields
+    struct Record {
+        action @0 :Text;
+        timestamp @1 :Text;
+        schema @2 :Text;
+        table @3 :Text;
+        colums @4 :List(Column);
+        primaryKey @5 :List(PrimaryKey);
+
+        struct Column {
+            name @0 :Text;
+            type  @1 :Text;
+            value @2 :Data;
+        }
+
+        struct PrimaryKey {
+            name @0 :Text;
+            type  @1 :Text;
+        }
+    }
 }
