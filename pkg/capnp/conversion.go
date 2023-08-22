@@ -8,28 +8,28 @@ import (
 )
 
 // FromPgReplTx converts Tx to its capnp verson.
-func FromPgReplTx(tx *pgrepl.Tx) (Tx, *capnp.Message, error) {
+func FromPgReplTx(tx *pgrepl.Tx) (Tx, error) {
 	// TODO: better error handling
 
-	msg, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
+	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
-		return Tx{}, nil, fmt.Errorf("capnp new message: %s", err)
+		return Tx{}, fmt.Errorf("capnp new message: %s", err)
 	}
 
 	capnpTx, err := NewRootTx(seg)
 	if err != nil {
-		return Tx{}, nil, fmt.Errorf("capnp new tx: %s", err)
+		return Tx{}, fmt.Errorf("capnp new tx: %s", err)
 	}
 
 	capnpTx.SetCommitLSN(uint64(tx.CommitLSN))
 	recordsList, err := NewTx_Record_List(seg, int32(len(tx.Records)))
 	if err != nil {
-		return Tx{}, nil, fmt.Errorf("capnp new columns list: %s", err)
+		return Tx{}, fmt.Errorf("capnp new columns list: %s", err)
 	}
 	for i, record := range tx.Records {
 		r := recordsList.At(i)
 		if err := r.SetAction(record.Action); err != nil {
-			return Tx{}, nil, fmt.Errorf("capnp new record: %s", err)
+			return Tx{}, fmt.Errorf("capnp new record: %s", err)
 		}
 		_ = r.SetTimestamp(record.Timestamp)
 		_ = r.SetSchema(record.Schema)
@@ -37,13 +37,14 @@ func FromPgReplTx(tx *pgrepl.Tx) (Tx, *capnp.Message, error) {
 
 		columnsList, err := NewTx_Record_Column_List(seg, int32(len(record.Columns)))
 		if err != nil {
-			return Tx{}, nil, fmt.Errorf("capnp new columns list: %s", err)
+			return Tx{}, fmt.Errorf("capnp new columns list: %s", err)
 		}
+
 		for index, column := range record.Columns {
 			col := columnsList.At(index)
 			_ = col.SetName(column.Name)
 			_ = col.SetType(column.Type)
-			_ = col.SetValue(col.Segment().Data())
+			_ = col.SetValue(column.Value)
 
 			_ = columnsList.Set(index, col)
 		}
@@ -51,7 +52,7 @@ func FromPgReplTx(tx *pgrepl.Tx) (Tx, *capnp.Message, error) {
 
 		pkList, err := NewTx_Record_PrimaryKey_List(seg, int32(len(record.PrimaryKey)))
 		if err != nil {
-			return Tx{}, nil, fmt.Errorf("capnp new pk list: %s", err)
+			return Tx{}, fmt.Errorf("capnp new pk list: %s", err)
 		}
 		for index, primarKey := range record.PrimaryKey {
 			pk := pkList.At(index)
@@ -66,5 +67,5 @@ func FromPgReplTx(tx *pgrepl.Tx) (Tx, *capnp.Message, error) {
 
 	_ = capnpTx.SetRecords(recordsList)
 
-	return capnpTx, msg, nil
+	return capnpTx, nil
 }

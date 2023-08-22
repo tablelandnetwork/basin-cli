@@ -23,11 +23,12 @@ func newSetupCommand(s terminal.Stdio) *cli.Command {
 		},
 		Action: func(cCtx *cli.Context) error {
 			answers := struct {
-				Host     string
-				Port     int
-				User     string
-				Password string
-				Database string
+				Host       string
+				Port       int
+				User       string
+				Password   string
+				Database   string
+				PrivateKey string
 			}{}
 
 			// the questions to ask
@@ -67,6 +68,13 @@ func newSetupCommand(s terminal.Stdio) *cli.Command {
 					},
 					Validate: survey.Required,
 				},
+				{
+					Name: "privatekey",
+					Prompt: &survey.Input{
+						Message: "Enter your Private Key:",
+					},
+					Validate: survey.Required,
+				},
 			}
 
 			if err := survey.Ask(qs, &answers, survey.WithStdio(s.In, s.Out, s.Err)); err != nil {
@@ -89,6 +97,7 @@ func newSetupCommand(s terminal.Stdio) *cli.Command {
 			cfg.DBS.Postgres.User = answers.User
 			cfg.DBS.Postgres.Password = answers.Password
 			cfg.DBS.Postgres.Database = answers.Database
+			cfg.PrivateKey = answers.PrivateKey
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
 				return fmt.Errorf("encode: %s", err)

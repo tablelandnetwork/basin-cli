@@ -3,6 +3,7 @@ package pgrepl
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -117,16 +118,24 @@ func TestReplication(t *testing.T) {
 		{
 			Name:  "id",
 			Type:  "integer",
-			Value: float64(1),
+			Value: toJSON(t, 1),
 		},
 		{
 			Name:  "name",
 			Type:  "text",
-			Value: "foo",
+			Value: toJSON(t, "foo"),
 		},
 	})
 
 	// TODO: add more assertions
 
 	replicator.Shutdown()
+}
+
+func toJSON(t *testing.T, v any) json.RawMessage {
+	t.Helper()
+	bytes, err := json.Marshal(v)
+	require.NoError(t, err)
+
+	return bytes
 }

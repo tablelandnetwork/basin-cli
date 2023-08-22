@@ -1,6 +1,8 @@
 package pgrepl
 
 import (
+	"encoding/json"
+
 	"github.com/jackc/pglogrepl"
 )
 
@@ -25,9 +27,9 @@ type Record struct {
 
 // Column contains column information.
 type Column struct {
-	Name  string `json:"name"`
-	Type  string `json:"type"`
-	Value any    `json:"value"`
+	Name  string          `json:"name"`
+	Type  string          `json:"type"`
+	Value json.RawMessage `json:"value"`
 }
 
 // PrimaryKey contains primary key information.

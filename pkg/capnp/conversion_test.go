@@ -24,55 +24,14 @@ func TestConversion(t *testing.T) {
 					{
 						Name:  "a",
 						Type:  "integer",
-						Value: []byte{},
+						Value: []byte{0x0, 0x1},
 					},
 				},
 			},
 		},
 	}
 
-	capnptx, _, err := FromPgReplTx(tx)
+	capnptx, err := FromPgReplTx(tx)
 	require.NoError(t, err)
-
-	requireEqualsTx(t, tx, capnptx)
-}
-
-func requireEqualsTx(t *testing.T, tx *pgrepl.Tx, capnptx Tx) {
-	// commit LSN
-	require.Equal(t, uint64(tx.CommitLSN), capnptx.CommitLSN())
-
-	records, err := capnptx.Records()
-	require.NoError(t, err)
-
-	// action
-	action, err := records.At(0).Action()
-	require.NoError(t, err)
-	require.Equal(t, tx.Records[0].Action, action)
-
-	// timestamp
-	timestamp, err := records.At(0).Timestamp()
-	require.NoError(t, err)
-	require.Equal(t, tx.Records[0].Timestamp, timestamp)
-
-	// schema
-	schema, err := records.At(0).Schema()
-	require.NoError(t, err)
-	require.Equal(t, tx.Records[0].Schema, schema)
-
-	// table
-	table, err := records.At(0).Table()
-	require.NoError(t, err)
-	require.Equal(t, tx.Records[0].Table, table)
-
-	// columns
-	columns, err := records.At(0).Colums()
-	require.NoError(t, err)
-
-	colName, err := columns.At(0).Name()
-	require.NoError(t, err)
-	require.Equal(t, tx.Records[0].Columns[0].Name, colName)
-
-	colType, err := columns.At(0).Type()
-	require.NoError(t, err)
-	require.Equal(t, tx.Records[0].Columns[0].Type, colType)
+	require.NoError(t, CompareTx(tx, capnptx))
 }

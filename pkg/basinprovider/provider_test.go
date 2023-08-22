@@ -17,7 +17,7 @@ func TestBasinProvider_Push(t *testing.T) {
 	// send to the server, the server deserialize it and send the value back
 
 	bp := newServer()
-	txData := newTx(t, &pgrepl.Tx{
+	tx := newTx(t, &pgrepl.Tx{
 		CommitLSN: 333,
 		Records: []pgrepl.Record{
 			{
@@ -26,19 +26,16 @@ func TestBasinProvider_Push(t *testing.T) {
 		},
 	})
 
-	response, err := bp.Push(context.Background(), txData, []byte{})
+	response, err := bp.Push(context.Background(), tx, []byte{})
 	require.NoError(t, err)
 	require.Equal(t, uint64(333), response)
 }
 
-func newTx(t *testing.T, tx *pgrepl.Tx) []byte {
-	_, msg, err := basincapnp.FromPgReplTx(tx)
+func newTx(t *testing.T, tx *pgrepl.Tx) basincapnp.Tx {
+	capnpTx, err := basincapnp.FromPgReplTx(tx)
 	require.NoError(t, err)
 
-	txData, err := msg.Marshal()
-	require.NoError(t, err)
-
-	return txData
+	return capnpTx
 }
 
 func newServer() *BasinProvider {

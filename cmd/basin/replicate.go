@@ -5,6 +5,7 @@ import (
 	"log"
 	"path"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	"github.com/tablelandnetwork/basin-cli/pkg/basinprovider"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
@@ -40,8 +41,13 @@ func newReplicatecommand() *cli.Command {
 				log.Fatal(err)
 			}
 
+			privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			bp := basinprovider.New(basinprovider.BasinProviderClient_ServerToClient(&basinprovider.BasinServerMock{}))
-			basinStreamer := app.NewBasinStreamer(r, bp)
+			basinStreamer := app.NewBasinStreamer(r, bp, privateKey)
 			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				log.Fatal(err)
 			}

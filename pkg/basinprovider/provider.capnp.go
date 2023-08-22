@@ -9,6 +9,7 @@ import (
 	schemas "capnproto.org/go/capnp/v3/schemas"
 	server "capnproto.org/go/capnp/v3/server"
 	context "context"
+	capnp2 "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 )
 
 type BasinProviderClient capnp.Client
@@ -219,17 +220,28 @@ func (s BasinProviderClient_push_Params) Message() *capnp.Message {
 func (s BasinProviderClient_push_Params) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s BasinProviderClient_push_Params) TxData() ([]byte, error) {
+func (s BasinProviderClient_push_Params) Tx() (capnp2.Tx, error) {
 	p, err := capnp.Struct(s).Ptr(0)
-	return []byte(p.Data()), err
+	return capnp2.Tx(p.Struct()), err
 }
 
-func (s BasinProviderClient_push_Params) HasTxData() bool {
+func (s BasinProviderClient_push_Params) HasTx() bool {
 	return capnp.Struct(s).HasPtr(0)
 }
 
-func (s BasinProviderClient_push_Params) SetTxData(v []byte) error {
-	return capnp.Struct(s).SetData(0, v)
+func (s BasinProviderClient_push_Params) SetTx(v capnp2.Tx) error {
+	return capnp.Struct(s).SetPtr(0, capnp.Struct(v).ToPtr())
+}
+
+// NewTx sets the tx field to a newly
+// allocated capnp2.Tx struct, preferring placement in s's segment.
+func (s BasinProviderClient_push_Params) NewTx() (capnp2.Tx, error) {
+	ss, err := capnp2.NewTx(capnp.Struct(s).Segment())
+	if err != nil {
+		return capnp2.Tx{}, err
+	}
+	err = capnp.Struct(s).SetPtr(0, capnp.Struct(ss).ToPtr())
+	return ss, err
 }
 
 func (s BasinProviderClient_push_Params) Signature() ([]byte, error) {
@@ -260,6 +272,9 @@ type BasinProviderClient_push_Params_Future struct{ *capnp.Future }
 func (f BasinProviderClient_push_Params_Future) Struct() (BasinProviderClient_push_Params, error) {
 	p, err := f.Future.Ptr()
 	return BasinProviderClient_push_Params(p.Struct()), err
+}
+func (p BasinProviderClient_push_Params_Future) Tx() capnp2.Tx_Future {
+	return capnp2.Tx_Future{Future: p.Future.Field(0, nil)}
 }
 
 type BasinProviderClient_push_Results capnp.Struct
@@ -334,28 +349,28 @@ func (f BasinProviderClient_push_Results_Future) Struct() (BasinProviderClient_p
 	return BasinProviderClient_push_Results(p.Struct()), err
 }
 
-const schema_9cf9878fd3dd8473 = "x\xda\xa4\x91\xb1K\x1ba\x00\xc5\xdf\xfb\xee\xae\x97\x94" +
-	"\x1e\xe9\xd7\xeb\xd0\xa1\x1d\x0aYZ\xd2\xa4%\x04\xd2t" +
-	"HhK\x0b\x9d\xee\xcb\x7f\xf0\xa5=\xd2\xa3\xe9\xe5\xb8" +
-	"\xef\xa2\xfe\x01\x82\x93\xa8\x83\x9b\x7fA\xc0Aq\x17\xff" +
-	"\x03\xc5Q2\x89\x83\xbb\x0eN'\x07&8\x0an\x8f" +
-	"\xc7\x83\xdf\x0f\xde\xf3i\xcf\xfe\xe4\x8d\x05\x84z\xed<" +
-	"\xc9\xaf6\xf7\xf5\xe0\xf3l\x0b\xb2E\xc0\x11.\xd0|" +
-	"\xc3\xa7\x02\xf4[\\\x06\xf3\xe3/\xe7\x07\x87\xeb\xa5=" +
-	"\xa8\x16\x09\xd8\xc5`\x9b/\x8a\xc1.\xbb`~\xd6\xa9" +
-	"\xb5\xb3\xa3\x1f\xd7\x90o\xad\xdc\xac\xceN7\xd6nv" +
-	"\x006O8\xa5\x7fI\x17\xf0/\xf8\xd3\xf7\x84\x8bZ" +
-	"\x9e\xfc\x1b6\x06\xdaDn\x9c\xa4\xe3\xa5\xe8O\x986" +
-	"\xe6\xa1\xfe['q\xd2\xf9\xaaM\x14\x07w\xdd\xb7Q" +
-	"\x14\xc6Y=\x99\x98\xbf\xd5@\xa7\xfa\xbf\x01T\xc9\xb2" +
-	"\x01\x9b\x80|\xd7\x01T\xd5\xa2\xfa((\xc9\x97\x85\xa1" +
-	"\xfc\xd0\x07T\xcd\xa2j\x0bv\xb3\x95\xef:\xd3\xf4 " +
-	"\xe8\x81\xb9\x89\x86\xb1\xce&)\x18.\xbaG(\xf5C" +
-	"3\x19e4\xca^(y\xbf\x00\xf5\xcc\xa2z%\x98" +
-	"\xa7\xa1I\xc6\xb1\x09\x01\xb0\x0c\xc1\xf2=\x9c\xf3P\\" +
-	"\xa5\xe0\x05\xa4\xb2-\x07X<\xc6\xf93R\xbe\x87\x90" +
-	"\x8e[)\x94z\x0c\xc8\xdb\x00\x00\x00\xff\xff\x17\x1b\x8a" +
-	"\x90"
+const schema_9cf9878fd3dd8473 = "x\xda\xa4\x911\x8b\xd3`\x1c\xc6\x9f\xe7MbZ1" +
+	"\xb4\xafq\x10\xc1A(\x88R\xdbJ)\xd4:X\x14" +
+	"\x14\x9c\xf2v\x17Ik\xa8\xc1\x9a\xc6\xbc\x89\xfa\x01\x04" +
+	"q\x10u\xf7\x13\x08\x0e\x8a\xbbt\xb8\xfd\xe0\xc6\xa3\xc3" +
+	"qS\xf7\xbb\xa1\xd3{\x04\xae\xe5\xc6\x83\xdb\xfe\xfcy" +
+	"x~?x\xea\x07C\xfb\xbew\xdb\x86P\x1d\xe7\x92" +
+	"9\xfa\xfe7\x1c?X\xfe\x80\xec\x11p\x84\x0bt\xd7" +
+	"\xbc,@_\x8a\x0f\xa0\xd9}x\xf8\xef\xff\xd7\xca\x1f" +
+	"\xa8\x1e\x09\xd8e\xe0\x9d\xb8Z\x06\xbe\x88G\xa0\xd9\x1f" +
+	"4\xfb\xf9\xe2\xe91\xe4-\xcb\xe8O\xcb\xbdo\x9f\xd7" +
+	"?\x01v\x7f\x8b_\xf4w\xcaF\x7f!\x9e\xf9+\xe1" +
+	"bb\xd27\xd3\xf68\xd4\xb1\x9b\xa4\xd9\xfc}\xfc*" +
+	"\xca\xda\x9b\xa35\x09\xd3$\x1d<\x0eu\x9c\x04\xa7\xbf" +
+	"'\xb38J\xf2VZ\xe8\xd7\x8d \xcc\xc2\xb7\x1aP" +
+	"\x15\xcb\x06l\x02\xf2\xce\x0d@5,\xaa\x8e\xa0$\xaf" +
+	"\x95\x86\xf2\xde\x08PM\x8b\xaa/h\xe5\x1fY7/" +
+	"\xd7\xc5M\xf7\x85\xbf\x02\xc8:ht<M\xc2\xbc\xc8" +
+	"\xc0\x88\x1e\x04=\xf0\"b\xa3H\x17\xb3\x9cZ\xd9[" +
+	"1\xef9\xa0\xaeXT\xd7\x05M\x16\xe9t\x9e\xe8\x08" +
+	"\x00\xab\x10\xac\x9e\xc19\xe7\xc5\xd5J^@*\xdbr" +
+	"\x80\xedn\xdc\xec#\xe5]\x08\xe9\xb8\xb5Ri\xc8\x80" +
+	"<\x09\x00\x00\xff\xff\xbe\xda\x8e*"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{

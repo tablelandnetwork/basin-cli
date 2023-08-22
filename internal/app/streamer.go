@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/ecdsa"
+	"crypto/sha256"
 	"fmt"
 
+	"capnproto.org/go/capnp/v3"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pglogrepl"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
@@ -17,31 +20,24 @@ type Replicator interface {
 	Shutdown()
 }
 
-type (
-	// TxData is the tx encoded data.
-	TxData []byte
-
-	// Signature is the signature of TxData.
-	Signature []byte
-)
-
 // BasinProvider ...
 type BasinProvider interface {
-	Push(context.Context, TxData, Signature) (uint64, error)
+	Push(context.Context, basincapnp.Tx, []byte) (uint64, error)
 }
 
 // BasinStreamer contains logic of streaming Postgres changes to Basin Provider.
 type BasinStreamer struct {
 	replicator Replicator
-	privateKey interface{} // nolint
+	privateKey *ecdsa.PrivateKey
 	provider   BasinProvider
 }
 
 // NewBasinStreamer creates new app.
-func NewBasinStreamer(r Replicator, bp BasinProvider) *BasinStreamer {
+func NewBasinStreamer(r Replicator, bp BasinProvider, pk *ecdsa.PrivateKey) *BasinStreamer {
 	return &BasinStreamer{
 		replicator: r,
 		provider:   bp,
+		privateKey: pk,
 	}
 }
 
@@ -53,30 +49,20 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	}
 
 	for tx := range txs {
-		data, _ := json.MarshalIndent(tx, "", "    ")
-		fmt.Println(string(data))
-
-		_, msg, err := basincapnp.FronPgReplTx(tx)
+		capnpTx, err := basincapnp.FromPgReplTx(tx)
 		if err != nil {
 			return fmt.Errorf("to capnproto: %s", err)
 		}
 
-		txData, err := msg.Marshal()
-		if err != nil {
-			return fmt.Errorf("marshal: %s", err)
-		}
-
-		signature, err := b.sign(txData)
+		signature, err := b.sign(capnpTx)
 		if err != nil {
 			return fmt.Errorf("sign: %s", err)
 		}
 
-		response, err := b.provider.Push(ctx, txData, signature)
+		_, err = b.provider.Push(ctx, capnpTx, signature)
 		if err != nil {
 			return fmt.Errorf("push: %s", err)
 		}
-
-		fmt.Println(response)
 
 		if err := b.replicator.Commit(ctx, tx.CommitLSN); err != nil {
 			return fmt.Errorf("commit: %s", err)
@@ -86,7 +72,17 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	return nil
 }
 
-func (b *BasinStreamer) sign([]byte) ([]byte, error) {
-	// TODO: implement this
-	return []byte{}, nil
+func (b *BasinStreamer) sign(tx basincapnp.Tx) ([]byte, error) {
+	bytes, err := capnp.Canonicalize(tx.ToPtr().Struct())
+	if err != nil {
+		return []byte{}, fmt.Errorf("canonicalize: %s", err)
+	}
+
+	hash := sha256.Sum256(bytes)
+	signature, err := crypto.Sign(hash[:], b.privateKey)
+	if err != nil {
+		return []byte{}, fmt.Errorf("sign: %s", err)
+	}
+
+	return signature, nil
 }

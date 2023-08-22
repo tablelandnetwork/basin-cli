@@ -19,6 +19,8 @@ func init() {
 }
 
 func TestInitCommand(t *testing.T) {
+	dir, _ := defaultConfigLocation(t.TempDir())
+
 	RunTest(t, func(c expectConsole) {
 		c.ExpectString("Enter your Postgres host: ")
 		c.SendLine("127.0.0.1")
@@ -30,6 +32,8 @@ func TestInitCommand(t *testing.T) {
 		c.SendLine("")
 		c.ExpectString("Enter your Postgres database:")
 		c.SendLine("db")
+		c.ExpectString("Enter your Private Key:")
+		c.SendLine("f81ab2709b7cf1f2ebbbd50bd730b267879a495318f7aac16bbe7caa8a8f2d8d")
 		c.ExpectString("\033[32mSuccess!\033[0m")
 		c.ExpectString("dbs:")
 		c.ExpectString("postgres:")
@@ -38,8 +42,7 @@ func TestInitCommand(t *testing.T) {
 		c.ExpectString("host: 127.0.0.1")
 		c.ExpectString("port: 5432")
 		c.ExpectString("database: db")
-
-		dir, _ := defaultConfigLocation("")
+		c.ExpectString("private_key: f81ab2709b7cf1f2ebbbd50bd730b267879a495318f7aac16bbe7caa8a8f2d8d")
 		c.ExpectString(fmt.Sprintf("written to %s/config.yaml", dir))
 
 		c.ExpectEOF()
@@ -52,7 +55,7 @@ func TestInitCommand(t *testing.T) {
 
 		args := os.Args[0:1] // Name of the program.
 
-		return cliApp.Run(append(args, "setup"))
+		return cliApp.Run(append(args, "setup", "--dir", dir))
 	})
 }
 

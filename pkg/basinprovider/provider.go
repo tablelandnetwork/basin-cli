@@ -2,9 +2,9 @@ package basinprovider
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
-	"capnproto.org/go/capnp/v3"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 )
@@ -24,9 +24,9 @@ func New(s BasinProviderClient) *BasinProvider {
 }
 
 // Push pushes Postgres tx to the server.
-func (bp *BasinProvider) Push(ctx context.Context, data app.TxData, sig app.Signature) (uint64, error) {
+func (bp *BasinProvider) Push(ctx context.Context, tx basincapnp.Tx, sig []byte) (uint64, error) {
 	f, release := bp.s.Push(ctx, func(bp BasinProviderClient_push_Params) error {
-		_ = bp.SetTxData(data)
+		_ = bp.SetTx(tx)
 		_ = bp.SetSignature(sig)
 
 		return nil
@@ -51,23 +51,20 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return err
 	}
 
-	txData, err := call.Args().TxData()
+	tx, err := call.Args().Tx()
 	if err != nil {
 		return err
 	}
 
-	msg, err := capnp.Unmarshal(txData)
-	if err != nil {
-		return err
-	}
-
-	tx, err := basincapnp.ReadRootTx(msg)
+	signature, err := call.Args().Signature()
 	if err != nil {
 		return err
 	}
 
 	records, _ := tx.Records()
+
 	fmt.Println(records.At(0).Action())
+	fmt.Println(hex.EncodeToString(signature))
 
 	res.SetResponse(tx.CommitLSN())
 	return nil
