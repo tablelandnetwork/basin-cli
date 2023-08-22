@@ -32,7 +32,7 @@ func TestBasinProvider_Push(t *testing.T) {
 }
 
 func newTx(t *testing.T, tx *pgrepl.Tx) []byte {
-	_, msg, err := basincapnp.FronPgReplTx(tx)
+	_, msg, err := basincapnp.FromPgReplTx(tx)
 	require.NoError(t, err)
 
 	txData, err := msg.Marshal()

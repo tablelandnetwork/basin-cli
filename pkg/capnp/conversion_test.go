@@ -31,7 +31,7 @@ func TestConversion(t *testing.T) {
 		},
 	}
 
-	capnptx, _, err := FronPgReplTx(tx)
+	capnptx, _, err := FromPgReplTx(tx)
 	require.NoError(t, err)
 
 	requireEqualsTx(t, tx, capnptx)

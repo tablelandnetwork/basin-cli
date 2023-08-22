@@ -56,7 +56,6 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return err
 	}
 
-	// let's decode the tx data to see if we get the correct commit LSN
 	msg, err := capnp.Unmarshal(txData)
 	if err != nil {
 		return err

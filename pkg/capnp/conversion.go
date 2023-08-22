@@ -7,8 +7,8 @@ import (
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
-// FronPgReplTx converts Tx to its capnp verson.
-func FronPgReplTx(tx *pgrepl.Tx) (Tx, *capnp.Message, error) {
+// FromPgReplTx converts Tx to its capnp verson.
+func FromPgReplTx(tx *pgrepl.Tx) (Tx, *capnp.Message, error) {
 	// TODO: better error handling
 
 	msg, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
