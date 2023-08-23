@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pglogrepl"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
+	"golang.org/x/exp/slog"
 )
 
 // Replicator replicates Postgres txs into a channel.
@@ -49,6 +50,8 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	}
 
 	for tx := range txs {
+		slog.Info("new transaction receive")
+
 		capnpTx, err := basincapnp.FromPgReplTx(tx)
 		if err != nil {
 			return fmt.Errorf("to capnproto: %s", err)
@@ -67,6 +70,8 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 		if err := b.replicator.Commit(ctx, tx.CommitLSN); err != nil {
 			return fmt.Errorf("commit: %s", err)
 		}
+
+		slog.Info("transaction acked")
 	}
 
 	return nil

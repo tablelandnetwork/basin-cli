@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
+	"golang.org/x/exp/slog"
 )
 
 const (
@@ -20,6 +20,15 @@ const (
 	// https://github.com/eulerto/wal2json
 	outputPlugin = "wal2json"
 )
+
+// Publication is the name a publication.
+// Currently it corresponds to a table's name.
+type Publication string
+
+// FullName is the name used to create a publication in Postgres.
+func (p Publication) FullName() string {
+	return fmt.Sprintf("pub_basin_%s", p)
+}
 
 // PgReplicator is a component that replicates Postgres data.
 type PgReplicator struct {
@@ -49,7 +58,7 @@ type PgReplicator struct {
 }
 
 // New creates a new Postgres replicator.
-func New(connStr string, slot string) (*PgReplicator, error) {
+func New(connStr string, publication Publication) (*PgReplicator, error) {
 	ctx := context.Background()
 
 	config, err := pgconn.ParseConfig(connStr)
@@ -59,7 +68,7 @@ func New(connStr string, slot string) (*PgReplicator, error) {
 
 	r := &PgReplicator{}
 	r.feed = make(chan *Tx)
-	r.slot = slot
+	r.slot = fmt.Sprintf("basin_%s", publication)
 
 	// Connect to the database
 	pgxConn, err := pgx.Connect(ctx, connStr)
@@ -69,7 +78,7 @@ func New(connStr string, slot string) (*PgReplicator, error) {
 	conn := &Conn{pgxConn}
 	defer func() {
 		if err := conn.Close(ctx); err != nil {
-			log.Println(err)
+			slog.Error("failed to close connection", "error", err)
 		}
 	}()
 
@@ -86,19 +95,20 @@ func New(connStr string, slot string) (*PgReplicator, error) {
 		return nil, fmt.Errorf("ping: %s", err)
 	}
 
-	// Fetch tables will be replicated from publications.
-	r.tables, err = conn.FetchPublicationTables(ctx)
+	// Check if publication exists
+	table, err := conn.GetPublicationTable(ctx, publication)
 	if err != nil {
 		return nil, err
 	}
+	r.tables = []string{table}
 
 	// Fetch the confirmed flush lsn.
-	lsn, err := conn.ConfirmedFlushLSN(ctx, slot)
+	lsn, err := conn.ConfirmedFlushLSN(ctx, r.slot)
 
 	// If no replication slot was found we create one.
 	if errors.Is(err, pgx.ErrNoRows) {
 		result, err := pglogrepl.CreateReplicationSlot(
-			context.Background(), r.pgConn, slot, outputPlugin, pglogrepl.CreateReplicationSlotOptions{
+			context.Background(), r.pgConn, r.slot, outputPlugin, pglogrepl.CreateReplicationSlotOptions{
 				Temporary:      false,
 				SnapshotAction: "NOEXPORT_SNAPSHOT",
 			},
@@ -144,7 +154,7 @@ func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, error) {
 		}}); err != nil {
 		return nil, err
 	}
-	log.Println("Logical replication started on slot", r.slot)
+	slog.Info("Logical replication started", "slot", r.slot)
 
 	go func() {
 		records := []Record{}
@@ -154,8 +164,7 @@ func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, error) {
 		for {
 			record, err := r.consumeRecord(ctx)
 			if err != nil {
-				// TODO: better logging
-				log.Println(err)
+				slog.Error("consume record", "error", err)
 				continue
 			}
 
@@ -174,8 +183,8 @@ func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, error) {
 			if record.Action == "C" {
 				// commit and begin end_lsn should match
 				if record.EndLsn != commitLSN {
-					// TODO: handle this in a better way
-					log.Fatalf("commit and begin end_lsn don't match: (%s, %s)", commitLSN, record.EndLsn)
+					slog.Error("commit and begin end_lsn don't match", "commit_lsn", commitLSN, "end_lsn", record.EndLsn)
+					continue
 				}
 
 				var lsn pglogrepl.LSN
@@ -238,7 +247,7 @@ func (r *PgReplicator) consumeRecord(ctx context.Context) (Record, error) {
 	msg, ok := rawMsg.(*pgproto3.CopyData)
 	if !ok {
 		if msg != nil {
-			log.Printf("unexpected message: %s\n", rawMsg)
+			slog.Error("unexpected message: %s\n", rawMsg)
 		}
 		return Record{}, nil
 	}
@@ -251,7 +260,7 @@ func (r *PgReplicator) consumeRecord(ctx context.Context) (Record, error) {
 		}
 
 		if pkm.ReplyRequested {
-			// TODO: Add INFO log here
+			slog.Info("primary keep alive reply requested")
 
 			if err := r.sendStandbyStatusUpdate(ctx); err != nil {
 				return Record{}, err

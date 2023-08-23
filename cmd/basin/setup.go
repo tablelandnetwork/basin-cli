@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// TODO: remove later.
 func newSetupCommand(s terminal.Stdio) *cli.Command {
 	return &cli.Command{
 		Name:  "setup",
@@ -97,7 +98,6 @@ func newSetupCommand(s terminal.Stdio) *cli.Command {
 			cfg.DBS.Postgres.User = answers.User
 			cfg.DBS.Postgres.Password = answers.Password
 			cfg.DBS.Postgres.Database = answers.Database
-			cfg.PrivateKey = answers.PrivateKey
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
 				return fmt.Errorf("encode: %s", err)

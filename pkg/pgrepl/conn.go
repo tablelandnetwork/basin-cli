@@ -42,6 +42,26 @@ func (c *Conn) FetchPublicationTables(ctx context.Context) ([]string, error) {
 	return tables, nil
 }
 
+// GetPublicationTable checks if the publication exists for a given table.
+func (c *Conn) GetPublicationTable(ctx context.Context, p Publication) (string, error) {
+	var schema, table string
+	err := c.QueryRow(ctx,
+		`
+			SELECT schemaname, tablename 
+			FROM pg_publication p
+			JOIN pg_publication_tables pt ON p.pubname = pt.pubname
+			WHERE p.pubname = $1
+		`, p.FullName(),
+	).Scan(&schema, &table)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("publication does not exist")
+	} else if err != nil {
+		return "", fmt.Errorf("query: %s", err)
+	}
+
+	return fmt.Sprintf("%s.%s", schema, table), nil
+}
+
 // ConfirmedFlushLSN fetches the confirmed flush LSN.
 func (c *Conn) ConfirmedFlushLSN(ctx context.Context, slot string) (pglogrepl.LSN, error) {
 	var lsn pglogrepl.LSN

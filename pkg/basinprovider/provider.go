@@ -2,8 +2,6 @@ package basinprovider
 
 import (
 	"context"
-	"encoding/hex"
-	"fmt"
 
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
@@ -56,15 +54,12 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return err
 	}
 
-	signature, err := call.Args().Signature()
-	if err != nil {
-		return err
-	}
+	// signature, err := call.Args().Signature()
+	// if err != nil {
+	// 	return err
+	// }
 
-	records, _ := tx.Records()
-
-	fmt.Println(records.At(0).Action())
-	fmt.Println(hex.EncodeToString(signature))
+	// records, _ := tx.Records()
 
 	res.SetResponse(tx.CommitLSN())
 	return nil

@@ -1,6 +1,6 @@
 module github.com/tablelandnetwork/basin-cli
 
-go 1.19
+go 1.21
 
 require (
 	capnproto.org/go/capnp/v3 v3.0.0-alpha-29
@@ -15,9 +15,9 @@ require (
 	github.com/lib/pq v1.2.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/ory/dockertest/v3 v3.10.0
-	github.com/rs/zerolog v1.30.0
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
+	golang.org/x/exp v0.0.0-20230810033253-352e893a4cad
 	google.golang.org/grpc v1.57.0
 	gopkg.in/yaml.v3 v3.0.1
 )

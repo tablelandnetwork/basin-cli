@@ -16,7 +16,7 @@ type config struct {
 			Database string `yaml:"database"`
 		} `yaml:"postgres"`
 	} `yaml:"dbs"`
-	PrivateKey string `yaml:"private_key"`
+	Address string `yaml:"address"`
 }
 
 func loadConfig(path string) (*config, error) {

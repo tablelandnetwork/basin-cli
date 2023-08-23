@@ -2,38 +2,27 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path"
-	"time"
 
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/mitchellh/go-homedir"
-	"github.com/rs/zerolog"
-	zlog "github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/exp/slog"
 )
 
 func main() {
-	zlog.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).
-		Level(zerolog.TraceLevel).
-		With().
-		Timestamp().
-		Caller().
-		Int("pid", os.Getpid()).
-		Logger()
-
 	cliApp := &cli.App{
 		Name:  "basin",
 		Usage: "basin replicates your database as logs and store them in Filecoin",
 		Commands: []*cli.Command{
-			newSetupCommand(terminal.Stdio{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}),
-			newReplicatecommand(),
+			newPublication(),
+			newWalletCommand(),
 		},
 	}
 
 	if err := cliApp.Run(os.Args); err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 }
 

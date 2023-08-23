@@ -93,10 +93,10 @@ func TestReplication(t *testing.T) {
 
 	_, err = db.ExecContext(context.Background(), `
 		create table t(id int primary key, name text);
-		create publication test for table t;
+		create publication pub_basin_t for table t;
 	`)
 	require.NoError(t, err)
-	replicator, err := New(databaseURL, "test")
+	replicator, err := New(databaseURL, "t")
 	require.NoError(t, err)
 
 	feed, err := replicator.StartReplication(context.Background())

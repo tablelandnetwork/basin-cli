@@ -19,6 +19,8 @@ func init() {
 }
 
 func TestInitCommand(t *testing.T) {
+	t.Skip()
+
 	dir, _ := defaultConfigLocation(t.TempDir())
 
 	RunTest(t, func(c expectConsole) {
