@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/sha256"
 	"fmt"
 
 	"capnproto.org/go/capnp/v3"
@@ -84,8 +83,8 @@ func (b *BasinStreamer) sign(tx basincapnp.Tx) ([]byte, error) {
 		return []byte{}, fmt.Errorf("canonicalize: %s", err)
 	}
 
-	hash := sha256.Sum256(bytes)
-	signature, err := crypto.Sign(hash[:], b.privateKey)
+	hash := crypto.Keccak256Hash(bytes)
+	signature, err := crypto.Sign(hash.Bytes(), b.privateKey)
 	if err != nil {
 		return []byte{}, fmt.Errorf("sign: %s", err)
 	}

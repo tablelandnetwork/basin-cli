@@ -12,10 +12,9 @@ import (
 )
 
 func main() {
-	client := basinprovider.BasinProviderClient_ServerToClient(&basinprovider.BasinServerMock{})
+	client := basinprovider.BasinProviderClient_ServerToClient(basinprovider.NewBasinServerMock(os.Getenv("ETH_ADDRESS")))
 
 	ctx := context.Background()
-
 	listener, err := net.Listen("tcp", "localhost:8080")
 	if err != nil {
 		log.Fatal(err)

@@ -1,11 +1,17 @@
 package basinprovider
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
+	"capnproto.org/go/capnp/v3"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
+	"golang.org/x/crypto/sha3"
 )
 
 // BasinProvider implements the app.BasinProvider interface.
@@ -41,7 +47,16 @@ func (bp *BasinProvider) Push(ctx context.Context, tx basincapnp.Tx, sig []byte)
 }
 
 // BasinServerMock is a mocked version of a server implementation.
-type BasinServerMock struct{}
+type BasinServerMock struct {
+	adddess string
+}
+
+// NewBasinServerMock creates new *BasinServerMock.
+func NewBasinServerMock(addr string) *BasinServerMock {
+	return &BasinServerMock{
+		adddess: addr,
+	}
+}
 
 // Push handles the Push request.
 func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push) error {
@@ -55,10 +70,38 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return err
 	}
 
-	fmt.Println(tx.CommitLSN())
+	signature, err := call.Args().Signature()
+	if err != nil {
+		return err
+	}
+
+	data, err := capnp.Canonicalize(tx.ToPtr().Struct())
+	if err != nil {
+		return fmt.Errorf("canonicalize: %s", err)
+	}
+
+	fmt.Println("VERIFIED: ", s.verifySignature(data, signature) == nil)
 
 	res.SetResponse(tx.CommitLSN())
 	return nil
 }
 
 func (s *BasinServerMock) mustEmbedUnimplementedBasinProviderServer() {} // nolint
+
+func (s *BasinServerMock) verifySignature(messaage []byte, signature []byte) error {
+	hash := crypto.Keccak256Hash(messaage)
+	sigPublicKey, err := crypto.Ecrecover(hash.Bytes(), signature)
+	if err != nil {
+		return fmt.Errorf("ecrecover: %s", err)
+	}
+
+	publicKeyBytes := common.HexToAddress(s.adddess).Bytes()
+
+	h := sha3.NewLegacyKeccak256()
+	h.Write(sigPublicKey[1:])
+	if !bytes.Equal(publicKeyBytes, h.Sum(nil)[12:]) {
+		return errors.New("failed to verify")
+	}
+
+	return nil
+}

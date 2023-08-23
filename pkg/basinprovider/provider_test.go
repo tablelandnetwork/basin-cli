@@ -42,7 +42,7 @@ func newServer() *BasinProvider {
 	buffer := 101024 * 1024
 	lis := bufconn.Listen(buffer)
 
-	srv := BasinProviderClient_ServerToClient(&BasinServerMock{})
+	srv := BasinProviderClient_ServerToClient(NewBasinServerMock("0x302e13801597Bff42e6CA44B59aFbe5E9e1c5fDd"))
 	bootstrapClient := capnp.Client(srv)
 
 	go func() {
