@@ -29,6 +29,12 @@ basin publication create  --dburi [DBURI] --address [ETH_ADDRESS] table_name
 
 ### Start replicating a publication
 
-```basb
+```bash
 basin publication start --private-key [PRIVATE_KEY] --name table_name
+```
+
+### Create a wallet
+
+```bash
+basin wallet create [OUTPUT]
 ```
