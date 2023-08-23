@@ -2,6 +2,7 @@ package basinprovider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
@@ -54,12 +55,7 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return err
 	}
 
-	// signature, err := call.Args().Signature()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// records, _ := tx.Records()
+	fmt.Println(tx.CommitLSN())
 
 	res.SetResponse(tx.CommitLSN())
 	return nil

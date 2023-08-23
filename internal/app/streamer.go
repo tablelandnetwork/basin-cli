@@ -49,6 +49,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 		return fmt.Errorf("start replication: %s", err)
 	}
 
+	// TODO: implement a retry mechanism
 	for tx := range txs {
 		slog.Info("new transaction receive")
 

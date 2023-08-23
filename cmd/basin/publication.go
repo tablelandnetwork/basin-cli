@@ -3,10 +3,12 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path"
 	"strings"
 
+	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -14,22 +16,23 @@ import (
 	"github.com/tablelandnetwork/basin-cli/pkg/basinprovider"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
 
-func newPublication() *cli.Command {
+func newPublicationCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "publication",
 		Usage: "publication commands",
 		Subcommands: []*cli.Command{
-			newPublicationCreate(),
+			newPublicationCreateCommand(),
 			newPublicationStartCommand(),
 		},
 	}
 }
 
-func newPublicationCreate() *cli.Command {
-	var address, dburi string
+func newPublicationCreateCommand() *cli.Command {
+	var address, dburi, provider string
 
 	return &cli.Command{
 		Name:  "create",
@@ -39,11 +42,19 @@ func newPublicationCreate() *cli.Command {
 				Name:        "address",
 				Usage:       "wallet address",
 				Destination: &address,
+				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "dburi",
 				Usage:       "PostgreSQL connection string",
 				Destination: &dburi,
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "provider",
+				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Destination: &provider,
+				Value:       DefaultProviderHost,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -53,14 +64,6 @@ func newPublicationCreate() *cli.Command {
 			name := cCtx.Args().First()
 			if name == "" {
 				return errors.New("name is empty")
-			}
-
-			if dburi == "" {
-				return errors.New("dburi is empty")
-			}
-
-			if address == "" {
-				return errors.New("address is empty")
 			}
 
 			pgConfig, err := pgconn.ParseConfig(dburi)
@@ -73,17 +76,18 @@ func newPublicationCreate() *cli.Command {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			cfg := config{}
 			f, err := os.Create(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("os create: %s", err)
 			}
 
+			cfg := config{}
 			cfg.DBS.Postgres.Host = pgConfig.Host
 			cfg.DBS.Postgres.Port = int(pgConfig.Port)
 			cfg.DBS.Postgres.User = pgConfig.User
 			cfg.DBS.Postgres.Password = pgConfig.Password
 			cfg.DBS.Postgres.Database = pgConfig.Database
+			cfg.ProviderHost = provider
 
 			// TODO: figure out what to do with address
 			cfg.Address = address
@@ -128,23 +132,17 @@ func newPublicationStartCommand() *cli.Command {
 				Name:        "private-key",
 				Usage:       "wallet private key",
 				Destination: &privateKey,
+				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "name",
 				Usage:       "publication name",
 				Destination: &publicationName,
+				Required:    true,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
-			if privateKey == "" {
-				return errors.New("private key is empty")
-			}
-
-			if publicationName == "" {
-				return errors.New("publication name is empty")
-			}
-
-			dir, err := defaultConfigLocation("")
+			dir, err := defaultConfigLocation(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
@@ -171,8 +169,19 @@ func newPublicationStartCommand() *cli.Command {
 			if err != nil {
 				return err
 			}
+			conn, err := net.Dial("tcp", cfg.ProviderHost)
+			if err != nil {
+				return fmt.Errorf("failed to connect to provider: %s", err)
+			}
 
-			bp := basinprovider.New(basinprovider.BasinProviderClient_ServerToClient(&basinprovider.BasinServerMock{}))
+			rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
+			defer func() {
+				if err := rpcConn.Close(); err != nil {
+					slog.Error(err.Error())
+				}
+			}()
+
+			bp := basinprovider.New(basinprovider.BasinProviderClient(rpcConn.Bootstrap(cCtx.Context)))
 			basinStreamer := app.NewBasinStreamer(r, bp, privateKey)
 			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				return fmt.Errorf("run: %s", err)
