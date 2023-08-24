@@ -14,11 +14,14 @@ import (
 func main() {
 	client := basinprovider.BasinProviderClient_ServerToClient(basinprovider.NewBasinServerMock(os.Getenv("ETH_ADDRESS")))
 
-	ctx := context.Background()
-	listener, err := net.Listen("tcp", "localhost:8080")
+	listener, err := net.Listen("tcp", "localhost:"+os.Getenv("PORT"))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Printf("Listening of port %s\n", os.Getenv("PORT"))
+	log.Printf("Receiving data from adddress %s\n", os.Getenv("ETH_ADDRESS"))
+
 	conn, err := listener.Accept()
 	if err != nil {
 		log.Fatal(err)
@@ -28,6 +31,7 @@ func main() {
 	})
 	defer conn.Close()
 
+	ctx := context.Background()
 	// Block until the connection terminates.
 	select {
 	case <-rpcConn.Done():

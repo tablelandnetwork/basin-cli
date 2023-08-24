@@ -36,5 +36,28 @@ basin publication start --private-key [PRIVATE_KEY] --name table_name
 ### Create a wallet
 
 ```bash
-basin wallet create [OUTPUT]
+basin wallet create filename
 ```
+
+## Running Locally
+
+You can make use of the scripts inside `scripts` to facilitate running the CLI locally without building.
+
+```bash
+# Starting the Provider Server
+PORT=8888 ETH_ADDRESS=0x8773d1D1BB8A4Bb2bc5EA1d55E2614aEdbe5351c ./scripts/server.sh
+
+# Create a wallet
+./scripts/run.sh wallet create pk.out  
+
+# Start replicating
+./scripts/run.sh publication start --name t --private-key ae91bbaffac7beb8143dc6ea5ef50aa2d37274c581f2b3f7a5faa2d6ee86b3bd 
+```
+
+## Run tests
+
+```bash
+make test
+```
+
+Note: One of the tests requires Docker Engine to be running.

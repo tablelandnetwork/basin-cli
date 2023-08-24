@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -46,7 +47,7 @@ func (bp *BasinProvider) Push(ctx context.Context, tx basincapnp.Tx, sig []byte)
 	return res.Response(), nil
 }
 
-// BasinServerMock is a mocked version of a server implementation.
+// BasinServerMock is a mocked version of a server implementation using for testing.
 type BasinServerMock struct {
 	adddess string
 }
@@ -80,7 +81,7 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return fmt.Errorf("canonicalize: %s", err)
 	}
 
-	fmt.Println("VERIFIED: ", s.verifySignature(data, signature) == nil)
+	log.Printf("VERIFIED: %t\n", s.verifySignature(data, signature) == nil)
 
 	res.SetResponse(tx.CommitLSN())
 	return nil
