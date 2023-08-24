@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pglogrepl"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,10 @@ func TestBasinStreamer(t *testing.T) {
 		sig []byte
 	})
 
-	streamer := NewBasinStreamer(&replicatorMock{feed: feed}, &basinProviderMock{feedback: feedback}, privateKey)
+	streamer := NewBasinStreamer(&replicatorMock{feed: feed}, &basinProviderMock{
+		feedback: feedback,
+		owner:    make(map[string]string),
+	}, privateKey)
 	go func() {
 		err = streamer.Run(context.Background())
 		require.NoError(t, err)
@@ -76,8 +80,8 @@ type replicatorMock struct {
 
 var _ Replicator = (*replicatorMock)(nil)
 
-func (rm *replicatorMock) StartReplication(_ context.Context) (chan *pgrepl.Tx, error) {
-	return rm.feed, nil
+func (rm *replicatorMock) StartReplication(_ context.Context) (chan *pgrepl.Tx, string, error) {
+	return rm.feed, "", nil
 }
 
 func (rm *replicatorMock) Commit(_ context.Context, _ pglogrepl.LSN) error {
@@ -93,13 +97,23 @@ type basinProviderMock struct {
 		tx  basincapnp.Tx
 		sig []byte
 	}
+	owner map[string]string
 }
 
-func (bp *basinProviderMock) Push(_ context.Context, tx basincapnp.Tx, signature []byte) (uint64, error) {
+func (bp *basinProviderMock) Push(
+	_ context.Context, _ string, tx basincapnp.Tx, signature []byte,
+) (uint64, error) {
 	bp.feedback <- struct {
 		tx  basincapnp.Tx
 		sig []byte
 	}{tx, signature}
 
 	return 1, nil
+}
+
+func (bp *basinProviderMock) Create(
+	_ context.Context, pubName string, owner common.Address, _ basincapnp.Schema,
+) error {
+	bp.owner[pubName] = owner.Hex()
+	return nil
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 
@@ -12,31 +12,36 @@ import (
 )
 
 func main() {
-	client := basinprovider.BasinProviderClient_ServerToClient(basinprovider.NewBasinServerMock(os.Getenv("ETH_ADDRESS")))
+	client := basinprovider.BasinProviderClient_ServerToClient(basinprovider.NewBasinServerMock())
 
 	listener, err := net.Listen("tcp", "localhost:"+os.Getenv("PORT"))
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		os.Exit(1)
 	}
 
-	log.Printf("Listening of port %s\n", os.Getenv("PORT"))
-	log.Printf("Receiving data from adddress %s\n", os.Getenv("ETH_ADDRESS"))
+	slog.Info("Listening of port", "port", os.Getenv("PORT"))
 
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Fatal(err)
-	}
-	rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), &rpc.Options{
-		BootstrapClient: capnp.Client(client),
-	})
-	defer conn.Close()
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+		rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), &rpc.Options{
+			BootstrapClient: capnp.Client(client),
+		})
+		defer conn.Close()
 
-	ctx := context.Background()
-	// Block until the connection terminates.
-	select {
-	case <-rpcConn.Done():
-		os.Exit(0)
-	case <-ctx.Done():
-		conn.Close()
+		ctx := context.Background()
+
+		// Block until the connection terminates.
+		select {
+		case <-rpcConn.Done():
+			slog.Info("connection closed")
+		case <-ctx.Done():
+			conn.Close()
+		}
+
 	}
 }

@@ -500,42 +500,258 @@ func (f Tx_Record_PrimaryKey_Future) Struct() (Tx_Record_PrimaryKey, error) {
 	return Tx_Record_PrimaryKey(p.Struct()), err
 }
 
-const schema_8c49da2775b6e7db = "x\xda|\x92\xcdk\xd4l\x14\xc5\xcfyn\xd2i\xa1" +
-	"}\xfb\x86\x0c}\xdfM\xa9\x94BU\xec\x97u5\x9b" +
-	")\xadB\x8b\xa3\xcc\xd3V\xa4\x05\x918\x06\x1d\x9c\xcc" +
-	"\x84i\xc6vVn]\xb8\x14DP\xecB\xa1\x82\xc5" +
-	"\x0f\xc4\x9dPE\xf0/\xe8\xa6\x0a\xee\x14\x0b\x82\x1b\x17" +
-	"\x16%\x92\xa9I\xa3\x88\xbb<7\x97{\xce\xf9\xdd;" +
-	":\xc7\x09c\xac\xeb\xb5\x82\xd2\xfb\xcc\xb6ww\xb67" +
-	"z\xa6\xfaoX\xbd\x0c\xa7w\x9e\x16\xde\x0f\xec\xac\xc3" +
-	"T\x19`|\x86\x93\xb4\x17\x98\x01\xecS\\F\xea\xbf" +
-	"\xd5\xc3\xf0\xec\xd7Fo\xe6\x8c\xfd\x11f[\xd4\xf1\x98" +
-	"\xdb\xf6s\x0e\x02\xe3\x9b<M0\xfcvu\xe1ea" +
-	"\xf3\xf3\x16~\x9d,\xad\xc9\xd2O{AZ\x93\xe5!" +
-	"R\xc3\xb4M\x86o><k\x0cn\xcd\\\x83\xd9\x12" +
-	"\xff$O\xec/\xf2\x1f`\x7f\x97e\x0c\x85\xfe\xa5\x0b" +
-	"#%\xc7\xaf\x1a\xfeH\xb02\x1c}\xf9\xb9\xf9\x95\xe1" +
-	"Y\xb7T\xab\x9f\x1f.\xd6\xcb\x9eSo\x1ew\x9b(" +
-	"\x92\xba]\x0c\xc0 `\x1d8\x08\xe8\x01\xa1\x1eU\xb4" +
-	"\xc8,\xa3\xe2PT\xdc/\xd4G\x14\xbb\xab\x8e\xe7\xb2" +
-	"\x13\x8a\x9d`w\xd0\xf4\x93G\"\xa9~\x97\xec\x8e4" +
-	"u;\xd3y;r\x09Ts1?U\xab4\xbcj" +
-	"\x18\xdb\x82\xb8M\xfd\x7fb\xeaf\x0e\xd0\xd7\x85z5" +
-	"e\xea\xf6,\xa0o\x09\xf5\x9a\xa2\xa5T\x96\x0a\xb0\xee" +
-	"E\x9d\xabB\xfd@\xd1\x12\xc9R\x00\xeb\xfea@\xdf" +
-	"\x15\xeaG\x8a\x96adi\x00\xd6z\xd4\xb9&\xd4\xaf" +
-	"\x14-\xd3\xcc\xd2\x04\xac\x17\x8b\x80\xde\x10\xea\xb7\x8ay" +
-	"\xa7\x14\x94k\xd5$]P\xf6\xdc\xa5\xc0\xf1@?\xae" +
-	"\xe5\x97J\x17]\xcf\x89\x9f}\x81s\xae\x92\xe0\xc8\x97" +
-	"\xa2LK\xfc\x07,\x0a\xf9\xef^v0*\x86~*" +
-	"l\xd2\x15C\x89{~\"\x95?nq\xaaV\xc94" +
-	"\xbcj\xb4\xc1\xce\x04\xd6\xb1hY\x13B]H\xc1\x9a" +
-	"\x89\x8aG\x85\xba\x98\x82u\"\xe22-\xd4\xf3\x7f[" +
-	"k\xdfe\xa7\xd2p\xd9\x05\xc5\xae\x94#\xc6\x8e\xfaZ" +
-	"\x96\xb4\xc1\xf4\xe93\x97\xdf\xf5\x98>\xad\xd9\xbd+\x8a" +
-	"}\x8dM\x02\xfa\x90PO+\x86\xa5\x9a\xe7\x95\x83\xc2" +
-	"\x1cx\x92\x1dP\xec\x00\xaf\xd4[SR\x14\x13\x8d]" +
-	"B?\x02\x00\x00\xff\xff1p\xe4a"
+type Schema capnp.Struct
+
+// Schema_TypeID is the unique identifier for the type Schema.
+const Schema_TypeID = 0xb2c63295c6bcc643
+
+func NewSchema(s *capnp.Segment) (Schema, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Schema(st), err
+}
+
+func NewRootSchema(s *capnp.Segment) (Schema, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Schema(st), err
+}
+
+func ReadRootSchema(msg *capnp.Message) (Schema, error) {
+	root, err := msg.Root()
+	return Schema(root.Struct()), err
+}
+
+func (s Schema) String() string {
+	str, _ := text.Marshal(0xb2c63295c6bcc643, capnp.Struct(s))
+	return str
+}
+
+func (s Schema) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Schema) DecodeFromPtr(p capnp.Ptr) Schema {
+	return Schema(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Schema) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Schema) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Schema) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Schema) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Schema) Colums() (Schema_Column_List, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return Schema_Column_List(p.List()), err
+}
+
+func (s Schema) HasColums() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Schema) SetColums(v Schema_Column_List) error {
+	return capnp.Struct(s).SetPtr(0, v.ToPtr())
+}
+
+// NewColums sets the colums field to a newly
+// allocated Schema_Column_List, preferring placement in s's segment.
+func (s Schema) NewColums(n int32) (Schema_Column_List, error) {
+	l, err := NewSchema_Column_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return Schema_Column_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(0, l.ToPtr())
+	return l, err
+}
+
+// Schema_List is a list of Schema.
+type Schema_List = capnp.StructList[Schema]
+
+// NewSchema creates a new list of Schema.
+func NewSchema_List(s *capnp.Segment, sz int32) (Schema_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Schema](l), err
+}
+
+// Schema_Future is a wrapper for a Schema promised by a client call.
+type Schema_Future struct{ *capnp.Future }
+
+func (f Schema_Future) Struct() (Schema, error) {
+	p, err := f.Future.Ptr()
+	return Schema(p.Struct()), err
+}
+
+type Schema_Column capnp.Struct
+
+// Schema_Column_TypeID is the unique identifier for the type Schema_Column.
+const Schema_Column_TypeID = 0xc6ee33dc50be1a5a
+
+func NewSchema_Column(s *capnp.Segment) (Schema_Column, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
+	return Schema_Column(st), err
+}
+
+func NewRootSchema_Column(s *capnp.Segment) (Schema_Column, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
+	return Schema_Column(st), err
+}
+
+func ReadRootSchema_Column(msg *capnp.Message) (Schema_Column, error) {
+	root, err := msg.Root()
+	return Schema_Column(root.Struct()), err
+}
+
+func (s Schema_Column) String() string {
+	str, _ := text.Marshal(0xc6ee33dc50be1a5a, capnp.Struct(s))
+	return str
+}
+
+func (s Schema_Column) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Schema_Column) DecodeFromPtr(p capnp.Ptr) Schema_Column {
+	return Schema_Column(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Schema_Column) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Schema_Column) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Schema_Column) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Schema_Column) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Schema_Column) Name() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Schema_Column) HasName() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Schema_Column) NameBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Schema_Column) SetName(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Schema_Column) Type() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Schema_Column) HasType() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Schema_Column) TypeBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Schema_Column) SetType(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s Schema_Column) IsNullable() bool {
+	return capnp.Struct(s).Bit(0)
+}
+
+func (s Schema_Column) SetIsNullable(v bool) {
+	capnp.Struct(s).SetBit(0, v)
+}
+
+func (s Schema_Column) IsPartOfPrimaryKey() bool {
+	return capnp.Struct(s).Bit(1)
+}
+
+func (s Schema_Column) SetIsPartOfPrimaryKey(v bool) {
+	capnp.Struct(s).SetBit(1, v)
+}
+
+// Schema_Column_List is a list of Schema_Column.
+type Schema_Column_List = capnp.StructList[Schema_Column]
+
+// NewSchema_Column creates a new list of Schema_Column.
+func NewSchema_Column_List(s *capnp.Segment, sz int32) (Schema_Column_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2}, sz)
+	return capnp.StructList[Schema_Column](l), err
+}
+
+// Schema_Column_Future is a wrapper for a Schema_Column promised by a client call.
+type Schema_Column_Future struct{ *capnp.Future }
+
+func (f Schema_Column_Future) Struct() (Schema_Column, error) {
+	p, err := f.Future.Ptr()
+	return Schema_Column(p.Struct()), err
+}
+
+const schema_8c49da2775b6e7db = "x\xda|\x94\xc1k#e\x18\xc6\xdf\xe7{g\xb6\x0d" +
+	"4v\x87\x09*\xcbJP\x8b\xbb\x8a\x9b\xddm\xbc\x98" +
+	"K\x16\xa3\xd0\xc5\xb8\xe6\xcd.\x88E\xd1i:5\xa3" +
+	"\x99$&\x13kNz\x14\xd1\x9b\"\x15\xc5\x16\x14*" +
+	"X\x14QAP\xa9\xa2\xf9\x03\x04/\xb5\xe0I\x8b\x1e" +
+	"\xc4K\x0f-\xc2\xc8\x97t&c\x97\xe68\xef\xbc\xf3" +
+	"\xbd\xbf\xe7y\x9fo.\xfd\x8c+\xc6\xe5\xf4*\x93\x92" +
+	"\xf3\xe6\xa9\xdf>\xf8k\xfb\xd6\xd2]\xefX\xf7 \\" +
+	"8\xfc\xa2\xfc\xc7\xdc\xe1\x16\x99j\x8a(\xbf\x81\xd7a" +
+	"\x7f\x8d)\"\xfbK\xacR\xe2\xbd\x95E\xf8\xccA\xef" +
+	"\x8e\xa9\xa7\xed?\xc9<\xa5\x9b-5\x0f\xfbNu\x8e" +
+	"(\xff\xa0z\x02\x84\xb04\xf8f\xf0\xf6\xfc\xe0s\xb2" +
+	"\xce\"\xfcu\xef\xab\xde\xb9\x9d\xabo\x90\xa9\xcf\xcbo" +
+	"\xf1\x19\xd8\xdf\xf2mD\xf6O\\$\x84\x8bg\xbe\xab" +
+	"\xec\xe6\xff\x1e\x90\xdc\x8d\xc4\xa7#\x90}\xae\xc2N\x19" +
+	"\x1a\xc44\xf6\x08\xe1\xbf\xaf=\xf9C\xf9\x97\x7fv\xe8" +
+	"\xff\xd4\xac\x9b\x7f7\x9e\x87}0l\xde7>\xa5\x04" +
+	"\xa8\x9c\xc5q\x10\xfbM\xf3\xd0^35\xc7\x86\xb9J" +
+	"\x17\xc2\xf6\x0b\xcf]\xac9\xed\xa6\xd9\xbe\xb8\xec\xaex" +
+	"M/\xf0Z\xcdnN\x97\xda\x85\x1b/\xe7\xaan\xad" +
+	"\xd5Y\xceU:\x9e\xeft\xfa\x8f\xba}\xa2\x0a \xd3" +
+	"l\x10\x19 \xb2\xee\xbd\x8fH\xe6\x18rI\xc1\x022" +
+	"\xd0\xc5\x0b\xbax\x9e!\x0f(\xcc6\x1d\xdf\xc5\x0c)" +
+	"\xcc\x10f\x83~;~\x88\x87\xf3I\xc3\xb3\xc3\xe92" +
+	"\x8d\xa4\x05\xa9B\xbcCs\xb1Xj5z~3\x8c" +
+	"\x00\x89\xdd\xbe\xdc\x1e\xd3\xad\x15\x88\xe4-\x86\xac'\xe8" +
+	"\xde\xaf\x12\xc9{\x0c\xd9T\xb0\x94\xca@\x11Y\x1f\xe9" +
+	"\xceu\x86|\xa2`1g\xc0D\xd6\xc7\xf3D\xf2!" +
+	"C>S\xb0\x0c#\x03\x83\xc8\xda\xd2\x9d\x9b\x0c\xf9Q" +
+	"\xc12\xcd\x0cL\"\xeb\xfbE\"\xd9f\xc8\xaeB\xd1" +
+	"\xa9i!\xb1\xcc\xc0\xf3\xddn\xe0\xf8\x84vT+v" +
+	"ku\xd7w\xa2\xc7l\xe0,5b_\x8a5\xad\xa9" +
+	"\x8b[\x08\x15\x06N\x8f\xb5\x13t1l'\xc4\xc6]" +
+	"\x91)Q\xcf$o\xaf\xd7\xea.\xfb\x8e\x18H$\xd1" +
+	"B\xe1\xc8M1b\x03\xd3Z\xec4C\xe6\xd4\xcd\\" +
+	"\xf1\xa7\xc7f\x1a'\xcd\xf4\x9d\xdcp\x02\x9a:D\xa7" +
+	"\xe3)\x8e\xce\xcbS\x0c\xa9'\xd6\xe4\xea\xe2\xb3\x0ci" +
+	"(\xe0hK\x9e\xb6\xb9\xce\x90@o\x09\xa3-\xbd\xf8" +
+	".\x91\x04\x0cyub\xda\xbc\xee\xb5^\xa3\xe1,\x11" +
+	"7\\\x80\x140,V\x9cN\xf0\xf8\x0a\xa2\x00iK" +
+	"\xa3\x97\x13\xf5\x8c/G\xa95\xab]\xd3\x92fbI" +
+	"\x8fh\xfa+\x0c)'$]\xd5\xc5\x87\x19RI$" +
+	"\xef1\x1d\xb2\x05\x86\xdc\x98\x84\x9f}\xc9i\xf4\\\xa4" +
+	"I!\x9d@S\xc7\xd1\x8a#\xb6\xe1j\xc7\xff/\x14" +
+	"\x8a\xd5\xa3\xbb4\xbe\xb9\xd5\xf1%\x8d\x00/?D$" +
+	"\xf73dA!\xac\xb5|\xdf\x0b\xca\xd7\x09\xd7\x90\"" +
+	"\x85\x14\xe1\x95\xce\xf0\x94D\x06\xe2\x19\xa3\x0c\xfc\x17\x00" +
+	"\x00\xff\xff\xe0\xda^\x1e"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
@@ -543,6 +759,8 @@ func RegisterSchema(reg *schemas.Registry) {
 		Nodes: []uint64{
 			0x9722004316c0ea9f,
 			0xadfa24e64cb4fa48,
+			0xb2c63295c6bcc643,
+			0xc6ee33dc50be1a5a,
 			0xdaf0d54cc25988fc,
 			0xe9135d071d75f95f,
 		},

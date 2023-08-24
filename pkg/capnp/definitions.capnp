@@ -27,3 +27,14 @@ struct Tx {
         }
     }
 }
+
+struct Schema {
+	colums @0 :List(Column);
+
+	struct Column {
+		name @0 :Text;
+		type  @1 :Text;
+		isNullable @2 :Bool;
+		isPartOfPrimaryKey @3 :Bool;
+	}
+}

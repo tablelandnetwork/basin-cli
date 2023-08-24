@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"capnproto.org/go/capnp/v3"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pglogrepl"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
@@ -15,14 +16,15 @@ import (
 
 // Replicator replicates Postgres txs into a channel.
 type Replicator interface {
-	StartReplication(ctx context.Context) (chan *pgrepl.Tx, error)
+	StartReplication(ctx context.Context) (chan *pgrepl.Tx, string, error)
 	Commit(ctx context.Context, lsn pglogrepl.LSN) error
 	Shutdown()
 }
 
 // BasinProvider ...
 type BasinProvider interface {
-	Push(context.Context, basincapnp.Tx, []byte) (uint64, error)
+	Push(context.Context, string, basincapnp.Tx, []byte) (uint64, error)
+	Create(context.Context, string, common.Address, basincapnp.Schema) error
 }
 
 // BasinStreamer contains logic of streaming Postgres changes to Basin Provider.
@@ -43,7 +45,7 @@ func NewBasinStreamer(r Replicator, bp BasinProvider, pk *ecdsa.PrivateKey) *Bas
 
 // Run runs the BasinStreamer logic.
 func (b *BasinStreamer) Run(ctx context.Context) error {
-	txs, err := b.replicator.StartReplication(ctx)
+	txs, pubName, err := b.replicator.StartReplication(ctx)
 	if err != nil {
 		return fmt.Errorf("start replication: %s", err)
 	}
@@ -62,7 +64,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 			return fmt.Errorf("sign: %s", err)
 		}
 
-		_, err = b.provider.Push(ctx, capnpTx, signature)
+		_, err = b.provider.Push(ctx, pubName, capnpTx, signature)
 		if err != nil {
 			return fmt.Errorf("push: %s", err)
 		}

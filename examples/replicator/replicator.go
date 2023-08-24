@@ -16,7 +16,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	txs, err := replicator.StartReplication(context.Background())
+	txs, _, err := replicator.StartReplication(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}

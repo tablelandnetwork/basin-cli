@@ -17,18 +17,38 @@ type BasinProviderClient capnp.Client
 // BasinProviderClient_TypeID is the unique identifier for the type BasinProviderClient.
 const BasinProviderClient_TypeID = 0xf546c174382c3adb
 
-func (c BasinProviderClient) Push(ctx context.Context, params func(BasinProviderClient_push_Params) error) (BasinProviderClient_push_Results_Future, capnp.ReleaseFunc) {
+func (c BasinProviderClient) Create(ctx context.Context, params func(BasinProviderClient_create_Params) error) (BasinProviderClient_create_Results_Future, capnp.ReleaseFunc) {
 
 	s := capnp.Send{
 		Method: capnp.Method{
 			InterfaceID:   0xf546c174382c3adb,
 			MethodID:      0,
 			InterfaceName: "pkg/basinprovider/provider.capnp:BasinProviderClient",
+			MethodName:    "create",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 3}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(BasinProviderClient_create_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return BasinProviderClient_create_Results_Future{Future: ans.Future()}, release
+
+}
+
+func (c BasinProviderClient) Push(ctx context.Context, params func(BasinProviderClient_push_Params) error) (BasinProviderClient_push_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xf546c174382c3adb,
+			MethodID:      1,
+			InterfaceName: "pkg/basinprovider/provider.capnp:BasinProviderClient",
 			MethodName:    "push",
 		},
 	}
 	if params != nil {
-		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 2}
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 3}
 		s.PlaceArgs = func(s capnp.Struct) error { return params(BasinProviderClient_push_Params(s)) }
 	}
 
@@ -110,6 +130,8 @@ func (c BasinProviderClient) GetFlowLimiter() fc.FlowLimiter {
 
 // A BasinProviderClient_Server is a BasinProviderClient with a local implementation.
 type BasinProviderClient_Server interface {
+	Create(context.Context, BasinProviderClient_create) error
+
 	Push(context.Context, BasinProviderClient_push) error
 }
 
@@ -129,13 +151,25 @@ func BasinProviderClient_ServerToClient(s BasinProviderClient_Server) BasinProvi
 // This can be used to create a more complicated Server.
 func BasinProviderClient_Methods(methods []server.Method, s BasinProviderClient_Server) []server.Method {
 	if cap(methods) == 0 {
-		methods = make([]server.Method, 0, 1)
+		methods = make([]server.Method, 0, 2)
 	}
 
 	methods = append(methods, server.Method{
 		Method: capnp.Method{
 			InterfaceID:   0xf546c174382c3adb,
 			MethodID:      0,
+			InterfaceName: "pkg/basinprovider/provider.capnp:BasinProviderClient",
+			MethodName:    "create",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Create(ctx, BasinProviderClient_create{call})
+		},
+	})
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xf546c174382c3adb,
+			MethodID:      1,
 			InterfaceName: "pkg/basinprovider/provider.capnp:BasinProviderClient",
 			MethodName:    "push",
 		},
@@ -145,6 +179,23 @@ func BasinProviderClient_Methods(methods []server.Method, s BasinProviderClient_
 	})
 
 	return methods
+}
+
+// BasinProviderClient_create holds the state for a server call to BasinProviderClient.create.
+// See server.Call for documentation.
+type BasinProviderClient_create struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c BasinProviderClient_create) Args() BasinProviderClient_create_Params {
+	return BasinProviderClient_create_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c BasinProviderClient_create) AllocResults() (BasinProviderClient_create_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return BasinProviderClient_create_Results(r), err
 }
 
 // BasinProviderClient_push holds the state for a server call to BasinProviderClient.push.
@@ -173,18 +224,210 @@ func NewBasinProviderClient_List(s *capnp.Segment, sz int32) (BasinProviderClien
 	return capnp.CapList[BasinProviderClient](l), err
 }
 
+type BasinProviderClient_create_Params capnp.Struct
+
+// BasinProviderClient_create_Params_TypeID is the unique identifier for the type BasinProviderClient_create_Params.
+const BasinProviderClient_create_Params_TypeID = 0x91dd396261b290f4
+
+func NewBasinProviderClient_create_Params(s *capnp.Segment) (BasinProviderClient_create_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return BasinProviderClient_create_Params(st), err
+}
+
+func NewRootBasinProviderClient_create_Params(s *capnp.Segment) (BasinProviderClient_create_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return BasinProviderClient_create_Params(st), err
+}
+
+func ReadRootBasinProviderClient_create_Params(msg *capnp.Message) (BasinProviderClient_create_Params, error) {
+	root, err := msg.Root()
+	return BasinProviderClient_create_Params(root.Struct()), err
+}
+
+func (s BasinProviderClient_create_Params) String() string {
+	str, _ := text.Marshal(0x91dd396261b290f4, capnp.Struct(s))
+	return str
+}
+
+func (s BasinProviderClient_create_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (BasinProviderClient_create_Params) DecodeFromPtr(p capnp.Ptr) BasinProviderClient_create_Params {
+	return BasinProviderClient_create_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s BasinProviderClient_create_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s BasinProviderClient_create_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s BasinProviderClient_create_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s BasinProviderClient_create_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s BasinProviderClient_create_Params) Name() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s BasinProviderClient_create_Params) HasName() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s BasinProviderClient_create_Params) NameBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s BasinProviderClient_create_Params) SetName(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s BasinProviderClient_create_Params) Owner() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s BasinProviderClient_create_Params) HasOwner() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s BasinProviderClient_create_Params) OwnerBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s BasinProviderClient_create_Params) SetOwner(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s BasinProviderClient_create_Params) Schema() (capnp2.Schema, error) {
+	p, err := capnp.Struct(s).Ptr(2)
+	return capnp2.Schema(p.Struct()), err
+}
+
+func (s BasinProviderClient_create_Params) HasSchema() bool {
+	return capnp.Struct(s).HasPtr(2)
+}
+
+func (s BasinProviderClient_create_Params) SetSchema(v capnp2.Schema) error {
+	return capnp.Struct(s).SetPtr(2, capnp.Struct(v).ToPtr())
+}
+
+// NewSchema sets the schema field to a newly
+// allocated capnp2.Schema struct, preferring placement in s's segment.
+func (s BasinProviderClient_create_Params) NewSchema() (capnp2.Schema, error) {
+	ss, err := capnp2.NewSchema(capnp.Struct(s).Segment())
+	if err != nil {
+		return capnp2.Schema{}, err
+	}
+	err = capnp.Struct(s).SetPtr(2, capnp.Struct(ss).ToPtr())
+	return ss, err
+}
+
+// BasinProviderClient_create_Params_List is a list of BasinProviderClient_create_Params.
+type BasinProviderClient_create_Params_List = capnp.StructList[BasinProviderClient_create_Params]
+
+// NewBasinProviderClient_create_Params creates a new list of BasinProviderClient_create_Params.
+func NewBasinProviderClient_create_Params_List(s *capnp.Segment, sz int32) (BasinProviderClient_create_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3}, sz)
+	return capnp.StructList[BasinProviderClient_create_Params](l), err
+}
+
+// BasinProviderClient_create_Params_Future is a wrapper for a BasinProviderClient_create_Params promised by a client call.
+type BasinProviderClient_create_Params_Future struct{ *capnp.Future }
+
+func (f BasinProviderClient_create_Params_Future) Struct() (BasinProviderClient_create_Params, error) {
+	p, err := f.Future.Ptr()
+	return BasinProviderClient_create_Params(p.Struct()), err
+}
+func (p BasinProviderClient_create_Params_Future) Schema() capnp2.Schema_Future {
+	return capnp2.Schema_Future{Future: p.Future.Field(2, nil)}
+}
+
+type BasinProviderClient_create_Results capnp.Struct
+
+// BasinProviderClient_create_Results_TypeID is the unique identifier for the type BasinProviderClient_create_Results.
+const BasinProviderClient_create_Results_TypeID = 0xb1088dbfb4e33bd0
+
+func NewBasinProviderClient_create_Results(s *capnp.Segment) (BasinProviderClient_create_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return BasinProviderClient_create_Results(st), err
+}
+
+func NewRootBasinProviderClient_create_Results(s *capnp.Segment) (BasinProviderClient_create_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return BasinProviderClient_create_Results(st), err
+}
+
+func ReadRootBasinProviderClient_create_Results(msg *capnp.Message) (BasinProviderClient_create_Results, error) {
+	root, err := msg.Root()
+	return BasinProviderClient_create_Results(root.Struct()), err
+}
+
+func (s BasinProviderClient_create_Results) String() string {
+	str, _ := text.Marshal(0xb1088dbfb4e33bd0, capnp.Struct(s))
+	return str
+}
+
+func (s BasinProviderClient_create_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (BasinProviderClient_create_Results) DecodeFromPtr(p capnp.Ptr) BasinProviderClient_create_Results {
+	return BasinProviderClient_create_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s BasinProviderClient_create_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s BasinProviderClient_create_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s BasinProviderClient_create_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s BasinProviderClient_create_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+
+// BasinProviderClient_create_Results_List is a list of BasinProviderClient_create_Results.
+type BasinProviderClient_create_Results_List = capnp.StructList[BasinProviderClient_create_Results]
+
+// NewBasinProviderClient_create_Results creates a new list of BasinProviderClient_create_Results.
+func NewBasinProviderClient_create_Results_List(s *capnp.Segment, sz int32) (BasinProviderClient_create_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return capnp.StructList[BasinProviderClient_create_Results](l), err
+}
+
+// BasinProviderClient_create_Results_Future is a wrapper for a BasinProviderClient_create_Results promised by a client call.
+type BasinProviderClient_create_Results_Future struct{ *capnp.Future }
+
+func (f BasinProviderClient_create_Results_Future) Struct() (BasinProviderClient_create_Results, error) {
+	p, err := f.Future.Ptr()
+	return BasinProviderClient_create_Results(p.Struct()), err
+}
+
 type BasinProviderClient_push_Params capnp.Struct
 
 // BasinProviderClient_push_Params_TypeID is the unique identifier for the type BasinProviderClient_push_Params.
-const BasinProviderClient_push_Params_TypeID = 0x91dd396261b290f4
+const BasinProviderClient_push_Params_TypeID = 0xaed826faaf7639b0
 
 func NewBasinProviderClient_push_Params(s *capnp.Segment) (BasinProviderClient_push_Params, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
 	return BasinProviderClient_push_Params(st), err
 }
 
 func NewRootBasinProviderClient_push_Params(s *capnp.Segment) (BasinProviderClient_push_Params, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
 	return BasinProviderClient_push_Params(st), err
 }
 
@@ -194,7 +437,7 @@ func ReadRootBasinProviderClient_push_Params(msg *capnp.Message) (BasinProviderC
 }
 
 func (s BasinProviderClient_push_Params) String() string {
-	str, _ := text.Marshal(0x91dd396261b290f4, capnp.Struct(s))
+	str, _ := text.Marshal(0xaed826faaf7639b0, capnp.Struct(s))
 	return str
 }
 
@@ -220,17 +463,35 @@ func (s BasinProviderClient_push_Params) Message() *capnp.Message {
 func (s BasinProviderClient_push_Params) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
-func (s BasinProviderClient_push_Params) Tx() (capnp2.Tx, error) {
+func (s BasinProviderClient_push_Params) PubName() (string, error) {
 	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s BasinProviderClient_push_Params) HasPubName() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s BasinProviderClient_push_Params) PubNameBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s BasinProviderClient_push_Params) SetPubName(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s BasinProviderClient_push_Params) Tx() (capnp2.Tx, error) {
+	p, err := capnp.Struct(s).Ptr(1)
 	return capnp2.Tx(p.Struct()), err
 }
 
 func (s BasinProviderClient_push_Params) HasTx() bool {
-	return capnp.Struct(s).HasPtr(0)
+	return capnp.Struct(s).HasPtr(1)
 }
 
 func (s BasinProviderClient_push_Params) SetTx(v capnp2.Tx) error {
-	return capnp.Struct(s).SetPtr(0, capnp.Struct(v).ToPtr())
+	return capnp.Struct(s).SetPtr(1, capnp.Struct(v).ToPtr())
 }
 
 // NewTx sets the tx field to a newly
@@ -240,21 +501,21 @@ func (s BasinProviderClient_push_Params) NewTx() (capnp2.Tx, error) {
 	if err != nil {
 		return capnp2.Tx{}, err
 	}
-	err = capnp.Struct(s).SetPtr(0, capnp.Struct(ss).ToPtr())
+	err = capnp.Struct(s).SetPtr(1, capnp.Struct(ss).ToPtr())
 	return ss, err
 }
 
 func (s BasinProviderClient_push_Params) Signature() ([]byte, error) {
-	p, err := capnp.Struct(s).Ptr(1)
+	p, err := capnp.Struct(s).Ptr(2)
 	return []byte(p.Data()), err
 }
 
 func (s BasinProviderClient_push_Params) HasSignature() bool {
-	return capnp.Struct(s).HasPtr(1)
+	return capnp.Struct(s).HasPtr(2)
 }
 
 func (s BasinProviderClient_push_Params) SetSignature(v []byte) error {
-	return capnp.Struct(s).SetData(1, v)
+	return capnp.Struct(s).SetData(2, v)
 }
 
 // BasinProviderClient_push_Params_List is a list of BasinProviderClient_push_Params.
@@ -262,7 +523,7 @@ type BasinProviderClient_push_Params_List = capnp.StructList[BasinProviderClient
 
 // NewBasinProviderClient_push_Params creates a new list of BasinProviderClient_push_Params.
 func NewBasinProviderClient_push_Params_List(s *capnp.Segment, sz int32) (BasinProviderClient_push_Params_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3}, sz)
 	return capnp.StructList[BasinProviderClient_push_Params](l), err
 }
 
@@ -274,13 +535,13 @@ func (f BasinProviderClient_push_Params_Future) Struct() (BasinProviderClient_pu
 	return BasinProviderClient_push_Params(p.Struct()), err
 }
 func (p BasinProviderClient_push_Params_Future) Tx() capnp2.Tx_Future {
-	return capnp2.Tx_Future{Future: p.Future.Field(0, nil)}
+	return capnp2.Tx_Future{Future: p.Future.Field(1, nil)}
 }
 
 type BasinProviderClient_push_Results capnp.Struct
 
 // BasinProviderClient_push_Results_TypeID is the unique identifier for the type BasinProviderClient_push_Results.
-const BasinProviderClient_push_Results_TypeID = 0xb1088dbfb4e33bd0
+const BasinProviderClient_push_Results_TypeID = 0x8d55d5b16b665e76
 
 func NewBasinProviderClient_push_Results(s *capnp.Segment) (BasinProviderClient_push_Results, error) {
 	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0})
@@ -298,7 +559,7 @@ func ReadRootBasinProviderClient_push_Results(msg *capnp.Message) (BasinProvider
 }
 
 func (s BasinProviderClient_push_Results) String() string {
-	str, _ := text.Marshal(0xb1088dbfb4e33bd0, capnp.Struct(s))
+	str, _ := text.Marshal(0x8d55d5b16b665e76, capnp.Struct(s))
 	return str
 }
 
@@ -349,34 +610,46 @@ func (f BasinProviderClient_push_Results_Future) Struct() (BasinProviderClient_p
 	return BasinProviderClient_push_Results(p.Struct()), err
 }
 
-const schema_9cf9878fd3dd8473 = "x\xda\xa4\x911\x8b\xd3`\x1c\xc6\x9f\xe7MbZ1" +
-	"\xb4\xafq\x10\xc1A(\x88R\xdbJ)\xd4:X\x14" +
-	"\x14\x9c\xf2v\x17Ik\xa8\xc1\x9a\xc6\xbc\x89\xfa\x01\x04" +
-	"q\x10u\xf7\x13\x08\x0e\x8a\xbbt\xb8\xfd\xe0\xc6\xa3\xc3" +
-	"qS\xf7\xbb\xa1\xd3{\x04\xae\xe5\xc6\x83\xdb\xfe\xfcy" +
-	"x~?x\xea\x07C\xfb\xbew\xdb\x86P\x1d\xe7\x92" +
-	"9\xfa\xfe7\x1c?X\xfe\x80\xec\x11p\x84\x0bt\xd7" +
-	"\xbc,@_\x8a\x0f\xa0\xd9}x\xf8\xef\xff\xd7\xca\x1f" +
-	"\xa8\x1e\x09\xd8e\xe0\x9d\xb8Z\x06\xbe\x88G\xa0\xd9\x1f" +
-	"4\xfb\xf9\xe2\xe91\xe4-\xcb\xe8O\xcb\xbdo\x9f\xd7" +
-	"?\x01v\x7f\x8b_\xf4w\xcaF\x7f!\x9e\xf9+\xe1" +
-	"bb\xd27\xd3\xf68\xd4\xb1\x9b\xa4\xd9\xfc}\xfc*" +
-	"\xca\xda\x9b\xa35\x09\xd3$\x1d<\x0eu\x9c\x04\xa7\xbf" +
-	"'\xb38J\xf2VZ\xe8\xd7\x8d \xcc\xc2\xb7\x1aP" +
-	"\x15\xcb\x06l\x02\xf2\xce\x0d@5,\xaa\x8e\xa0$\xaf" +
-	"\x95\x86\xf2\xde\x08PM\x8b\xaa/h\xe5\x1fY7/" +
-	"\xd7\xc5M\xf7\x85\xbf\x02\xc8:ht<M\xc2\xbc\xc8" +
-	"\xc0\x88\x1e\x04=\xf0\"b\xa3H\x17\xb3\x9cZ\xd9[" +
-	"1\xef9\xa0\xaeXT\xd7\x05M\x16\xe9t\x9e\xe8\x08" +
-	"\x00\xab\x10\xac\x9e\xc19\xe7\xc5\xd5J^@*\xdbr" +
-	"\x80\xedn\xdc\xec#\xe5]\x08\xe9\xb8\xb5Ri\xc8\x80" +
-	"<\x09\x00\x00\xff\xff\xbe\xda\x8e*"
+const schema_9cf9878fd3dd8473 = "x\xda\xa4\x931h\x13_\x1c\xc7\xbf\xdf\xf7.\xffk" +
+	"\xff$4g:hAD\xa9\x0eEZ\xdbR\xb0q" +
+	"HlU\xacT\xc9+\x16tP\xb9\xc4\xd764\xb9" +
+	"\x1c\xf7.Q'\x17!SQ\x87n\xae\x0e\x0aZ[" +
+	"\x1c\x05\xe9\x92Y\x10A\x90N\xe2\xe0\xaeC\x059\xb9" +
+	"\xd4\xc4\x0e\x1d\xa4nw\x8f\x0f\xbf\xdf\x87\xef\xfb\xbeS" +
+	"\x0b\xcc[\xa3\xa9f\x02B\xe5\x13\xffE\x8d\x9b\x0b\xcb" +
+	"\xeb\x1f\xe6W\xa0&H\xc0\xb2\x81\xf1g\xe2\x80\x003" +
+	"\x9b\"\x07F\xdf\x1em\xb8\xc5\xc9\xad\xc7p&\x08$" +
+	"d\x0c|\x11\x031\xf0S\xac\x81\xd1\xab\xc9\xc6\xda\x8f" +
+	"\x13\x1f_\xee\x06V\xe5\xff1\xf0B\xc6\xc0\xbb3\x9f" +
+	"_\xbf]\xe9Y\xdf\x01\xda\x1bf\xacc\x02V\xf4)" +
+	"{\xf2t\xb8y\xe1;\x9c\xa322\x0f\xb6\xde?l" +
+	"n?\x018~\xd6z\xce\xcc\xf5\x18\xcd\xcc[\xcd\xcc" +
+	"S\xcb\xc6\xbd\xc8_^\x1c)\xba\xa6l{~Pk" +
+	"\x94o\xeb`\xa4\xf31\\r}\xcf\xcfN\xb9\xa6\xec" +
+	"\x15~\x9fMW\xca\xda\x0b\x87\xfd\xbaY\x1a\x9c\xd3\xa6" +
+	"^\x09i\x94%-\xc0\"\xe0\xa4.\x01*)\xa9\x0e" +
+	"\x0aF\x816~\xcd3\x1a\x00{!\xd8\x0b\xees]" +
+	")\xd0n\xa8\x07\x0bn\xe0\xca\xaaQ\xc9\xee\xbe\xf3C" +
+	"\x80\xcaK\xaaYA\x87\xec\x8f\xd3vf\xc6\x00uN" +
+	"R\x15\x04\x1d!\xfa)\x00\xe7r\x16P\x17%\xd5U" +
+	"\xc1>\xcf\xadj&!\x98\x04\x8f\xd4\xeex:\xe8\xfc" +
+	"\xe5LiIW]\xa6\xa3\xe9\xd6\x9b\xd6\xeaXk\x03" +
+	" \xd3\xfb6o\x07\x15{WM;\x99\xae\xf8\xd4^" +
+	"\xe2\x03{\x89\xcf\x01jVR]\x13\xbc\xef\xd7\x8bW" +
+	"v\xb9\xcb\xf0.\xd3\xd1\xad\xed\xfaa\xfbF\xe6k\xc7" +
+	"\xd4\x94\x17=7\xac\x07\xa0f\x0a\x82\xa9\x7f\xcd=\xbe" +
+	"h\xbb\x12\x9a\xee\x94\xc4\xdfN\xe9\x8b\xc7\x14H\xd5#" +
+	"\x13@\xb7\xf6\xec\xb4\xd7\x19\xcdB8\xc7m\xfei<" +
+	";\x8f\xc794\x04\xe1\xa4\xec\xdc\x8eE\x9e}q\x98" +
+	"y\x16\xc8_\x01\x00\x00\xff\xff8\x97\xf9\xb4"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_9cf9878fd3dd8473,
 		Nodes: []uint64{
+			0x8d55d5b16b665e76,
 			0x91dd396261b290f4,
+			0xaed826faaf7639b0,
 			0xb1088dbfb4e33bd0,
 			0xf546c174382c3adb,
 		},

@@ -14,5 +14,6 @@ test:
 .PHONY: test
 
 generate:
-	capnp compile -I ../go-capnp/std -ogo pkg/capnp/tx.capnp
+	capnp compile -I ../go-capnp/std -ogo pkg/capnp/definitions.capnp
+	capnp compile -I ../go-capnp/std -ogo pkg/basinprovider/provider.capnp
 .PHONY: generate

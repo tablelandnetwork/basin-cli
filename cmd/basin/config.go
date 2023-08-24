@@ -22,7 +22,6 @@ type config struct {
 			Database string `yaml:"database"`
 		} `yaml:"postgres"`
 	} `yaml:"dbs"`
-	Address      string `yaml:"address"`
 	ProviderHost string `yaml:"provider_host"`
 }
 

@@ -4,103 +4,50 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
-	"log"
 	"os"
 	"testing"
-	"time"
 
 	_ "github.com/lib/pq"
-
 	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/tablelandnetwork/basin-cli/test"
+
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	db          *sql.DB
-	databaseURL string
+	db  *sql.DB
+	uri string
 )
 
 func TestMain(m *testing.M) {
-	// uses a sensible default on windows (tcp/http) and linux/osx (socket)
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("Could not construct pool: %s", err)
-	}
+	pool := test.GetDockerPool()
 
-	err = pool.Client.Ping()
-	if err != nil {
-		log.Fatalf("Could not connect to Docker: %s", err)
-	}
-
-	// pulls an image, creates a container based on it and runs it
-	resource, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository: "debezium/postgres",
-		Tag:        "14-alpine",
-		Cmd:        []string{"postgres", "-c", "wal_level=logical"},
-		Env: []string{
-			"POSTGRES_PASSWORD=secret",
-			"POSTGRES_USER=admin",
-			"POSTGRES_DB=basin",
-			"listen_addresses = '*'",
-		},
-	}, func(config *docker.HostConfig) {
-		// set AutoRemove to true so that stopped container goes away by itself
-		config.AutoRemove = true
-		config.RestartPolicy = docker.RestartPolicy{Name: "no"}
-	})
-	if err != nil {
-		log.Fatalf("Could not start resource: %s", err)
-	}
-
-	_ = resource.Expire(120) // Tell docker to hard kill the container in 120 seconds
-
-	databaseURL = fmt.Sprintf("postgres://admin:secret@%s/basin?sslmode=disable", resource.GetHostPort("5432/tcp"))
-
-	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
-	pool.MaxWait = 120 * time.Second
-	if err = pool.Retry(func() error {
-		db, err = sql.Open("postgres", databaseURL)
-		if err != nil {
-			return err
-		}
-		return db.Ping()
-	}); err != nil {
-		log.Fatalf("Could not connect to docker: %s", err)
-	}
+	var resource *dockertest.Resource
+	db, resource, uri = pool.RunPostgres()
 
 	// Run tests
 	code := m.Run()
 
 	// You can't defer this because os.Exit doesn't care for defer
-	if err := pool.Purge(resource); err != nil {
-		log.Fatalf("Could not purge resource: %s", err)
-	}
+	pool.Purge(resource)
 
 	os.Exit(code)
 }
 
 func TestReplication(t *testing.T) {
-	_, err := db.ExecContext(context.Background(), `
-		CREATE TABLE hba (lines text); 
-		COPY hba FROM '/var/lib/postgresql/data/pg_hba.conf';
-		INSERT INTO hba (lines) VALUES ('host  replication admin  172.17.0.1/32                 md5');
-		COPY hba TO '/var/lib/postgresql/data/pg_hba.conf';
-		SELECT pg_reload_conf();
-	`)
-	require.NoError(t, err)
+	t.Parallel()
 
-	_, err = db.ExecContext(context.Background(), `
+	_, err := db.ExecContext(context.Background(), `
 		create table t(id int primary key, name text);
 		create publication pub_basin_t for table t;
 	`)
 	require.NoError(t, err)
-	replicator, err := New(databaseURL, "t")
+	replicator, err := New(uri, "t")
 	require.NoError(t, err)
 
-	feed, err := replicator.StartReplication(context.Background())
+	feed, pubName, err := replicator.StartReplication(context.Background())
 	require.NoError(t, err)
+	require.Equal(t, "public.t", pubName)
 
 	_, err = db.ExecContext(context.Background(), `
 			insert into t values (1, 'foo');
