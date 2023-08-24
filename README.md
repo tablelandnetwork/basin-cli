@@ -45,7 +45,7 @@ You can make use of the scripts inside `scripts` to facilitate running the CLI l
 
 ```bash
 # Starting the Provider Server
-PORT=8888 ETH_ADDRESS=0x8773d1D1BB8A4Bb2bc5EA1d55E2614aEdbe5351c ./scripts/server.sh
+PORT=8888 ./scripts/server.sh
 
 # Create a wallet
 ./scripts/run.sh wallet create pk.out  
