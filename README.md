@@ -39,7 +39,9 @@ basin publication start --private-key [PRIVATE_KEY] --name table_name
 basin wallet create filename
 ```
 
-## Running Locally
+## Local development
+
+### Running
 
 You can make use of the scripts inside `scripts` to facilitate running the CLI locally without building.
 
@@ -54,10 +56,16 @@ PORT=8888 ./scripts/server.sh
 ./scripts/run.sh publication start --name t --private-key ae91bbaffac7beb8143dc6ea5ef50aa2d37274c581f2b3f7a5faa2d6ee86b3bd 
 ```
 
-## Run tests
+### Run tests
 
 ```bash
 make test
 ```
 
 Note: One of the tests requires Docker Engine to be running.
+
+### Generate Cap'N Proto code
+
+```bash
+make generate
+```
