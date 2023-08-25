@@ -168,10 +168,11 @@ func newPublicationStartCommand() *cli.Command {
 				return err
 			}
 
-			client, err := getBasinClient(cCtx.Context, cfg.ProviderHost)
+			client, close, err := getBasinClient(cCtx.Context, cfg.ProviderHost)
 			if err != nil {
 				return err
 			}
+			defer close()
 
 			bp := basinprovider.New(client)
 			basinStreamer := app.NewBasinStreamer(r, bp, privateKey)
@@ -184,27 +185,29 @@ func newPublicationStartCommand() *cli.Command {
 	}
 }
 
-func getBasinClient(ctx context.Context, provider string) (basinprovider.BasinProviderClient, error) {
+func getBasinClient(ctx context.Context, provider string) (basinprovider.BasinProviderClient, func(), error) {
 	var client basinprovider.BasinProviderClient
+	var closer func()
 	if provider == "mock" {
 		client = basinprovider.BasinProviderClient_ServerToClient(basinprovider.NewBasinServerMock())
+		closer = func() {}
 	} else {
 		conn, err := net.Dial("tcp", provider)
 		if err != nil {
-			return basinprovider.BasinProviderClient{}, fmt.Errorf("failed to connect to provider: %s", err)
+			return basinprovider.BasinProviderClient{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
 		}
 
 		rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
-		defer func() {
+		closer = func() {
 			if err := rpcConn.Close(); err != nil {
 				slog.Error(err.Error())
 			}
-		}()
+		}
 
 		client = basinprovider.BasinProviderClient(rpcConn.Bootstrap(ctx))
 	}
 
-	return client, nil
+	return client, closer, nil
 }
 
 func createPublication(
@@ -310,10 +313,11 @@ func createPublication(
 		return false, fmt.Errorf("failed to create publication: %s", err)
 	}
 
-	client, err := getBasinClient(ctx, provider)
+	client, close, err := getBasinClient(ctx, provider)
 	if err != nil {
 		return false, err
 	}
+	defer close()
 
 	bp := basinprovider.New(client)
 	if err := bp.Create(ctx, name, common.HexToAddress(owner), capnpSchema); err != nil {
