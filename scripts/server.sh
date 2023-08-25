@@ -5,4 +5,4 @@ if [ -z "${PORT}" ]; then
     exit 1
 fi
 
-PORT=${PORT} go run examples/provider/server.go > log
+PORT=${PORT} go run examples/provider/server.go

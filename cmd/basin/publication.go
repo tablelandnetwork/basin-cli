@@ -299,7 +299,7 @@ func createPublication(
 		column.SetIsNullable(col.isNull)
 		column.SetIsPartOfPrimaryKey(col.isPrimary)
 	}
-	_ = capnpSchema.SetColums(columnsList)
+	_ = capnpSchema.SetColumns(columnsList)
 
 	if _, err := tx.Exec(
 		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", pgrepl.Publication(name).FullName(), name),

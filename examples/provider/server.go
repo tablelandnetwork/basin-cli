@@ -20,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("Listening of port", "port", os.Getenv("PORT"))
+	slog.Info("Listening", "port", os.Getenv("PORT"))
 
 	for {
 		conn, err := listener.Accept()

@@ -52,7 +52,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 
 	// TODO: implement a retry mechanism
 	for tx := range txs {
-		slog.Info("new transaction receive")
+		slog.Info("new transaction received")
 
 		capnpTx, err := basincapnp.FromPgReplTx(tx)
 		if err != nil {

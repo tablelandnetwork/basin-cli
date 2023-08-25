@@ -48,7 +48,7 @@ func FromPgReplTx(tx *pgrepl.Tx) (Tx, error) {
 
 			_ = columnsList.Set(index, col)
 		}
-		_ = r.SetColums(columnsList)
+		_ = r.SetColumns(columnsList)
 
 		pkList, err := NewTx_Record_PrimaryKey_List(seg, int32(len(record.PrimaryKey)))
 		if err != nil {

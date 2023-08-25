@@ -17,6 +17,8 @@ import (
 )
 
 func TestPublication(t *testing.T) {
+	// This is supposed to be the closest to an e2E test we get
+	// skipping this for now until I think of a way to assert the data that went to Basin Provider
 	t.Skip()
 
 	t.Parallel()

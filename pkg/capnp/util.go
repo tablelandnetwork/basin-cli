@@ -69,7 +69,7 @@ func compareRecord(record pgrepl.Record, capnpRecord Tx_Record) error {
 	}
 
 	// columns
-	columns, err := capnpRecord.Colums()
+	columns, err := capnpRecord.Columns()
 	if err != nil {
 		return fmt.Errorf("records columns: %s", err)
 	}

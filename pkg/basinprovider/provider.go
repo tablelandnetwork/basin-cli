@@ -140,7 +140,7 @@ func (s *BasinServerMock) Create(_ context.Context, call BasinProviderClient_cre
 
 	slog.Info("Publication created", "publication", pubName, "owner", owner)
 
-	columns, _ := schema.Colums()
+	columns, _ := schema.Columns()
 	for i := 0; i < columns.Len(); i++ {
 		name, _ := columns.At(i).Name()
 		typ, _ := columns.At(i).Type()

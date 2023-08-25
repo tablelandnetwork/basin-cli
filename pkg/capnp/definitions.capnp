@@ -12,7 +12,7 @@ struct Tx {
         timestamp @1 :Text;
         schema @2 :Text;
         table @3 :Text;
-        colums @4 :List(Column);
+        columns @4 :List(Column);
         primaryKey @5 :List(PrimaryKey);
 
         struct Column {
@@ -29,7 +29,7 @@ struct Tx {
 }
 
 struct Schema {
-	colums @0 :List(Column);
+	columns @0 :List(Column);
 
 	struct Column {
 		name @0 :Text;
