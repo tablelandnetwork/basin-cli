@@ -71,17 +71,9 @@ func newPublicationCreateCommand() *cli.Command {
 			if cCtx.NArg() != 1 {
 				return errors.New("one argument should be provided")
 			}
-			parts := strings.Split(cCtx.Args().First(), ".")
-			if len(parts) != 2 {
-				return errors.New("invalid publication name")
-			}
-			ns := parts[0]
-			if ns == "" {
-				return errors.New("namespace is empty")
-			}
-			table := parts[1]
-			if table == "" {
-				return errors.New("table name is empty")
+			ns, rel, err := parsePublicationName(cCtx.Args().First())
+			if err != nil {
+				return err
 			}
 
 			pgConfig, err := pgconn.ParseConfig(dburi)
@@ -111,17 +103,17 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			exists, err := createPublication(cCtx.Context, dburi, ns, table, provider, owner)
+			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner)
 			if err != nil {
 				return fmt.Errorf("failed to create publication: %s", err)
 			}
 
 			if exists {
-				fmt.Printf("Publication %s.%s already exists.\n\n", ns, table)
+				fmt.Printf("Publication %s.%s already exists.\n\n", ns, rel)
 				return nil
 			}
 
-			fmt.Printf("\033[32mPublication %s.%s created.\033[0m\n\n", ns, table)
+			fmt.Printf("\033[32mPublication %s.%s created.\033[0m\n\n", ns, rel)
 			return nil
 		},
 	}
@@ -148,7 +140,7 @@ func newPublicationStartCommand() *cli.Command {
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
-			ns, table, err := parsePublicationName(publicationName)
+			ns, rel, err := parsePublicationName(publicationName)
 			if err != nil {
 				return err
 			}
@@ -171,7 +163,7 @@ func newPublicationStartCommand() *cli.Command {
 				cfg.DBS.Postgres.Database,
 			)
 
-			r, err := pgrepl.New(connString, pgrepl.Publication(table))
+			r, err := pgrepl.New(connString, pgrepl.Publication(rel))
 			if err != nil {
 				return fmt.Errorf("failed to create replicator: %s", err)
 			}
@@ -198,7 +190,7 @@ func newPublicationStartCommand() *cli.Command {
 	}
 }
 
-func parsePublicationName(name string) (ns string, table string, err error) {
+func parsePublicationName(name string) (ns string, rel string, err error) {
 	parts := strings.Split(name, ".")
 	if len(parts) != 2 {
 		return "", "", errors.New("invalid publication name")
@@ -207,9 +199,9 @@ func parsePublicationName(name string) (ns string, table string, err error) {
 	if ns == "" {
 		return "", "", errors.New("namespace is empty")
 	}
-	table = parts[1]
-	if table == "" {
-		return "", "", errors.New("table name is empty")
+	rel = parts[1]
+	if rel == "" {
+		return "", "", errors.New("relation is empty")
 	}
 	return
 }
@@ -240,7 +232,7 @@ func getBasinClient(ctx context.Context, provider string) (basinprovider.Publica
 }
 
 func createPublication(
-	ctx context.Context, dburi string, ns string, table string, provider string, owner string,
+	ctx context.Context, dburi string, ns string, rel string, provider string, owner string,
 ) (exists bool, err error) {
 	pgxConn, err := pgx.Connect(ctx, dburi)
 	if err != nil {
@@ -280,7 +272,7 @@ func createPublication(
 			AND pki.table_name = c.table_name
 			AND pki.column_name = c.column_name
 		WHERE c.table_name = $1; 
-		`, table,
+		`, rel,
 	)
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch schema")
@@ -334,7 +326,7 @@ func createPublication(
 	_ = capnpSchema.SetColumns(columnsList)
 
 	if _, err := tx.Exec(
-		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", pgrepl.Publication(table).FullName(), table),
+		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", pgrepl.Publication(rel).FullName(), rel),
 	); err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			return true, nil
@@ -349,7 +341,7 @@ func createPublication(
 	defer close()
 
 	bp := basinprovider.New(client)
-	if err := bp.Create(ctx, ns, table, capnpSchema, common.HexToAddress(owner)); err != nil {
+	if err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner)); err != nil {
 		return false, fmt.Errorf("create call: %s", err)
 	}
 

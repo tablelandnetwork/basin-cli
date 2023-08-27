@@ -1,7 +1,6 @@
 package capnp
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"capnproto.org/go/capnp/v3"
@@ -11,8 +10,6 @@ import (
 // FromPgReplTx converts Tx to its capnp verson.
 func FromPgReplTx(tx *pgrepl.Tx) (Tx, error) {
 	// TODO: better error handling
-	j, _ := json.MarshalIndent(&tx, "", "  ")
-	fmt.Println(fmt.Sprintf("%s", j))
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {

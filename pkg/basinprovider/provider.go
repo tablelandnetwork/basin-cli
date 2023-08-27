@@ -31,17 +31,17 @@ func New(p Publications) *BasinProvider {
 }
 
 // Push pushes Postgres tx to the server.
-func (bp *BasinProvider) Push(ctx context.Context, ns string, table string, tx basincapnp.Tx, sig []byte) error {
+func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx basincapnp.Tx, sig []byte) error {
 	f, release := bp.p.Push(ctx, func(bp Publications_push_Params) error {
 		_ = bp.SetTx(tx)
 		_ = bp.SetSig(sig)
 		_ = bp.SetNs(ns)
 
-		if strings.Contains(table, ".") {
-			parts := strings.Split(table, ".") // remove the schema from table's name (e.g. public)
-			table = parts[1]
+		if strings.Contains(rel, ".") {
+			parts := strings.Split(rel, ".") // remove the schema from table's name (e.g. public)
+			rel = parts[1]
 		}
-		_ = bp.SetTable(table)
+		_ = bp.SetRel(rel)
 
 		return nil
 	})
@@ -53,10 +53,10 @@ func (bp *BasinProvider) Push(ctx context.Context, ns string, table string, tx b
 
 // Create creates a publication on Basin Provider.
 func (bp *BasinProvider) Create(
-	ctx context.Context, ns string, table string, schema basincapnp.Schema, owner common.Address) error {
+	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address) error {
 	_, release := bp.p.Create(ctx, func(bp Publications_create_Params) error {
 		_ = bp.SetNs(ns)
-		_ = bp.SetTable(table)
+		_ = bp.SetRel(rel)
 		_ = bp.SetSchema(schema)
 		_ = bp.SetOwner(owner.Hex())
 
@@ -118,7 +118,7 @@ func (s *BasinServerMock) Create(_ context.Context, call Publications_create) er
 		return err
 	}
 
-	table, err := call.Args().Table()
+	rel, err := call.Args().Rel()
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (s *BasinServerMock) Create(_ context.Context, call Publications_create) er
 		return err
 	}
 
-	slog.Info("Publication created", "namespace", ns, "table", table, "owner", owner)
+	slog.Info("Publication created", "namespace", ns, "relation", rel, "owner", owner)
 
 	columns, _ := schema.Columns()
 	for i := 0; i < columns.Len(); i++ {

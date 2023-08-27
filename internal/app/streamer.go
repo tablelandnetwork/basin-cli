@@ -1,10 +1,11 @@
 package app
 
 import (
-	"capnproto.org/go/capnp/v3"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+
+	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pglogrepl"
