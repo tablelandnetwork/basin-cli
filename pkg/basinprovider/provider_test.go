@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	capnp "capnproto.org/go/capnp/v3"
+	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ func TestBasinProvider_Create(t *testing.T) {
 	// send to the server, the server deserialize it and send the value back
 
 	bp := newServer()
-	err := bp.Create(context.Background(), "t", common.HexToAddress(""), basincapnp.Schema{})
+	err := bp.Create(context.Background(), "n", "t", basincapnp.Schema{}, common.HexToAddress(""))
 	require.NoError(t, err)
 }
 
@@ -36,9 +36,8 @@ func TestBasinProvider_Push(t *testing.T) {
 		},
 	})
 
-	response, err := bp.Push(context.Background(), "t", tx, []byte{})
+	err := bp.Push(context.Background(), "n", "t", tx, []byte{})
 	require.NoError(t, err)
-	require.Equal(t, uint64(333), response)
 }
 
 func newTx(t *testing.T, tx *pgrepl.Tx) basincapnp.Tx {
@@ -52,7 +51,7 @@ func newServer() *BasinProvider {
 	buffer := 101024 * 1024
 	lis := bufconn.Listen(buffer)
 
-	srv := BasinProviderClient_ServerToClient(NewBasinServerMock())
+	srv := Publications_ServerToClient(NewBasinServerMock())
 	bootstrapClient := capnp.Client(srv)
 
 	go func() {

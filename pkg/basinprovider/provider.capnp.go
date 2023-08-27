@@ -3,12 +3,13 @@
 package basinprovider
 
 import (
+	context "context"
+
 	capnp "capnproto.org/go/capnp/v3"
 	text "capnproto.org/go/capnp/v3/encoding/text"
 	fc "capnproto.org/go/capnp/v3/flowcontrol"
 	schemas "capnproto.org/go/capnp/v3/schemas"
 	server "capnproto.org/go/capnp/v3/server"
-	context "context"
 	capnp2 "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 )
 

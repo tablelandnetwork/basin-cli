@@ -120,7 +120,7 @@ func newPublicationCreateCommand() *cli.Command {
 }
 
 func newPublicationStartCommand() *cli.Command {
-	var privateKey, publicationName string
+	var privateKey string
 
 	return &cli.Command{
 		Name:  "start",
@@ -132,15 +132,12 @@ func newPublicationStartCommand() *cli.Command {
 				Destination: &privateKey,
 				Required:    true,
 			},
-			&cli.StringFlag{
-				Name:        "name",
-				Usage:       "publication name",
-				Destination: &publicationName,
-				Required:    true,
-			},
 		},
 		Action: func(cCtx *cli.Context) error {
-			ns, rel, err := parsePublicationName(publicationName)
+			if cCtx.NArg() != 1 {
+				return errors.New("one argument should be provided")
+			}
+			ns, rel, err := parsePublicationName(cCtx.Args().First())
 			if err != nil {
 				return err
 			}
