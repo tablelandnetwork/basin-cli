@@ -18,51 +18,47 @@ import (
 
 // BasinProvider implements the app.BasinProvider interface.
 type BasinProvider struct {
-	s BasinProviderClient
+	p Publications
 }
 
 var _ app.BasinProvider = (*BasinProvider)(nil)
 
 // New creates a new BasinProvider.
-func New(s BasinProviderClient) *BasinProvider {
+func New(p Publications) *BasinProvider {
 	return &BasinProvider{
-		s: s,
+		p: p,
 	}
 }
 
 // Push pushes Postgres tx to the server.
-func (bp *BasinProvider) Push(ctx context.Context, pubName string, tx basincapnp.Tx, sig []byte) (uint64, error) {
-	f, release := bp.s.Push(ctx, func(bp BasinProviderClient_push_Params) error {
+func (bp *BasinProvider) Push(ctx context.Context, ns string, table string, tx basincapnp.Tx, sig []byte) error {
+	f, release := bp.p.Push(ctx, func(bp Publications_push_Params) error {
 		_ = bp.SetTx(tx)
-		_ = bp.SetSignature(sig)
+		_ = bp.SetSig(sig)
+		_ = bp.SetNs(ns)
 
-		if strings.Contains(pubName, ".") {
-			parts := strings.Split(pubName, ".") // remove the schema from table's name (e.g. public)
-			pubName = parts[1]
+		if strings.Contains(table, ".") {
+			parts := strings.Split(table, ".") // remove the schema from table's name (e.g. public)
+			table = parts[1]
 		}
-
-		_ = bp.SetPubName(pubName)
+		_ = bp.SetTable(table)
 
 		return nil
 	})
 	defer release()
 
-	res, err := f.Struct()
-	if err != nil {
-		return 0, err
-	}
-
-	return res.Response(), nil
+	_, err := f.Struct()
+	return err
 }
 
 // Create creates a publication on Basin Provider.
 func (bp *BasinProvider) Create(
-	ctx context.Context, pubName string, owner common.Address, schema basincapnp.Schema,
-) error {
-	_, release := bp.s.Create(ctx, func(bp BasinProviderClient_create_Params) error {
-		_ = bp.SetName(pubName)
-		_ = bp.SetOwner(owner.Hex())
+	ctx context.Context, ns string, table string, schema basincapnp.Schema, owner common.Address) error {
+	_, release := bp.p.Create(ctx, func(bp Publications_create_Params) error {
+		_ = bp.SetNs(ns)
+		_ = bp.SetTable(table)
 		_ = bp.SetSchema(schema)
+		_ = bp.SetOwner(owner.Hex())
 
 		return nil
 	})
@@ -86,13 +82,8 @@ func NewBasinServerMock() *BasinServerMock {
 }
 
 // Push handles the Push request.
-func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push) error {
-	res, err := call.AllocResults() // allocate the results struct
-	if err != nil {
-		return err
-	}
-
-	pubName, err := call.Args().PubName()
+func (s *BasinServerMock) Push(_ context.Context, call Publications_push) error {
+	ns, err := call.Args().Ns()
 	if err != nil {
 		return err
 	}
@@ -102,7 +93,7 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return err
 	}
 
-	signature, err := call.Args().Signature()
+	sig, err := call.Args().Sig()
 	if err != nil {
 		return err
 	}
@@ -112,23 +103,22 @@ func (s *BasinServerMock) Push(_ context.Context, call BasinProviderClient_push)
 		return fmt.Errorf("canonicalize: %s", err)
 	}
 
-	err = s.verifySignature(pubName, data, signature)
+	err = s.verifySignature(ns, data, sig)
 	s.txs[tx] = err == nil
 
 	slog.Info("Tx received", "verified", err == nil)
 
-	res.SetResponse(tx.CommitLSN())
 	return nil
 }
 
 // Create handles the Create request.
-func (s *BasinServerMock) Create(_ context.Context, call BasinProviderClient_create) error {
-	pubName, err := call.Args().Name()
+func (s *BasinServerMock) Create(_ context.Context, call Publications_create) error {
+	ns, err := call.Args().Ns()
 	if err != nil {
 		return err
 	}
 
-	owner, err := call.Args().Owner()
+	table, err := call.Args().Table()
 	if err != nil {
 		return err
 	}
@@ -138,7 +128,12 @@ func (s *BasinServerMock) Create(_ context.Context, call BasinProviderClient_cre
 		return err
 	}
 
-	slog.Info("Publication created", "publication", pubName, "owner", owner)
+	owner, err := call.Args().Owner()
+	if err != nil {
+		return err
+	}
+
+	slog.Info("Publication created", "namespace", ns, "table", table, "owner", owner)
 
 	columns, _ := schema.Columns()
 	for i := 0; i < columns.Len(); i++ {
@@ -149,22 +144,22 @@ func (s *BasinServerMock) Create(_ context.Context, call BasinProviderClient_cre
 		slog.Info("Column schema", "name", name, "typ", typ, "is_null", isNull, "is_pk", isPk)
 	}
 
-	s.owner[pubName] = owner
+	s.owner[ns] = owner
 	return nil
 }
 
 func (s *BasinServerMock) mustEmbedUnimplementedBasinProviderServer() {} // nolint
 
-func (s *BasinServerMock) verifySignature(pubName string, message []byte, signature []byte) error {
+func (s *BasinServerMock) verifySignature(ns string, message []byte, signature []byte) error {
 	hash := crypto.Keccak256Hash(message)
 	sigPublicKey, err := crypto.Ecrecover(hash.Bytes(), signature)
 	if err != nil {
 		return fmt.Errorf("ecrecover: %s", err)
 	}
 
-	address, ok := s.owner[pubName]
+	address, ok := s.owner[ns]
 	if !ok {
-		return errors.New("non existent publication")
+		return errors.New("non existent namespace")
 	}
 
 	publicKeyBytes := common.HexToAddress(address).Bytes()
