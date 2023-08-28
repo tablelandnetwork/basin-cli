@@ -58,7 +58,7 @@ func (bp *BasinProvider) Create(
 		_ = bp.SetNs(ns)
 		_ = bp.SetRel(rel)
 		_ = bp.SetSchema(schema)
-		_ = bp.SetOwner(owner.Hex())
+		_ = bp.SetOwner(owner.Bytes())
 
 		return nil
 	})
@@ -144,7 +144,7 @@ func (s *BasinServerMock) Create(_ context.Context, call Publications_create) er
 		slog.Info("Column schema", "name", name, "typ", typ, "is_null", isNull, "is_pk", isPk)
 	}
 
-	s.owner[ns] = owner
+	s.owner[ns] = common.BytesToAddress(owner).Hex()
 	return nil
 }
 
