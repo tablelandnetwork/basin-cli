@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
 	"capnproto.org/go/capnp/v3"
@@ -23,6 +24,8 @@ import (
 	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
+
+var pubNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-zA-Z0-9_]*$)`)
 
 func newPublicationCommand() *cli.Command {
 	return &cli.Command{
@@ -188,18 +191,12 @@ func newPublicationStartCommand() *cli.Command {
 }
 
 func parsePublicationName(name string) (ns string, rel string, err error) {
-	parts := strings.Split(name, ".")
-	if len(parts) != 2 {
-		return "", "", errors.New("invalid publication name")
+	match := pubNameRx.FindStringSubmatch(name)
+	if len(match) != 3 {
+		return "", "", errors.New("publication name must be of the form `namespace.relation_name` using only letters, numbers, and underscores (_), where `namespace` and `relation` do not start with a number")
 	}
-	ns = parts[0]
-	if ns == "" {
-		return "", "", errors.New("namespace is empty")
-	}
-	rel = parts[1]
-	if rel == "" {
-		return "", "", errors.New("relation is empty")
-	}
+	ns = match[1]
+	rel = match[2]
 	return
 }
 
