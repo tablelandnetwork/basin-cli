@@ -35,7 +35,7 @@ func TestBasinStreamer(t *testing.T) {
 		sig []byte
 	})
 
-	streamer := NewBasinStreamer(&replicatorMock{feed: feed}, &basinProviderMock{
+	streamer := NewBasinStreamer("n", &replicatorMock{feed: feed}, &basinProviderMock{
 		feedback: feedback,
 		owner:    make(map[string]string),
 	}, privateKey)
@@ -101,19 +101,19 @@ type basinProviderMock struct {
 }
 
 func (bp *basinProviderMock) Push(
-	_ context.Context, _ string, tx basincapnp.Tx, signature []byte,
-) (uint64, error) {
+	_ context.Context, _ string, _ string, tx basincapnp.Tx, signature []byte,
+) error {
 	bp.feedback <- struct {
 		tx  basincapnp.Tx
 		sig []byte
 	}{tx, signature}
 
-	return 1, nil
+	return nil
 }
 
 func (bp *basinProviderMock) Create(
-	_ context.Context, pubName string, owner common.Address, _ basincapnp.Schema,
+	_ context.Context, ns string, _ string, _ basincapnp.Schema, owner common.Address,
 ) error {
-	bp.owner[pubName] = owner.Hex()
+	bp.owner[ns] = owner.Hex()
 	return nil
 }

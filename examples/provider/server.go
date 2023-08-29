@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	client := basinprovider.BasinProviderClient_ServerToClient(basinprovider.NewBasinServerMock())
+	client := basinprovider.Publications_ServerToClient(basinprovider.NewBasinServerMock())
 
 	listener, err := net.Listen("tcp", "localhost:"+os.Getenv("PORT"))
 	if err != nil {

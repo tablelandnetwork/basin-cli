@@ -54,12 +54,13 @@ func TestPublication(t *testing.T) {
 }
 
 type helper struct {
-	app       *cli.App
-	db        *sql.DB
-	dburi     string
-	pk        *ecdsa.PrivateKey
-	tableName string
-	dir       string
+	app   *cli.App
+	db    *sql.DB
+	dburi string
+	pk    *ecdsa.PrivateKey
+	ns    string
+	rel   string
+	dir   string
 }
 
 func newHelper(app *cli.App, db *sql.DB, dburi string, dir string) (*helper, error) {
@@ -69,9 +70,10 @@ func newHelper(app *cli.App, db *sql.DB, dburi string, dir string) (*helper, err
 	}
 
 	return &helper{
-		pk:        pk,
-		tableName: "t",
-		dir:       dir,
+		pk:  pk,
+		ns:  "n",
+		rel: "t",
+		dir: dir,
 
 		app:   app,
 		db:    db,
@@ -82,33 +84,41 @@ func newHelper(app *cli.App, db *sql.DB, dburi string, dir string) (*helper, err
 func (h *helper) CreateTable(t *testing.T) {
 	_, err := h.db.ExecContext(
 		context.Background(),
-		fmt.Sprintf("create table %s(id serial primary key, name text);", h.tableName),
+		fmt.Sprintf("create table %s(id serial primary key, name text);", h.rel),
 	)
 	require.NoError(t, err)
 }
 
 func (h *helper) CreatePublication(t *testing.T) {
+	name := fmt.Sprintf("%s.%s", h.ns, h.rel)
 	err := h.app.Run([]string{
 		"basin",
-		"publication", "--dir", h.dir,
-		"create", "--dburi", h.dburi, "--address", crypto.PubkeyToAddress(h.pk.PublicKey).Hex(), "--provider", "mock",
-		h.tableName,
+		"publication",
+		"--dir", h.dir,
+		"create",
+		"--dburi", h.dburi,
+		"--address", crypto.PubkeyToAddress(h.pk.PublicKey).Hex(),
+		"--provider", "mock",
+		name,
 	})
 	require.NoError(t, err)
 }
 
 func (h *helper) StartReplication(t *testing.T) {
 	ctx := context.Background()
+	name := fmt.Sprintf("%s.%s", h.ns, h.rel)
 	err := h.app.RunContext(ctx, []string{
 		"basin",
-		"publication", "--dir", h.dir,
-		"start", "--name", h.tableName, "--private-key", hex.EncodeToString(crypto.FromECDSA(h.pk)),
-		h.tableName,
+		"publication",
+		"--dir", h.dir,
+		"start",
+		"--private-key", hex.EncodeToString(crypto.FromECDSA(h.pk)),
+		name,
 	})
 	require.NoError(t, err)
 }
 
 func (h *helper) AddNewRecord(t *testing.T) {
-	_, err := h.db.ExecContext(context.Background(), fmt.Sprintf("insert into %s (name) values ('foo');", h.tableName))
+	_, err := h.db.ExecContext(context.Background(), fmt.Sprintf("insert into %s (name) values ('foo');", h.rel))
 	require.NoError(t, err)
 }

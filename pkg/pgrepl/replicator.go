@@ -156,7 +156,7 @@ func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, string, 
 	slog.Info("Logical replication started", "slot", r.slot)
 
 	go func() {
-		records := []Record{}
+		var records []Record
 		var commitLSN string
 
 		// Consume all records between BEGIN and COMMIT inside a Transaction

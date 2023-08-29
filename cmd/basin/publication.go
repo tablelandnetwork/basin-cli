@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 
 	"capnproto.org/go/capnp/v3"
@@ -23,6 +24,8 @@ import (
 	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
+
+var pubNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-zA-Z0-9_]*$)`)
 
 func newPublicationCommand() *cli.Command {
 	return &cli.Command{
@@ -71,9 +74,9 @@ func newPublicationCreateCommand() *cli.Command {
 			if cCtx.NArg() != 1 {
 				return errors.New("one argument should be provided")
 			}
-			name := cCtx.Args().First()
-			if name == "" {
-				return errors.New("name is empty")
+			ns, rel, err := parsePublicationName(cCtx.Args().First())
+			if err != nil {
+				return err
 			}
 
 			pgConfig, err := pgconn.ParseConfig(dburi)
@@ -103,24 +106,24 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			exists, err := createPublication(cCtx.Context, dburi, name, provider, owner)
+			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner)
 			if err != nil {
 				return fmt.Errorf("failed to create publication: %s", err)
 			}
 
 			if exists {
-				fmt.Printf("Publication %s already exists.\n\n", name)
+				fmt.Printf("Publication %s.%s already exists.\n\n", ns, rel)
 				return nil
 			}
 
-			fmt.Printf("\033[32mPublication %s created.\033[0m\n\n", name)
+			fmt.Printf("\033[32mPublication %s.%s created.\033[0m\n\n", ns, rel)
 			return nil
 		},
 	}
 }
 
 func newPublicationStartCommand() *cli.Command {
-	var privateKey, publicationName string
+	var privateKey string
 
 	return &cli.Command{
 		Name:  "start",
@@ -132,14 +135,16 @@ func newPublicationStartCommand() *cli.Command {
 				Destination: &privateKey,
 				Required:    true,
 			},
-			&cli.StringFlag{
-				Name:        "name",
-				Usage:       "publication name",
-				Destination: &publicationName,
-				Required:    true,
-			},
 		},
 		Action: func(cCtx *cli.Context) error {
+			if cCtx.NArg() != 1 {
+				return errors.New("one argument should be provided")
+			}
+			ns, rel, err := parsePublicationName(cCtx.Args().First())
+			if err != nil {
+				return err
+			}
+
 			dir, err := defaultConfigLocation(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
@@ -158,7 +163,7 @@ func newPublicationStartCommand() *cli.Command {
 				cfg.DBS.Postgres.Database,
 			)
 
-			r, err := pgrepl.New(connString, pgrepl.Publication(publicationName))
+			r, err := pgrepl.New(connString, pgrepl.Publication(rel))
 			if err != nil {
 				return fmt.Errorf("failed to create replicator: %s", err)
 			}
@@ -175,7 +180,7 @@ func newPublicationStartCommand() *cli.Command {
 			defer close()
 
 			bp := basinprovider.New(client)
-			basinStreamer := app.NewBasinStreamer(r, bp, privateKey)
+			basinStreamer := app.NewBasinStreamer(ns, r, bp, privateKey)
 			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				return fmt.Errorf("run: %s", err)
 			}
@@ -185,16 +190,26 @@ func newPublicationStartCommand() *cli.Command {
 	}
 }
 
-func getBasinClient(ctx context.Context, provider string) (basinprovider.BasinProviderClient, func(), error) {
-	var client basinprovider.BasinProviderClient
+func parsePublicationName(name string) (ns string, rel string, err error) {
+	match := pubNameRx.FindStringSubmatch(name)
+	if len(match) != 3 {
+		return "", "", errors.New("publication name must be of the form `namespace.relation_name` using only letters, numbers, and underscores (_), where `namespace` and `relation` do not start with a number")
+	}
+	ns = match[1]
+	rel = match[2]
+	return
+}
+
+func getBasinClient(ctx context.Context, provider string) (basinprovider.Publications, func(), error) {
+	var client basinprovider.Publications
 	var closer func()
 	if provider == "mock" {
-		client = basinprovider.BasinProviderClient_ServerToClient(basinprovider.NewBasinServerMock())
+		client = basinprovider.Publications_ServerToClient(basinprovider.NewBasinServerMock())
 		closer = func() {}
 	} else {
 		conn, err := net.Dial("tcp", provider)
 		if err != nil {
-			return basinprovider.BasinProviderClient{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
+			return basinprovider.Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
 		}
 
 		rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
@@ -204,14 +219,14 @@ func getBasinClient(ctx context.Context, provider string) (basinprovider.BasinPr
 			}
 		}
 
-		client = basinprovider.BasinProviderClient(rpcConn.Bootstrap(ctx))
+		client = basinprovider.Publications(rpcConn.Bootstrap(ctx))
 	}
 
 	return client, closer, nil
 }
 
 func createPublication(
-	ctx context.Context, dburi string, name string, provider string, owner string,
+	ctx context.Context, dburi string, ns string, rel string, provider string, owner string,
 ) (exists bool, err error) {
 	pgxConn, err := pgx.Connect(ctx, dburi)
 	if err != nil {
@@ -251,7 +266,7 @@ func createPublication(
 			AND pki.table_name = c.table_name
 			AND pki.column_name = c.column_name
 		WHERE c.table_name = $1; 
-		`, name,
+		`, rel,
 	)
 	if err != nil {
 		return false, fmt.Errorf("failed to fetch schema")
@@ -265,14 +280,14 @@ func createPublication(
 
 	var colName, typ string
 	var isNull, isPrimary bool
-	columns := []column{}
+	var columns []column
 	for rows.Next() {
 		if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
 			return false, fmt.Errorf("scan: %s", err)
 		}
 
 		columns = append(columns, column{
-			name:      name,
+			name:      colName,
 			typ:       typ,
 			isNull:    isNull,
 			isPrimary: isPrimary,
@@ -305,7 +320,7 @@ func createPublication(
 	_ = capnpSchema.SetColumns(columnsList)
 
 	if _, err := tx.Exec(
-		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", pgrepl.Publication(name).FullName(), name),
+		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", pgrepl.Publication(rel).FullName(), rel),
 	); err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			return true, nil
@@ -320,7 +335,7 @@ func createPublication(
 	defer close()
 
 	bp := basinprovider.New(client)
-	if err := bp.Create(ctx, name, common.HexToAddress(owner), capnpSchema); err != nil {
+	if err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner)); err != nil {
 		return false, fmt.Errorf("create call: %s", err)
 	}
 

@@ -23,20 +23,22 @@ type Replicator interface {
 
 // BasinProvider ...
 type BasinProvider interface {
-	Push(context.Context, string, basincapnp.Tx, []byte) (uint64, error)
-	Create(context.Context, string, common.Address, basincapnp.Schema) error
+	Create(context.Context, string, string, basincapnp.Schema, common.Address) error
+	Push(context.Context, string, string, basincapnp.Tx, []byte) error
 }
 
 // BasinStreamer contains logic of streaming Postgres changes to Basin Provider.
 type BasinStreamer struct {
+	namespace  string
 	replicator Replicator
 	privateKey *ecdsa.PrivateKey
 	provider   BasinProvider
 }
 
 // NewBasinStreamer creates new app.
-func NewBasinStreamer(r Replicator, bp BasinProvider, pk *ecdsa.PrivateKey) *BasinStreamer {
+func NewBasinStreamer(ns string, r Replicator, bp BasinProvider, pk *ecdsa.PrivateKey) *BasinStreamer {
 	return &BasinStreamer{
+		namespace:  ns,
 		replicator: r,
 		provider:   bp,
 		privateKey: pk,
@@ -45,7 +47,7 @@ func NewBasinStreamer(r Replicator, bp BasinProvider, pk *ecdsa.PrivateKey) *Bas
 
 // Run runs the BasinStreamer logic.
 func (b *BasinStreamer) Run(ctx context.Context) error {
-	txs, pubName, err := b.replicator.StartReplication(ctx)
+	txs, table, err := b.replicator.StartReplication(ctx)
 	if err != nil {
 		return fmt.Errorf("start replication: %s", err)
 	}
@@ -64,8 +66,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 			return fmt.Errorf("sign: %s", err)
 		}
 
-		_, err = b.provider.Push(ctx, pubName, capnpTx, signature)
-		if err != nil {
+		if err := b.provider.Push(ctx, b.namespace, table, capnpTx, signature); err != nil {
 			return fmt.Errorf("push: %s", err)
 		}
 

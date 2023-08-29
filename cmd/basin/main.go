@@ -10,7 +10,7 @@ import (
 func main() {
 	cliApp := &cli.App{
 		Name:  "basin",
-		Usage: "basin replicates your database as logs and store them in Filecoin",
+		Usage: "Publish data from your database to the Tableland network.",
 		Commands: []*cli.Command{
 			newPublicationCommand(),
 			newWalletCommand(),
