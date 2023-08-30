@@ -10,7 +10,7 @@ import (
 )
 
 // DefaultProviderHost is the address of Basin Provider.
-const DefaultProviderHost = "localhost:8080"
+const DefaultProviderHost = "34.73.36.206:3000"
 
 type config struct {
 	DBS struct {

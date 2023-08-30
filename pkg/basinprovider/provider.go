@@ -30,19 +30,22 @@ func New(p Publications) *BasinProvider {
 	}
 }
 
-// Push pushes Postgres tx to the server.
-func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx basincapnp.Tx, sig []byte) error {
-	f, release := bp.p.Push(ctx, func(bp Publications_push_Params) error {
-		_ = bp.SetTx(tx)
-		_ = bp.SetSig(sig)
-		_ = bp.SetNs(ns)
-
-		if strings.Contains(rel, ".") {
-			parts := strings.Split(rel, ".") // remove the schema from table's name (e.g. public)
-			rel = parts[1]
+// Create creates a publication on Basin Provider.
+func (bp *BasinProvider) Create(
+	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address) error {
+	f, release := bp.p.Create(ctx, func(bp Publications_create_Params) error {
+		if err := bp.SetNs(ns); err != nil {
+			return fmt.Errorf("setting ns: %s", err)
 		}
-		_ = bp.SetRel(rel)
-
+		if err := bp.SetRel(rel); err != nil {
+			return fmt.Errorf("setting rel: %s", err)
+		}
+		if err := bp.SetSchema(schema); err != nil {
+			return fmt.Errorf("setting schema: %s", err)
+		}
+		if err := bp.SetOwner(owner.Bytes()); err != nil {
+			return fmt.Errorf("setting owner: %s", err)
+		}
 		return nil
 	})
 	defer release()
@@ -51,20 +54,31 @@ func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx bas
 	return err
 }
 
-// Create creates a publication on Basin Provider.
-func (bp *BasinProvider) Create(
-	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address) error {
-	_, release := bp.p.Create(ctx, func(bp Publications_create_Params) error {
-		_ = bp.SetNs(ns)
-		_ = bp.SetRel(rel)
-		_ = bp.SetSchema(schema)
-		_ = bp.SetOwner(owner.Bytes())
-
+// Push pushes Postgres tx to the server.
+func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx basincapnp.Tx, sig []byte) error {
+	f, release := bp.p.Push(ctx, func(bp Publications_push_Params) error {
+		if err := bp.SetNs(ns); err != nil {
+			return fmt.Errorf("setting ns: %s", err)
+		}
+		if strings.Contains(rel, ".") {
+			parts := strings.Split(rel, ".") // remove the schema from table's name (e.g. public)
+			rel = parts[1]
+		}
+		if err := bp.SetRel(rel); err != nil {
+			return fmt.Errorf("setting rel: %s", err)
+		}
+		if err := bp.SetTx(tx); err != nil {
+			return fmt.Errorf("setting rel: %s", err)
+		}
+		if err := bp.SetSig(sig); err != nil {
+			return fmt.Errorf("setting sig: %s", err)
+		}
 		return nil
 	})
 	defer release()
 
-	return nil
+	_, err := f.Struct()
+	return err
 }
 
 // BasinServerMock is a mocked version of a server implementation using for testing.
