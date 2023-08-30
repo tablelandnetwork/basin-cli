@@ -1,8 +1,37 @@
-# Basin CLI
+# basin-cli
 
-Publish data from your database to the Tableland network.
+[![License](https://img.shields.io/github/license/tablelandnetwork/basin-cli.svg)](./LICENSE)
+[![standard-readme compliant](https://img.shields.io/badge/standard--readme-OK-green.svg)](https://github.com/RichardLitt/standard-readme)
 
-## Build
+> Continuously publish data from your database to the Tableland network.
+
+# Table of Contents
+
+- [basin-cli](#basin-cli)
+- [Table of Contents](#table-of-contents)
+- [Background](#background)
+- [Usage](#usage)
+  - [Install](#install)
+  - [Postgres Setup](#postgres-setup)
+  - [Create a publication](#create-a-publication)
+  - [Start replicating a publication](#start-replicating-a-publication)
+  - [Create a wallet](#create-a-wallet)
+- [Development](#development)
+  - [Running](#running)
+  - [Run tests](#run-tests)
+  - [Generate Cap'N Proto code](#generate-capn-proto-code)
+- [Contributing](#contributing)
+- [License](#license)
+
+# Background
+
+Tableland Basin is a secure and verifiable open data platform. The Basin CLI is a tool that allows you to continuously replicate a table or view from your database to the network. Currently, only PostgreSQL is supported.
+
+🚧 Basin is currently not in a production-ready state. Any data that is pushed to the network may be subject to deletion. 🚧
+
+# Usage
+
+## Install
 
 ```bash
 git clone https://github.com/tablelandnetwork/basin-cli.git
@@ -10,7 +39,7 @@ cd basin-cli
 go install ./cmd/basin
 ```
 
-## Usage
+## Postgres Setup
 
 - Make sure you have access to a superuser or a role with `LOGIN` and `REPLICATION` options.
 For example, you can create a new role such as `CREATE ROLE basin WITH PASSWORD NULL LOGIN REPLICATION;`.
@@ -23,29 +52,35 @@ For example, you can create a new role such as `CREATE ROLE basin WITH PASSWORD 
 
     The `wal_level` setting must be set to logical: `ALTER SYSTEM SET wal_level = logical;`.
 
-### Create a publication
+## Create a publication
+
+_Publications_ define the data you are pushing to Basin. The name of a publication contains a `namespace` (e.g. `my_company`) and the name of an existing database relation (e.g. `my_table`), separated by a period (`.`). Use `basin publication create` to create a new publication. See `basin publication create --help` for more info.
 
 ```bash
 basin publication create  --dburi [DBURI] --address [ETH_ADDRESS] namespace.relation_name
 ```
 
-`namespace.relation_name` is something like `my_company.my_table`. 
+🚧 Basin currently only replicates `INSERT` statements, which means that it only replicates append-only data (e.g., log-style data). Row updates and deletes will be ignored. 🚧
 
-### Start replicating a publication
+## Start replicating a publication
+
+Use `basin publication start` to start a daemon that will continuously push changes to the underlying table/view to the network. See `basin publication start --help` for more info.
 
 ```bash
 basin publication start --private-key [PRIVATE_KEY] namespace.relation_name
 ```
 
-### Create a wallet
+## Create a wallet
+
+You can use an existing Ethereum wallet or set up a new one using the CLI. Your private key is only used locally for signing.
 
 ```bash
-basin wallet create filename
+basin wallet create [FILENAME]
 ```
 
-## Local development
+# Development
 
-### Running
+## Running
 
 You can make use of the scripts inside `scripts` to facilitate running the CLI locally without building.
 
@@ -60,7 +95,7 @@ PORT=8888 ./scripts/server.sh
 ./scripts/run.sh publication start --private-key [PRIVATE_KEY] namespace.relation_name 
 ```
 
-### Run tests
+## Run tests
 
 ```bash
 make test
@@ -68,8 +103,19 @@ make test
 
 Note: One of the tests requires Docker Engine to be running.
 
-### Generate Cap'N Proto code
+## Generate Cap'N Proto code
 
 ```bash
 make generate
 ```
+
+# Contributing
+
+PRs accepted.
+
+Small note: If editing the README, please conform to the
+[standard-readme](https://github.com/RichardLitt/standard-readme) specification.
+
+# License
+
+MIT AND Apache-2.0, © 2021-2023 Tableland Network Contributors
