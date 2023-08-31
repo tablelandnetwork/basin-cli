@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"strings"
 
 	"capnproto.org/go/capnp/v3"
+	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
@@ -18,16 +20,52 @@ import (
 
 // BasinProvider implements the app.BasinProvider interface.
 type BasinProvider struct {
-	p Publications
+	p        Publications
+	provider string
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 var _ app.BasinProvider = (*BasinProvider)(nil)
 
 // New creates a new BasinProvider.
-func New(p Publications) *BasinProvider {
-	return &BasinProvider{
-		p: p,
+func New(ctx context.Context, provider string) (*BasinProvider, error) {
+	client, cancel, err := connect(ctx, provider)
+	if err != nil {
+		return nil, err
 	}
+
+	return &BasinProvider{
+		p:        client,
+		provider: provider,
+		ctx:      ctx,
+		cancel:   cancel,
+	}, nil
+}
+
+func connect(ctx context.Context, provider string) (Publications, func(), error) {
+	var client Publications
+	var closer func()
+	if provider == "mock" {
+		client = Publications_ServerToClient(NewBasinServerMock())
+		closer = func() {}
+	} else {
+		conn, err := net.Dial("tcp", provider)
+		if err != nil {
+			return Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
+		}
+
+		rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
+		closer = func() {
+			if err := rpcConn.Close(); err != nil {
+				slog.Error(err.Error())
+			}
+		}
+
+		client = Publications(rpcConn.Bootstrap(ctx))
+	}
+
+	return client, closer, nil
 }
 
 // Create creates a publication on Basin Provider.
@@ -79,6 +117,23 @@ func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx bas
 
 	_, err := f.Struct()
 	return err
+}
+
+// Reconnect with the Basin Provider.
+func (bp *BasinProvider) Reconnect() error {
+	bp.cancel()
+	client, cancel, err := connect(bp.ctx, bp.provider)
+	if err != nil {
+		return err
+	}
+	bp.p = client
+	bp.cancel = cancel
+	return nil
+}
+
+// Close the connection with the Basin Provider.
+func (bp *BasinProvider) Close() {
+	bp.cancel()
 }
 
 // BasinServerMock is a mocked version of a server implementation using for testing.

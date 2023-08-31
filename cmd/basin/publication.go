@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"path"
 	"regexp"
 	"strings"
 
 	"capnproto.org/go/capnp/v3"
-	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v5"
@@ -21,7 +19,6 @@ import (
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"github.com/urfave/cli/v2"
-	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
 
@@ -173,13 +170,12 @@ func newPublicationStartCommand() *cli.Command {
 				return err
 			}
 
-			client, close, err := getBasinClient(cCtx.Context, cfg.ProviderHost)
+			bp, err := basinprovider.New(cCtx.Context, cfg.ProviderHost)
 			if err != nil {
 				return err
 			}
-			defer close()
+			defer bp.Close()
 
-			bp := basinprovider.New(client)
 			basinStreamer := app.NewBasinStreamer(ns, r, bp, privateKey)
 			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				return fmt.Errorf("run: %s", err)
@@ -198,31 +194,6 @@ func parsePublicationName(name string) (ns string, rel string, err error) {
 	ns = match[1]
 	rel = match[2]
 	return
-}
-
-func getBasinClient(ctx context.Context, provider string) (basinprovider.Publications, func(), error) {
-	var client basinprovider.Publications
-	var closer func()
-	if provider == "mock" {
-		client = basinprovider.Publications_ServerToClient(basinprovider.NewBasinServerMock())
-		closer = func() {}
-	} else {
-		conn, err := net.Dial("tcp", provider)
-		if err != nil {
-			return basinprovider.Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
-		}
-
-		rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
-		closer = func() {
-			if err := rpcConn.Close(); err != nil {
-				slog.Error(err.Error())
-			}
-		}
-
-		client = basinprovider.Publications(rpcConn.Bootstrap(ctx))
-	}
-
-	return client, closer, nil
 }
 
 func createPublication(
@@ -328,13 +299,12 @@ func createPublication(
 		return false, fmt.Errorf("failed to create publication: %s", err)
 	}
 
-	client, close, err := getBasinClient(ctx, provider)
+	bp, err := basinprovider.New(ctx, provider)
 	if err != nil {
 		return false, err
 	}
-	defer close()
+	defer bp.Close()
 
-	bp := basinprovider.New(client)
 	if err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner)); err != nil {
 		return false, fmt.Errorf("create call: %s", err)
 	}

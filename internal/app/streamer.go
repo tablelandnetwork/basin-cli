@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"capnproto.org/go/capnp/v3"
+	"capnproto.org/go/capnp/v3/exc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pglogrepl"
@@ -25,6 +26,7 @@ type Replicator interface {
 type BasinProvider interface {
 	Create(context.Context, string, string, basincapnp.Schema, common.Address) error
 	Push(context.Context, string, string, basincapnp.Tx, []byte) error
+	Reconnect() error
 }
 
 // BasinStreamer contains logic of streaming Postgres changes to Basin Provider.
@@ -52,7 +54,6 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 		return fmt.Errorf("start replication: %s", err)
 	}
 
-	// TODO: implement a retry mechanism
 	for tx := range txs {
 		slog.Info("new transaction received")
 
@@ -66,7 +67,7 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 			return fmt.Errorf("sign: %s", err)
 		}
 
-		if err := b.provider.Push(ctx, b.namespace, table, capnpTx, signature); err != nil {
+		if err := b.push(ctx, table, capnpTx, signature); err != nil {
 			return fmt.Errorf("push: %s", err)
 		}
 
@@ -93,4 +94,17 @@ func (b *BasinStreamer) sign(tx basincapnp.Tx) ([]byte, error) {
 	}
 
 	return signature, nil
+}
+
+func (b *BasinStreamer) push(ctx context.Context, table string, tx basincapnp.Tx, signature []byte) error {
+	if err := b.provider.Push(ctx, b.namespace, table, tx, signature); exc.IsType(err, exc.Disconnected) {
+		slog.Info("reconnecting")
+		if err := b.provider.Reconnect(); err != nil {
+			return fmt.Errorf("reconnect: %s", err)
+		}
+		return b.push(ctx, table, tx, signature)
+	} else if err != nil {
+		return err
+	}
+	return nil
 }
