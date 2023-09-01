@@ -44,28 +44,19 @@ func New(ctx context.Context, provider string) (*BasinProvider, error) {
 }
 
 func connect(ctx context.Context, provider string) (Publications, func(), error) {
-	var client Publications
-	var closer func()
-	if provider == "mock" {
-		client = Publications_ServerToClient(NewBasinServerMock())
-		closer = func() {}
-	} else {
-		conn, err := net.Dial("tcp", provider)
-		if err != nil {
-			return Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
-		}
-
-		rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
-		closer = func() {
-			if err := rpcConn.Close(); err != nil {
-				slog.Error(err.Error())
-			}
-		}
-
-		client = Publications(rpcConn.Bootstrap(ctx))
+	conn, err := net.Dial("tcp", provider)
+	if err != nil {
+		return Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
 	}
 
-	return client, closer, nil
+	rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
+	closer := func() {
+		if err := rpcConn.Close(); err != nil {
+			slog.Error(err.Error())
+		}
+	}
+
+	return Publications(rpcConn.Bootstrap(ctx)), closer, nil
 }
 
 // Create creates a publication on Basin Provider.
