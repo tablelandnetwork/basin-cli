@@ -96,6 +96,7 @@ func (b *BasinStreamer) sign(tx basincapnp.Tx) ([]byte, error) {
 	return signature, nil
 }
 
+// TODO: Add exponential backoff on reconnect
 func (b *BasinStreamer) push(ctx context.Context, table string, tx basincapnp.Tx, signature []byte) error {
 	if err := b.provider.Push(ctx, b.namespace, table, tx, signature); exc.IsType(err, exc.Disconnected) {
 		slog.Info("reconnecting")
