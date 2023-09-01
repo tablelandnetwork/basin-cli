@@ -100,6 +100,13 @@ type basinProviderMock struct {
 	owner map[string]string
 }
 
+func (bp *basinProviderMock) Create(
+	_ context.Context, ns string, _ string, _ basincapnp.Schema, owner common.Address,
+) error {
+	bp.owner[ns] = owner.Hex()
+	return nil
+}
+
 func (bp *basinProviderMock) Push(
 	_ context.Context, _ string, _ string, tx basincapnp.Tx, signature []byte,
 ) error {
@@ -111,9 +118,6 @@ func (bp *basinProviderMock) Push(
 	return nil
 }
 
-func (bp *basinProviderMock) Create(
-	_ context.Context, ns string, _ string, _ basincapnp.Schema, owner common.Address,
-) error {
-	bp.owner[ns] = owner.Hex()
+func (bp *basinProviderMock) Reconnect() error {
 	return nil
 }

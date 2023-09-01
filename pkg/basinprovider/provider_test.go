@@ -58,5 +58,13 @@ func newServer() *BasinProvider {
 		_ = rpc.Serve(lis, bootstrapClient)
 	}()
 
-	return New(srv)
+	return &BasinProvider{
+		p:        srv,
+		provider: "mock",
+		ctx:      context.Background(),
+		cancel: func() {
+			close(make(chan struct{}))
+		},
+	}
+
 }
