@@ -50,7 +50,7 @@ func newPublicationCreateCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "address",
-				Usage:       "wallet address",
+				Usage:       "Ethereum wallet address",
 				Destination: &owner,
 				Required:    true,
 			},
@@ -74,6 +74,10 @@ func newPublicationCreateCommand() *cli.Command {
 			ns, rel, err := parsePublicationName(cCtx.Args().First())
 			if err != nil {
 				return err
+			}
+
+			if !common.IsHexAddress(owner) {
+				return fmt.Errorf("%s is not a valid Ethereum wallet address", owner)
 			}
 
 			pgConfig, err := pgconn.ParseConfig(dburi)
@@ -128,7 +132,7 @@ func newPublicationStartCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
-				Usage:       "wallet private key",
+				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
 			},
