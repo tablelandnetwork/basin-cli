@@ -54,10 +54,20 @@ For example, you can create a new role such as `CREATE ROLE basin WITH PASSWORD 
 
 ## Create a publication
 
-_Publications_ define the data you are pushing to Basin. The name of a publication contains a `namespace` (e.g. `my_company`) and the name of an existing database relation (e.g. `my_table`), separated by a period (`.`). Use `basin publication create` to create a new publication. See `basin publication create --help` for more info.
+_Publications_ define the data you are pushing to Basin.  
+
+Basin uses public key authentication, so you will need an Ethereum style (ECDSA, secp256k1) wallet to create a new publication. You can use an existing wallet or set up a new one with `basin wallet create`. Your private key is only used locally for signing.
 
 ```bash
-basin publication create  --dburi [DBURI] --address [ETH_ADDRESS] namespace.relation_name
+basin wallet create [FILENAME]
+```
+
+A new private key will be written to `FILENAME`.
+
+The name of a publication contains a `namespace` (e.g. `my_company`) and the name of an existing database relation (e.g. `my_table`), separated by a period (`.`). Use `basin publication create` to create a new publication. See `basin publication create --help` for more info.
+
+```bash
+basin publication create  --dburi [DBURI] --address [WALLET_ADDRESS] namespace.relation_name
 ```
 
 🚧 Basin currently only replicates `INSERT` statements, which means that it only replicates append-only data (e.g., log-style data). Row updates and deletes will be ignored. 🚧
@@ -68,14 +78,6 @@ Use `basin publication start` to start a daemon that will continuously push chan
 
 ```bash
 basin publication start --private-key [PRIVATE_KEY] namespace.relation_name
-```
-
-## Create a wallet
-
-You can use an existing Ethereum wallet or set up a new one using the CLI. Your private key is only used locally for signing.
-
-```bash
-basin wallet create [FILENAME]
 ```
 
 # Development
