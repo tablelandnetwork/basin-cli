@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	"github.com/tablelandnetwork/basin-cli/pkg/basinprovider"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
@@ -37,6 +38,7 @@ func newPublicationCommand() *cli.Command {
 		Subcommands: []*cli.Command{
 			newPublicationCreateCommand(),
 			newPublicationStartCommand(),
+			newPublicationUploadCommand(),
 		},
 	}
 }
@@ -190,10 +192,90 @@ func newPublicationStartCommand() *cli.Command {
 	}
 }
 
+func newPublicationUploadCommand() *cli.Command {
+	var privateKey, publicationName string
+
+	return &cli.Command{
+		Name:  "upload",
+		Usage: "upload a Parquet file",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "private-key",
+				Usage:       "Ethereum wallet private key",
+				Destination: &privateKey,
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "name",
+				Usage:       "Publication name",
+				Destination: &publicationName,
+				Required:    true,
+			},
+		},
+		Action: func(cCtx *cli.Context) error {
+			if cCtx.NArg() != 1 {
+				return errors.New("one argument should be provided")
+			}
+			ns, rel, err := parsePublicationName(publicationName)
+			if err != nil {
+				return err
+			}
+
+			privateKey, err := crypto.HexToECDSA(privateKey)
+			if err != nil {
+				return err
+			}
+
+			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			if err != nil {
+				return fmt.Errorf("default config location: %s", err)
+			}
+
+			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			if err != nil {
+				return fmt.Errorf("load config: %s", err)
+			}
+
+			bp, err := basinprovider.New(cCtx.Context, cfg.ProviderHost)
+			if err != nil {
+				return err
+			}
+			defer bp.Close()
+
+			filepath := cCtx.Args().First()
+
+			f, err := os.Open(filepath)
+			if err != nil {
+				return fmt.Errorf("open file: %s", err)
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+
+			fi, err := f.Stat()
+			if err != nil {
+				return fmt.Errorf("fstat: %s", err)
+			}
+
+			bar := progressbar.DefaultBytes(
+				fi.Size(),
+				"Uploading",
+			)
+
+			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey)
+			if err := basinStreamer.Upload(cCtx.Context, filepath, bar); err != nil {
+				return fmt.Errorf("upload: %s", err)
+			}
+
+			return nil
+		},
+	}
+}
+
 func parsePublicationName(name string) (ns string, rel string, err error) {
 	match := pubNameRx.FindStringSubmatch(name)
 	if len(match) != 3 {
-		return "", "", errors.New("publication name must be of the form `namespace.relation_name` using only letters, numbers, and underscores (_), where `namespace` and `relation` do not start with a number")
+		return "", "", errors.New("publication name must be of the form `namespace.relation_name` using only letters, numbers, and underscores (_), where `namespace` and `relation` do not start with a number") // nolint
 	}
 	ns = match[1]
 	rel = match[2]

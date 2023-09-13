@@ -37,7 +37,7 @@ type BasinStreamer struct {
 	provider   BasinProvider
 }
 
-// NewBasinStreamer creates new app.
+// NewBasinStreamer creates new streamer.
 func NewBasinStreamer(ns string, r Replicator, bp BasinProvider, pk *ecdsa.PrivateKey) *BasinStreamer {
 	return &BasinStreamer{
 		namespace:  ns,

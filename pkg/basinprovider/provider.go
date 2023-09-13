@@ -3,8 +3,10 @@ package basinprovider
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"strings"
@@ -83,7 +85,8 @@ func connectWithBackoff(ctx context.Context, provider string) (client Publicatio
 
 // Create creates a publication on Basin Provider.
 func (bp *BasinProvider) Create(
-	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address) error {
+	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address,
+) error {
 	f, release := bp.p.Create(ctx, func(bp Publications_create_Params) error {
 		if err := bp.SetNs(ns); err != nil {
 			return fmt.Errorf("setting ns: %s", err)
@@ -132,14 +135,79 @@ func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx bas
 	return err
 }
 
+// Upload uploads a file to th server.
+func (bp *BasinProvider) Upload(
+	ctx context.Context, ns string, rel string, r io.Reader, signer *app.Signer, progress io.Writer,
+) error {
+	uploadFuture, uploadRelease := bp.p.Upload(ctx, func(p Publications_upload_Params) error {
+		if err := p.SetNs(ns); err != nil {
+			return fmt.Errorf("setting sig: %s", err)
+		}
+
+		if err := p.SetRel(rel); err != nil {
+			return fmt.Errorf("setting sig: %s", err)
+		}
+
+		return nil
+	})
+	defer uploadRelease()
+
+	callback := uploadFuture.Callback()
+
+	buf := make([]byte, 0, 4*1024)
+	for {
+		n, err := r.Read(buf[:cap(buf)])
+		buf = buf[:n]
+		if err != nil {
+			if err != io.EOF {
+				return fmt.Errorf("read file: %s", err)
+			}
+			break
+		}
+		signer.Sum(buf)
+
+		err = callback.Write(ctx, func(p Publications_Callback_write_Params) error {
+			return p.SetChunk(buf)
+		})
+		if err != nil {
+			return fmt.Errorf("write: %s", err)
+		}
+
+		_, _ = progress.Write(buf)
+	}
+
+	doneFuture, doneRelease := callback.Done(ctx, func(p Publications_Callback_done_Params) error {
+		signature, err := signer.Sign()
+		if err != nil {
+			return fmt.Errorf("sign: %s", err)
+		}
+
+		if err := p.SetSig(signature); err != nil {
+			return fmt.Errorf("setting sig: %s", err)
+		}
+
+		return nil
+	})
+	defer doneRelease()
+	if _, err := doneFuture.Struct(); err != nil {
+		return fmt.Errorf("done: %s", err)
+	}
+
+	if err := bp.p.WaitStreaming(); err != nil {
+		return fmt.Errorf("wait streaming: %s", err)
+	}
+
+	return nil
+}
+
 // Reconnect with the Basin Provider.
 func (bp *BasinProvider) Reconnect() error {
 	bp.cancel()
-	client, cancel, err := connectWithBackoff(bp.ctx, bp.provider)
+	p, cancel, err := connectWithBackoff(bp.ctx, bp.provider)
 	if err != nil {
 		return err
 	}
-	bp.p = client
+	bp.p = p
 	bp.cancel = cancel
 	return nil
 }
@@ -230,7 +298,32 @@ func (s *BasinServerMock) Create(_ context.Context, call Publications_create) er
 	return nil
 }
 
-func (s *BasinServerMock) mustEmbedUnimplementedBasinProviderServer() {} // nolint
+// Upload handles the Write request.
+func (s *BasinServerMock) Upload(_ context.Context, call Publications_upload) error {
+	ns, err := call.Args().Ns()
+	if err != nil {
+		return err
+	}
+
+	rel, err := call.Args().Rel()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(ns, rel)
+
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+
+	err = results.SetCallback(Publications_Callback(capnp.NewClient(Publications_Callback_NewServer(&callbackMock{}))))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func (s *BasinServerMock) verifySignature(ns string, message []byte, signature []byte) error {
 	hash := crypto.Keccak256Hash(message)
@@ -252,5 +345,28 @@ func (s *BasinServerMock) verifySignature(ns string, message []byte, signature [
 		return errors.New("failed to verify")
 	}
 
+	return nil
+}
+
+type callbackMock struct{}
+
+func (c *callbackMock) Write(_ context.Context, p Publications_Callback_write) error {
+	chunk, err := p.Args().Chunk()
+	if err != nil {
+		return nil
+	}
+
+	fmt.Println(len(chunk))
+
+	return nil
+}
+
+func (c *callbackMock) Done(_ context.Context, p Publications_Callback_done) error {
+	signature, err := p.Args().Sig()
+	if err != nil {
+		return nil
+	}
+
+	fmt.Println(hex.EncodeToString(signature))
 	return nil
 }
