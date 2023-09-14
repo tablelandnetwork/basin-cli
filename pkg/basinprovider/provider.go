@@ -203,11 +203,11 @@ func (bp *BasinProvider) Upload(
 // Reconnect with the Basin Provider.
 func (bp *BasinProvider) Reconnect() error {
 	bp.cancel()
-	p, cancel, err := connectWithBackoff(bp.ctx, bp.provider)
+	client, cancel, err := connectWithBackoff(bp.ctx, bp.provider)
 	if err != nil {
 		return err
 	}
-	bp.p = p
+	bp.p = client
 	bp.cancel = cancel
 	return nil
 }

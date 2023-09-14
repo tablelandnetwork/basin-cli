@@ -80,6 +80,14 @@ Use `basin publication start` to start a daemon that will continuously push chan
 basin publication start --private-key [PRIVATE_KEY] namespace.relation_name
 ```
 
+## Upload a Parquet file
+
+Use `basin publication upload` to upload a Parquet file.
+
+```bash
+basin publication upload --name [PUBLICATION] --private-key [PRIVATE_KEY] filepath
+```
+
 # Development
 
 ## Running
