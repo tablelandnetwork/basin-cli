@@ -15,7 +15,6 @@ import (
 // BasinProviderUploader ...
 type BasinProviderUploader interface {
 	Upload(context.Context, string, string, io.Reader, *Signer, io.Writer) error
-	Reconnect() error
 }
 
 // BasinUploader contains logic of uploading Parquet files to Basin Provider.

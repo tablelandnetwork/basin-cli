@@ -3,7 +3,6 @@ package basinprovider
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -221,13 +220,16 @@ func (bp *BasinProvider) Close() {
 type BasinServerMock struct {
 	owner map[string]string
 	txs   map[basincapnp.Tx]bool
+
+	uploads map[string]*callbackMock
 }
 
 // NewBasinServerMock creates new *BasinServerMock.
 func NewBasinServerMock() *BasinServerMock {
 	return &BasinServerMock{
-		owner: make(map[string]string),
-		txs:   make(map[basincapnp.Tx]bool),
+		owner:   make(map[string]string),
+		txs:     make(map[basincapnp.Tx]bool),
+		uploads: make(map[string]*callbackMock),
 	}
 }
 
@@ -310,18 +312,21 @@ func (s *BasinServerMock) Upload(_ context.Context, call Publications_upload) er
 		return err
 	}
 
-	fmt.Println(ns, rel)
-
 	results, err := call.AllocResults()
 	if err != nil {
 		return err
 	}
 
-	err = results.SetCallback(Publications_Callback(capnp.NewClient(Publications_Callback_NewServer(&callbackMock{}))))
+	callback := &callbackMock{
+		ns:  ns,
+		rel: rel,
+	}
+	err = results.SetCallback(Publications_Callback(capnp.NewClient(Publications_Callback_NewServer(callback))))
 	if err != nil {
 		return err
 	}
 
+	s.uploads[fmt.Sprintf("%s.%s", ns, rel)] = callback
 	return nil
 }
 
@@ -348,7 +353,12 @@ func (s *BasinServerMock) verifySignature(ns string, message []byte, signature [
 	return nil
 }
 
-type callbackMock struct{}
+type callbackMock struct {
+	ns    string
+	rel   string
+	bytes []byte
+	sig   []byte
+}
 
 func (c *callbackMock) Write(_ context.Context, p Publications_Callback_write) error {
 	chunk, err := p.Args().Chunk()
@@ -356,7 +366,7 @@ func (c *callbackMock) Write(_ context.Context, p Publications_Callback_write) e
 		return nil
 	}
 
-	fmt.Println(len(chunk))
+	c.bytes = append(c.bytes, chunk...)
 
 	return nil
 }
@@ -367,6 +377,6 @@ func (c *callbackMock) Done(_ context.Context, p Publications_Callback_done) err
 		return nil
 	}
 
-	fmt.Println(hex.EncodeToString(signature))
+	c.sig = signature
 	return nil
 }
