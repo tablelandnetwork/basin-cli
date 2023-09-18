@@ -176,9 +176,6 @@ func (bp *BasinProvider) Upload(
 			return p.SetChunk(buf)
 		})
 		defer release()
-		if err != nil {
-			return fmt.Errorf("write: %s", err)
-		}
 		if _, err := f.Struct(); err != nil {
 			return fmt.Errorf("waiting for write: %s", err)
 		}
