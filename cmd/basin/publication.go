@@ -60,7 +60,6 @@ func newPublicationCreateCommand() *cli.Command {
 				Name:        "dburi",
 				Usage:       "PostgreSQL connection string",
 				Destination: &dburi,
-				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "provider",
@@ -73,7 +72,9 @@ func newPublicationCreateCommand() *cli.Command {
 			if cCtx.NArg() != 1 {
 				return errors.New("one argument should be provided")
 			}
-			ns, rel, err := parsePublicationName(cCtx.Args().First())
+
+			pub := cCtx.Args().First()
+			ns, rel, err := parsePublicationName(pub)
 			if err != nil {
 				return err
 			}
@@ -92,18 +93,27 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			f, err := os.Create(path.Join(dir, "config.yaml"))
+			f, err := os.OpenFile(path.Join(dir, "config.yaml"), os.O_RDWR|os.O_CREATE, 0o666)
 			if err != nil {
 				return fmt.Errorf("os create: %s", err)
 			}
+			defer func() {
+				_ = f.Close()
+			}()
 
-			cfg := config{}
-			cfg.DBS.Postgres.Host = pgConfig.Host
-			cfg.DBS.Postgres.Port = int(pgConfig.Port)
-			cfg.DBS.Postgres.User = pgConfig.User
-			cfg.DBS.Postgres.Password = pgConfig.Password
-			cfg.DBS.Postgres.Database = pgConfig.Database
-			cfg.ProviderHost = provider
+			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			if err != nil {
+				return fmt.Errorf("load config: %s", err)
+			}
+
+			cfg.Publications[pub] = publication{
+				Host:         pgConfig.Host,
+				Port:         int(pgConfig.Port),
+				User:         pgConfig.User,
+				Password:     pgConfig.Password,
+				Database:     pgConfig.Database,
+				ProviderHost: provider,
+			}
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
 				return fmt.Errorf("encode: %s", err)
@@ -143,7 +153,9 @@ func newPublicationStartCommand() *cli.Command {
 			if cCtx.NArg() != 1 {
 				return errors.New("one argument should be provided")
 			}
-			ns, rel, err := parsePublicationName(cCtx.Args().First())
+
+			publication := cCtx.Args().First()
+			ns, rel, err := parsePublicationName(publication)
 			if err != nil {
 				return err
 			}
@@ -159,11 +171,11 @@ func newPublicationStartCommand() *cli.Command {
 			}
 
 			connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
-				cfg.DBS.Postgres.User,
-				cfg.DBS.Postgres.Password,
-				cfg.DBS.Postgres.Host,
-				cfg.DBS.Postgres.Port,
-				cfg.DBS.Postgres.Database,
+				cfg.Publications[publication].User,
+				cfg.Publications[publication].Password,
+				cfg.Publications[publication].Host,
+				cfg.Publications[publication].Port,
+				cfg.Publications[publication].Database,
 			)
 
 			r, err := pgrepl.New(connString, pgrepl.Publication(rel))
@@ -176,7 +188,7 @@ func newPublicationStartCommand() *cli.Command {
 				return err
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, cfg.ProviderHost)
+			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publication].ProviderHost)
 			if err != nil {
 				return err
 			}
@@ -236,7 +248,7 @@ func newPublicationUploadCommand() *cli.Command {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, cfg.ProviderHost)
+			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publicationName].ProviderHost)
 			if err != nil {
 				return err
 			}
@@ -259,7 +271,7 @@ func newPublicationUploadCommand() *cli.Command {
 
 			bar := progressbar.DefaultBytes(
 				fi.Size(),
-				"Uploading",
+				"Uploading file...",
 			)
 
 			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey)
@@ -285,6 +297,21 @@ func parsePublicationName(name string) (ns string, rel string, err error) {
 func createPublication(
 	ctx context.Context, dburi string, ns string, rel string, provider string, owner string,
 ) (exists bool, err error) {
+	bp, err := basinprovider.New(ctx, provider)
+	if err != nil {
+		return false, err
+	}
+	defer bp.Close()
+
+	if dburi == "" {
+		exists, err := bp.Create(ctx, ns, rel, basincapnp.Schema{}, common.HexToAddress(owner))
+		if err != nil {
+			return false, fmt.Errorf("create call: %s", err)
+		}
+
+		return exists, nil
+	}
+
 	pgxConn, err := pgx.Connect(ctx, dburi)
 	if err != nil {
 		return false, fmt.Errorf("connect: %s", err)
@@ -385,13 +412,7 @@ func createPublication(
 		return false, fmt.Errorf("failed to create publication: %s", err)
 	}
 
-	bp, err := basinprovider.New(ctx, provider)
-	if err != nil {
-		return false, err
-	}
-	defer bp.Close()
-
-	if err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner)); err != nil {
+	if _, err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner)); err != nil {
 		return false, fmt.Errorf("create call: %s", err)
 	}
 

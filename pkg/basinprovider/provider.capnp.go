@@ -8,7 +8,6 @@ import (
 	fc "capnproto.org/go/capnp/v3/flowcontrol"
 	schemas "capnproto.org/go/capnp/v3/schemas"
 	server "capnproto.org/go/capnp/v3/server"
-	stream "capnproto.org/go/capnp/v3/std/capnp/stream"
 	context "context"
 	capnp2 "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 )
@@ -69,7 +68,7 @@ func (c Publications) Upload(ctx context.Context, params func(Publications_uploa
 		},
 	}
 	if params != nil {
-		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 2}
+		s.ArgsSize = capnp.ObjectSize{DataSize: 8, PointerCount: 2}
 		s.PlaceArgs = func(s capnp.Struct) error { return params(Publications_upload_Params(s)) }
 	}
 
@@ -229,7 +228,7 @@ func (c Publications_create) Args() Publications_create_Params {
 
 // AllocResults allocates the results struct.
 func (c Publications_create) AllocResults() (Publications_create_Results, error) {
-	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 8, PointerCount: 0})
 	return Publications_create_Results(r), err
 }
 
@@ -281,7 +280,8 @@ type Publications_Callback capnp.Client
 // Publications_Callback_TypeID is the unique identifier for the type Publications_Callback.
 const Publications_Callback_TypeID = 0xb4928ae23403b190
 
-func (c Publications_Callback) Write(ctx context.Context, params func(Publications_Callback_write_Params) error) error {
+func (c Publications_Callback) Write(ctx context.Context, params func(Publications_Callback_write_Params) error) (Publications_Callback_write_Results_Future, capnp.ReleaseFunc) {
+
 	s := capnp.Send{
 		Method: capnp.Method{
 			InterfaceID:   0xb4928ae23403b190,
@@ -295,7 +295,8 @@ func (c Publications_Callback) Write(ctx context.Context, params func(Publicatio
 		s.PlaceArgs = func(s capnp.Struct) error { return params(Publications_Callback_write_Params(s)) }
 	}
 
-	return capnp.Client(c).SendStreamCall(ctx, s)
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Publications_Callback_write_Results_Future{Future: ans.Future()}, release
 
 }
 
@@ -455,9 +456,9 @@ func (c Publications_Callback_write) Args() Publications_Callback_write_Params {
 }
 
 // AllocResults allocates the results struct.
-func (c Publications_Callback_write) AllocResults() (stream.StreamResult, error) {
+func (c Publications_Callback_write) AllocResults() (Publications_Callback_write_Results, error) {
 	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 0})
-	return stream.StreamResult(r), err
+	return Publications_Callback_write_Results(r), err
 }
 
 // Publications_Callback_done holds the state for a server call to Publications_Callback.done.
@@ -561,6 +562,71 @@ type Publications_Callback_write_Params_Future struct{ *capnp.Future }
 func (f Publications_Callback_write_Params_Future) Struct() (Publications_Callback_write_Params, error) {
 	p, err := f.Future.Ptr()
 	return Publications_Callback_write_Params(p.Struct()), err
+}
+
+type Publications_Callback_write_Results capnp.Struct
+
+// Publications_Callback_write_Results_TypeID is the unique identifier for the type Publications_Callback_write_Results.
+const Publications_Callback_write_Results_TypeID = 0xc7b7a97070ce93e5
+
+func NewPublications_Callback_write_Results(s *capnp.Segment) (Publications_Callback_write_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_write_Results(st), err
+}
+
+func NewRootPublications_Callback_write_Results(s *capnp.Segment) (Publications_Callback_write_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_write_Results(st), err
+}
+
+func ReadRootPublications_Callback_write_Results(msg *capnp.Message) (Publications_Callback_write_Results, error) {
+	root, err := msg.Root()
+	return Publications_Callback_write_Results(root.Struct()), err
+}
+
+func (s Publications_Callback_write_Results) String() string {
+	str, _ := text.Marshal(0xc7b7a97070ce93e5, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_Callback_write_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_Callback_write_Results) DecodeFromPtr(p capnp.Ptr) Publications_Callback_write_Results {
+	return Publications_Callback_write_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_Callback_write_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_Callback_write_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_Callback_write_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_Callback_write_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+
+// Publications_Callback_write_Results_List is a list of Publications_Callback_write_Results.
+type Publications_Callback_write_Results_List = capnp.StructList[Publications_Callback_write_Results]
+
+// NewPublications_Callback_write_Results creates a new list of Publications_Callback_write_Results.
+func NewPublications_Callback_write_Results_List(s *capnp.Segment, sz int32) (Publications_Callback_write_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return capnp.StructList[Publications_Callback_write_Results](l), err
+}
+
+// Publications_Callback_write_Results_Future is a wrapper for a Publications_Callback_write_Results promised by a client call.
+type Publications_Callback_write_Results_Future struct{ *capnp.Future }
+
+func (f Publications_Callback_write_Results_Future) Struct() (Publications_Callback_write_Results, error) {
+	p, err := f.Future.Ptr()
+	return Publications_Callback_write_Results(p.Struct()), err
 }
 
 type Publications_Callback_done_Params capnp.Struct
@@ -851,12 +917,12 @@ type Publications_create_Results capnp.Struct
 const Publications_create_Results_TypeID = 0x9d09768207bbb14b
 
 func NewPublications_create_Results(s *capnp.Segment) (Publications_create_Results, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0})
 	return Publications_create_Results(st), err
 }
 
 func NewRootPublications_create_Results(s *capnp.Segment) (Publications_create_Results, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0})
 	return Publications_create_Results(st), err
 }
 
@@ -892,13 +958,20 @@ func (s Publications_create_Results) Message() *capnp.Message {
 func (s Publications_create_Results) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
+func (s Publications_create_Results) Exists() bool {
+	return capnp.Struct(s).Bit(0)
+}
+
+func (s Publications_create_Results) SetExists(v bool) {
+	capnp.Struct(s).SetBit(0, v)
+}
 
 // Publications_create_Results_List is a list of Publications_create_Results.
 type Publications_create_Results_List = capnp.StructList[Publications_create_Results]
 
 // NewPublications_create_Results creates a new list of Publications_create_Results.
 func NewPublications_create_Results_List(s *capnp.Segment, sz int32) (Publications_create_Results_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0}, sz)
 	return capnp.StructList[Publications_create_Results](l), err
 }
 
@@ -1121,12 +1194,12 @@ type Publications_upload_Params capnp.Struct
 const Publications_upload_Params_TypeID = 0xd067b888abba0bca
 
 func NewPublications_upload_Params(s *capnp.Segment) (Publications_upload_Params, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
 	return Publications_upload_Params(st), err
 }
 
 func NewRootPublications_upload_Params(s *capnp.Segment) (Publications_upload_Params, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
 	return Publications_upload_Params(st), err
 }
 
@@ -1198,12 +1271,20 @@ func (s Publications_upload_Params) SetRel(v string) error {
 	return capnp.Struct(s).SetText(1, v)
 }
 
+func (s Publications_upload_Params) Size() uint64 {
+	return capnp.Struct(s).Uint64(0)
+}
+
+func (s Publications_upload_Params) SetSize(v uint64) {
+	capnp.Struct(s).SetUint64(0, v)
+}
+
 // Publications_upload_Params_List is a list of Publications_upload_Params.
 type Publications_upload_Params_List = capnp.StructList[Publications_upload_Params]
 
 // NewPublications_upload_Params creates a new list of Publications_upload_Params.
 func NewPublications_upload_Params_List(s *capnp.Segment, sz int32) (Publications_upload_Params_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2}, sz)
 	return capnp.StructList[Publications_upload_Params](l), err
 }
 
@@ -1300,57 +1381,61 @@ func (p Publications_upload_Results_Future) Callback() Publications_Callback {
 	return Publications_Callback(p.Future.Field(0, nil).Client())
 }
 
-const schema_9cf9878fd3dd8473 = "x\xda\xac\x95_h\x1cU\x14\xc6\xcfw\xef\xec\xdc\x0d" +
-	"f\xcd^&R-H\xec\xd2\x82-t\xdb$\x85b" +
-	"Dv%\x14I}\xc9\xed\xb3\xa5N&cv\xc8d" +
-	"v\x99\xd9\xc9\x0a\xbe\x98\xfa\xa7V\x04\x8b\x90\x07\xa5Z" +
-	"|\xf0AD0\xe2\x83D-}\x8a \x88\x7f\x1f\x8c" +
-	"X\xc4\"\x88\x85\xbe\xa9%\x82\x8c\xdc\xd9\x9d\xdd\x11\x95" +
-	"\xa6M\xdf.\xbb\xdf\xdd\xf3\xfd\xce9\xfb\xdd\xc3\xa7Y" +
-	"\xdd\x18/]/\x12S\x8d\x82\x99l~\xb5\"\xd6\xcb" +
-	"_<G\xb2\x0a\xa2\x82!\x88&m\xe3k\x10\xac\xd8" +
-	"\xf8\x85\x90\xfc|\xe1\x9a\xf3\xc8\xc3\xcf\x9f\xcd\x0bf\x0a" +
-	"W\xb4\xe0dA\x0b\x1e\x1aZ\xae\x0c\xed{\xe2%\x92" +
-	"G\xb5\x00Z0nV\x18\xc1\x9a1k\x84\xe4\xf7\xf3" +
-	"O?3\xf4\xc6\xc5sy\x81g\xee\xd6\x82\x95T\xf0" +
-	"\xe8\xdaG\xe2\xf4\xf2\xd0\xeb\xdd\x12i\x857\xcd\xab " +
-	"#9\xb7\xc6\x8f\\y\xf1\x95\x0fHVyry\xd7" +
-	"o\x8d\xcd\xfb~\xf8\x8b\x08\x93\xab\xe6:\xacwMA" +
-	"d\xbdm\x9e\xb1\xb6\xf4)\xb9\xf3\xd2\x81?\x8f\x1e\x8b" +
-	"?\xef\x16J\x7f\xe7'm\xc4H>\xbbc\xfd\x9d\x17" +
-	">\\\xf8\xb2\x07\xc1\xf4W\x9bf\x0aq\xcd\xec\x10\x92" +
-	"\xf1\xeb\xef=8w\xb1\xf2mO\x90z\x9c\x11WS" +
-	"J\xa1=~\xb2\xff\x8f\x0b\xdfM>\xf5c\xce\xe3\x8a" +
-	"\xf8^{\xec\xdb\x92{x\x12={\xf9\x9b\x97\xcfl" +
-	"\x9d\xd7\x1ec\x11\xc2:+v\x11Y\xab\xe2S\xabT" +
-	"\x14\xf4V\xd2Z\\84gG\x9e\x19\xb4\xc2\xe6\xb2" +
-	"7\xef\x86\x87\xb2C\xd5\xb1[Akj6\x9e\xf3=" +
-	"\xc7n{\xcd \xaa\xb6\xe2\xa8\xb1w\xd6\x0e\xed%D" +
-	"\xaa\xcc\x0d\"\x03D\xd2\xdeM\xa4\x1e\xe3P\x0d\x06\x09" +
-	"\x8cB\x7f\xe8V\x88\xd4\xe3\x1c\xcag\x90\x8c\x8d\x82\x11" +
-	"IO+\xe79T\x8bAr>\x0aN$\x97\xb4\xb2" +
-	"\xc1\xa1\xda\x0c<\x880L\x0c\xc3\x04\x11\xba~v\xe6" +
-	"\xed'QNNm\xc5\xf7\x8a\x93\xd6\xafD@\x99 " +
-	"\"o\x01%b(\x11n\x96\xc4\x09]\xbb\xedj\x16" +
-	"a/\xdd\"\xcb\xd4\x7f\xb1L\xdc\x90\xa5\x169\x0dw" +
-	"\xc9F9\x99\xde\xf8xcub\xe3\xfd\x1e\xcfX\xb3" +
-	"\x13\xb8\xe1\xbf\x88\xc4\xf6\x88\xa6m\xdf\x9f\xb3\x9d\xc5j" +
-	"'\xf4rdF\x9f\xac\xa4\xad\x159\xd4(\xc3\x98\xd3" +
-	"\x88\x83\xc5\x1d\x97\x9ao\x06i%\x9b\xff\xb3ReP" +
-	"\xe96\x0c\xe9\x84\x1b\x8d\xc4~;\xea_/l\xd7f" +
-	"\xad\xebs\x16PE^ \xea\xa7\x03\x82\xb5K\x9d\xc9" +
-	"\xd7N\xbd*\xc7'\x88\xc9}\x02\x83`@\xf6\xc7\x95" +
-	"\xf7\x1c &Kb,\xedh\x1d#\x1a\xb7\x8eY\xec" +
-	"\xb0a'\xdc(\x16y\x9em\xb6#n\xf9M{\xbe" +
-	"?\xd9b\xbf\xdf\xfb\xf5\xce\xee\xe5P\x87s;{P" +
-	"\x0f\xe1~\x0eu\xe4\x7f7\xf1\x16\x0dd\xf3\xc8O\xfc" +
-	"8\x91\x1a\xe6Pw3$N\x8f\x96\x88 \x07\xa1I" +
-	"\x80\xbc\xf9\x9ai\xe4\xe8\x8e\xf9<\xd71\xe3F\x97\xc7" +
-	"\xd2\xdb\xca\x00r\xa9\x8d\xe3\xc9\xf4\xc0\x9b\x1aNW\"" +
-	"{Q\x90\xe5\xbeTS\xc4\xe41\xbd\x12\xd9s\x84," +
-	"o\xe5\x03z%\x0e\x0a\xb0~\x88#\x0bk\xb9G\xdf" +
-	"\xbbK\xd4\xbak[\xc7\x88\xf6^G\xad\xdb\xb6tq" +
-	"\xfe\x0e\x00\x00\xff\xff\x14'\xfbC"
+const schema_9cf9878fd3dd8473 = "x\xda\xacU]h\x1cE\x1c\xff\xfff\xf6vzx" +
+	"gn\xd8H\xb5Pb\x0f\xfb`\xc0\xabI\x84\xd2\x88" +
+	"\xdcI\x0cj\xb5pS|\xac\xe8\xe6\xb2\xe6\x96\xdc\xc7" +
+	"\xba{\x9b\xb6\xfa\xe2W\xad\x15\xc5\xa2\xf4\xad\xb5\xf8(" +
+	"\"ZQ\x94\xa8\xc5\x97\xa6 \xf8\xed\x83\x11\x83P," +
+	"\xa2 \"\xf8A\x85\xb02{\xb7w[\xac41}" +
+	"\x1b\x98\xdf\xcc\xefc\xfe\xff\xf9\xdf|\x84U\x8c\xb1\xfc" +
+	"\xaf\x82\x98\xda\x971\xa3\xe5/\x1e\x17\x8b\x85\xcf\x0e\x91" +
+	",\x81(c\x08\xa2\x89\x15\xfe%\x08\xd6o\xfcGB" +
+	"\xf4\xc3\xc9_jw\xde\xfe\xf4\x914\xe0\x8cqN\x03" +
+	"\x96\x0d\x0d\xb8-\xbbP\xccn\x7f\xe89\x92;5\x00" +
+	"\x1a\xf0z\xa6\xc8\x08\xd6\x99L\x99\x10\xfdq\xfc\xb1'" +
+	"\xb3/\x9f>\x9a\x06\x9c\xcfl\xd1\x80\xd5\x18p\xcf\xa9" +
+	"\xf7\xc5\x13\x0b\xd9\x13\xa4J\x00QL\xb1\xd5\xfcYS" +
+	"\x8c\x99\x1ap\xf4\x14\xbf\xe5\xdc\xb3/\xbeM\xb2\xc4\xa3" +
+	"\x95\xcd\xbf\xd7\x97\xaf\xffn\x95\x08\x13\xca\\\x84\xe5\x9a" +
+	"\x82\xc8r\xcc\xc3\xd6;z\x15\x9d\x7f\xe9S\xcf{\xf5" +
+	"\xdd\xb3]\xbe\xf8\xb6\x13\xe6(##\xba\xfa\xa3\xd1\xbf" +
+	"wN\x87\x9f\xa4v\x8e\x99E\xbd\xf3\xf1U\x8b\xaf=" +
+	"\xf3\xde\xdc\xe7=\x09\x19\xa6\xf7\x9e7c\x9b\xaf\x98o" +
+	"\x10\xa2\xb1\xbf\xde\xbcu\xe6t\xf1\xeb^\x0e\xb1\x8b]" +
+	"\"\x16\xb9Gh\x91\x1f\xde\xf8\xe7\xc9o&\x1e\xfd\xbe" +
+	"\x0b\x88/\x7fX|\x0b2\x06\x8a\xe56\x1e\x05O\xad" +
+	"|\xf5\xc2\xe1\x0b\xc7\xb5|G\xf8\xb0\x0e\x8a\xcdD\xd6" +
+	"!q\xd6Z\x15\x82\x0eF\xde\xfc\xdc\x8e\x19;p\xcd" +
+	"\x96\xe7\xb7\x17\xdcY\xc7\xdf\x91,J5\xdbky\x93" +
+	"\xd5p\xa6\xe1\xd6\xec\x8e\xdbn\x05%/\x0c\xea7T" +
+	"m\xdfn\"P\x05n\x10\x19 \x92\xf6\x16\"\xb5\x8f" +
+	"C\xd5\x19$0\xac]I\xa7H\xa4\x1e\xe4P\x0d\x06" +
+	"\xc9\xd80\x18\x91t5r\x96Cy\x0c\x92\xf3ap" +
+	"\"\xd9\xd4\xc8:\x87\xea0\xf0V\x80\x1c1\xe4\x08\xc2" +
+	"w\x1a\xc9\x9aw\x0e\xa0\x10=p!\xdc*\xee\xb7~" +
+	"\"\x02\x0a\x04\x11\xb8s\xc8\x13C\x9e\xb0^'5\xdf" +
+	"\xb1;\x8e\xf6\"\xec\xe6\xff\xf42y)/\xe3\x97\xf5" +
+	"R\x0eju\xa7i\xa3\x10M-}\xb0tl|\xe9" +
+	"\xad\x9e\x9f\x91\xf6\xfe\x96\xe3\xff\xcb\x91X\x9b\xa3)\xbb" +
+	"\xd1\x98\xb1k\xf3\xa5\xfd\xbe\x9brf\xf4\x9d\xe5\xb5\xb4" +
+	"M\x1cj\x98a\xa4V\x0f[\xf3\x1b\xa6\x9am\xb7b" +
+	"&\x9b_\xccT\x1c0]\x81G\xda\xeb\x04Ca\xa3" +
+	"s\x11\xc3\xe4\x80\xa1\xec\x1cp\x83N\x00\x10\x03R$" +
+	"\x99\xb5\x9a)w\xddT\x01\xb5\x89g\x88\xfa\xbf\x0c\x92" +
+	"\xee\x96c\xe3\xc4\xe4v\x81\xc1\x07\x83\xa4\xbf\xe5u\xa3" +
+	"\xc4d^\x8c\xc4\xb9W0\xa4C\xa9\xa0\x8a\x8d\xbe`" +
+	"b{c\xaf\xb3\xd7\x09B\x91\xbee\x8d\xd9\x87^\xa3" +
+	"m\xcf\xf6\xcb(\xd7\x8f~Z7H\x85C\xdd\x9bj" +
+	"\x90\xbb\xf5\x8b\xdf\xc1\xa1\xaa\x0c\xe8\xf5\xc7\x9eQ\"u" +
+	"\x17\x87\xba\xef?[a(p\x1fq\x90%\x86\xec\xfa" +
+	"\xab\xa3\xa7\xf0R\xd5\xb1\x9bH\xe58\xd4\xb5\x0cQ\xad" +
+	"\x17\x07\x11A\x0e~w\x02\xe4\xfa9\xe3\x0fPG\xda" +
+	"\xe0\xa9H\x8d\xcb\x1d\x1e\x89O+\x03\xe9\xf1\x82\xdd\xd1" +
+	"\xd4@\x9b\xca\xc5\xa5\x97L@$sJ\xaaIbr" +
+	"Z\x97^2>\x91\xfc\xfer\x97.\xbd\x9b\x04X\x7f" +
+	"\xa6 \x19\x1dr\x9b>w\x8d(w\x9b\xa8\x82!\xad" +
+	"\xbd\x82r7\xb6\xb8@\xff\x09\x00\x00\xff\xff\x9a\x16+" +
+	"\xa1"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
@@ -1362,6 +1447,7 @@ func RegisterSchema(reg *schemas.Registry) {
 			0x90be9e0983809cf5,
 			0x9d09768207bbb14b,
 			0xb4928ae23403b190,
+			0xc7b7a97070ce93e5,
 			0xcd754537fa2ac00e,
 			0xd067b888abba0bca,
 			0xd422be623bb0f731,

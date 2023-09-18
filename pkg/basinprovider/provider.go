@@ -24,6 +24,9 @@ import (
 // maxPushAttempts is the max number of attempts used to dial the provider.
 const maxPushAttempts = 10
 
+// uploadChunk is the size of the chunk when uploading a file.
+const uploadChunk = 1 << 20 // 2 ^ 20 bytes = 1MiB
+
 // BasinProvider implements the app.BasinProvider interface.
 type BasinProvider struct {
 	p        Publications
@@ -85,7 +88,7 @@ func connectWithBackoff(ctx context.Context, provider string) (client Publicatio
 // Create creates a publication on Basin Provider.
 func (bp *BasinProvider) Create(
 	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address,
-) error {
+) (bool, error) {
 	f, release := bp.p.Create(ctx, func(bp Publications_create_Params) error {
 		if err := bp.SetNs(ns); err != nil {
 			return fmt.Errorf("setting ns: %s", err)
@@ -103,8 +106,12 @@ func (bp *BasinProvider) Create(
 	})
 	defer release()
 
-	_, err := f.Struct()
-	return err
+	results, err := f.Struct()
+	if err != nil {
+		return false, fmt.Errorf("waiting for create: %s", err)
+	}
+
+	return results.Exists(), nil
 }
 
 // Push pushes Postgres tx to the server.
@@ -153,7 +160,7 @@ func (bp *BasinProvider) Upload(
 
 	callback := uploadFuture.Callback()
 
-	buf := make([]byte, 0, 4*1024)
+	buf := make([]byte, uploadChunk)
 	for {
 		n, err := r.Read(buf[:cap(buf)])
 		buf = buf[:n]
@@ -165,11 +172,15 @@ func (bp *BasinProvider) Upload(
 		}
 		signer.Sum(buf)
 
-		err = callback.Write(ctx, func(p Publications_Callback_write_Params) error {
+		f, release := callback.Write(ctx, func(p Publications_Callback_write_Params) error {
 			return p.SetChunk(buf)
 		})
+		defer release()
 		if err != nil {
 			return fmt.Errorf("write: %s", err)
+		}
+		if _, err := f.Struct(); err != nil {
+			return fmt.Errorf("waiting for write: %s", err)
 		}
 
 		_, _ = progress.Write(buf)
@@ -218,8 +229,9 @@ func (bp *BasinProvider) Close() {
 
 // BasinServerMock is a mocked version of a server implementation using for testing.
 type BasinServerMock struct {
-	owner map[string]string
-	txs   map[basincapnp.Tx]bool
+	publications map[string]struct{}
+	owner        map[string]string
+	txs          map[basincapnp.Tx]bool
 
 	uploads map[string]*callbackMock
 }
@@ -227,9 +239,10 @@ type BasinServerMock struct {
 // NewBasinServerMock creates new *BasinServerMock.
 func NewBasinServerMock() *BasinServerMock {
 	return &BasinServerMock{
-		owner:   make(map[string]string),
-		txs:     make(map[basincapnp.Tx]bool),
-		uploads: make(map[string]*callbackMock),
+		publications: make(map[string]struct{}),
+		owner:        make(map[string]string),
+		txs:          make(map[basincapnp.Tx]bool),
+		uploads:      make(map[string]*callbackMock),
 	}
 }
 
@@ -285,7 +298,7 @@ func (s *BasinServerMock) Create(_ context.Context, call Publications_create) er
 		return err
 	}
 
-	slog.Info("Publication created", "namespace", ns, "relation", rel, "owner", owner)
+	slog.Info("Publication created", "namespace", ns, "relation", rel, "owner", common.BytesToAddress(owner).Hex())
 
 	columns, _ := schema.Columns()
 	for i := 0; i < columns.Len(); i++ {
@@ -296,7 +309,17 @@ func (s *BasinServerMock) Create(_ context.Context, call Publications_create) er
 		slog.Info("Column schema", "name", name, "typ", typ, "is_null", isNull, "is_pk", isPk)
 	}
 
-	s.owner[ns] = common.BytesToAddress(owner).Hex()
+	results, _ := call.AllocResults()
+	_, ok := s.publications[fmt.Sprintf("%s.%s", ns, rel)]
+	fmt.Println(s.publications, ok)
+	if ok {
+		results.SetExists(true)
+	} else {
+		s.publications[fmt.Sprintf("%s.%s", ns, rel)] = struct{}{}
+		results.SetExists(false)
+	}
+	fmt.Println(s.publications, ok)
+
 	return nil
 }
 

@@ -23,8 +23,9 @@ func TestBasinProvider_Create(t *testing.T) {
 	// send to the server, the server deserialize it and send the value back
 
 	bp, _ := newClientAndServer()
-	err := bp.Create(context.Background(), "n", "t", basincapnp.Schema{}, common.HexToAddress(""))
+	exists, err := bp.Create(context.Background(), "n", "t", basincapnp.Schema{}, common.HexToAddress(""))
 	require.NoError(t, err)
+	require.False(t, exists)
 }
 
 func TestBasinProvider_Push(t *testing.T) {

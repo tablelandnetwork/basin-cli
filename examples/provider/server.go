@@ -20,6 +20,7 @@ func main() {
 
 	slog.Info("Listening", "port", os.Getenv("PORT"))
 
+	server := basinprovider.NewBasinServerMock()
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -28,7 +29,7 @@ func main() {
 		}
 		defer conn.Close()
 
-		client := basinprovider.Publications_ServerToClient(basinprovider.NewBasinServerMock())
+		client := basinprovider.Publications_ServerToClient(server)
 		rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), &rpc.Options{
 			BootstrapClient: capnp.Client(client),
 		})

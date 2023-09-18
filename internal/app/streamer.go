@@ -24,7 +24,7 @@ type Replicator interface {
 
 // BasinProvider ...
 type BasinProvider interface {
-	Create(context.Context, string, string, basincapnp.Schema, common.Address) error
+	Create(context.Context, string, string, basincapnp.Schema, common.Address) (bool, error)
 	Push(context.Context, string, string, basincapnp.Tx, []byte) error
 	Reconnect() error
 }
