@@ -33,7 +33,7 @@ type basinProviderUploderMock struct {
 }
 
 func (bp *basinProviderUploderMock) Upload(
-	_ context.Context, _ string, _ string, r io.Reader, _ *Signer, _ io.Writer,
+	_ context.Context, _ string, _ string, _ uint64, r io.Reader, _ *Signer, _ io.Writer,
 ) error {
 	buf := make([]byte, 4*1024)
 	for {

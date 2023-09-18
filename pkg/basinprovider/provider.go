@@ -143,7 +143,7 @@ func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx bas
 
 // Upload uploads a file to th server.
 func (bp *BasinProvider) Upload(
-	ctx context.Context, ns string, rel string, r io.Reader, signer *app.Signer, progress io.Writer,
+	ctx context.Context, ns string, rel string, size uint64, r io.Reader, signer *app.Signer, progress io.Writer,
 ) error {
 	uploadFuture, uploadRelease := bp.p.Upload(ctx, func(p Publications_upload_Params) error {
 		if err := p.SetNs(ns); err != nil {
@@ -153,6 +153,8 @@ func (bp *BasinProvider) Upload(
 		if err := p.SetRel(rel); err != nil {
 			return fmt.Errorf("setting sig: %s", err)
 		}
+
+		p.SetSize(size)
 
 		return nil
 	})
@@ -308,14 +310,12 @@ func (s *BasinServerMock) Create(_ context.Context, call Publications_create) er
 
 	results, _ := call.AllocResults()
 	_, ok := s.publications[fmt.Sprintf("%s.%s", ns, rel)]
-	fmt.Println(s.publications, ok)
 	if ok {
 		results.SetExists(true)
 	} else {
 		s.publications[fmt.Sprintf("%s.%s", ns, rel)] = struct{}{}
 		results.SetExists(false)
 	}
-	fmt.Println(s.publications, ok)
 
 	return nil
 }
@@ -331,6 +331,8 @@ func (s *BasinServerMock) Upload(_ context.Context, call Publications_upload) er
 	if err != nil {
 		return err
 	}
+
+	fmt.Println(call.Args().Size())
 
 	results, err := call.AllocResults()
 	if err != nil {

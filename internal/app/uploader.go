@@ -14,7 +14,7 @@ import (
 
 // BasinProviderUploader ...
 type BasinProviderUploader interface {
-	Upload(context.Context, string, string, io.Reader, *Signer, io.Writer) error
+	Upload(context.Context, string, string, uint64, io.Reader, *Signer, io.Writer) error
 }
 
 // BasinUploader contains logic of uploading Parquet files to Basin Provider.
@@ -45,7 +45,14 @@ func (bu *BasinUploader) Upload(ctx context.Context, filepath string, progress i
 		_ = f.Close()
 	}()
 
-	if err := bu.provider.Upload(ctx, bu.namespace, bu.relation, f, NewSigner(bu.privateKey), progress); err != nil {
+	fi, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("file stat: %s", err)
+	}
+
+	if err := bu.provider.Upload(
+		ctx, bu.namespace, bu.relation, uint64(fi.Size()), f, NewSigner(bu.privateKey), progress,
+	); err != nil {
 		return fmt.Errorf("upload: %s", err)
 	}
 

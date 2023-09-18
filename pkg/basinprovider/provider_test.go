@@ -60,7 +60,9 @@ func TestBasinProvider_Upload(t *testing.T) {
 		filedata := []byte{'H', 'e', 'l', 'l', 'o'}
 
 		buf := bytes.NewReader(filedata)
-		err := client.Upload(context.Background(), "test", "test", buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}))
+		err := client.Upload(
+			context.Background(), "test", "test", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}),
+		)
 		require.NoError(t, err)
 		require.Equal(t, filedata, server.uploads["test.test"].bytes)
 		require.Equal(t, "801fb03a3a34fd9d3ac5445f693df74c822d2e8cfa736191e7919e099931d8a51cd0a62fc67da6d8f0aab4302c18aa0cf381c973a8817b7062805f19d03f88ce00", hex.EncodeToString(server.uploads["test.test"].sig)) // nolint
@@ -70,7 +72,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 		filedata := []byte{'W', 'o', 'r', 'l', 'd'}
 
 		buf := bytes.NewReader(filedata)
-		err := client.Upload(context.Background(), "test2", "test2", buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{})) // nolint
+		err := client.Upload(context.Background(), "test2", "test2", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{})) // nolint
 		require.NoError(t, err)
 		require.Equal(t, filedata, server.uploads["test2.test2"].bytes)
 		require.Equal(t, "3ad572a3483971285f3c6dc0e71d234a58543876f98b23183dc4e60008c1a92310f42202858b48ad917588535c2234c85413e124a2dcdd0759df9c555a9f585901", hex.EncodeToString(server.uploads["test2.test2"].sig)) // nolint
