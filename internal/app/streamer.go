@@ -24,7 +24,7 @@ type Replicator interface {
 
 // BasinProvider ...
 type BasinProvider interface {
-	Create(context.Context, string, string, basincapnp.Schema, common.Address) error
+	Create(context.Context, string, string, basincapnp.Schema, common.Address) (bool, error)
 	Push(context.Context, string, string, basincapnp.Tx, []byte) error
 	Reconnect() error
 }
@@ -37,7 +37,7 @@ type BasinStreamer struct {
 	provider   BasinProvider
 }
 
-// NewBasinStreamer creates new app.
+// NewBasinStreamer creates new streamer.
 func NewBasinStreamer(ns string, r Replicator, bp BasinProvider, pk *ecdsa.PrivateKey) *BasinStreamer {
 	return &BasinStreamer{
 		namespace:  ns,

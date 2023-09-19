@@ -57,6 +57,26 @@ func (c Publications) Push(ctx context.Context, params func(Publications_push_Pa
 
 }
 
+func (c Publications) Upload(ctx context.Context, params func(Publications_upload_Params) error) (Publications_upload_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xfddc20d968f417dd,
+			MethodID:      2,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications",
+			MethodName:    "upload",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 8, PointerCount: 2}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Publications_upload_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Publications_upload_Results_Future{Future: ans.Future()}, release
+
+}
+
 func (c Publications) WaitStreaming() error {
 	return capnp.Client(c).WaitStreaming()
 }
@@ -133,6 +153,8 @@ type Publications_Server interface {
 	Create(context.Context, Publications_create) error
 
 	Push(context.Context, Publications_push) error
+
+	Upload(context.Context, Publications_upload) error
 }
 
 // Publications_NewServer creates a new Server from an implementation of Publications_Server.
@@ -151,7 +173,7 @@ func Publications_ServerToClient(s Publications_Server) Publications {
 // This can be used to create a more complicated Server.
 func Publications_Methods(methods []server.Method, s Publications_Server) []server.Method {
 	if cap(methods) == 0 {
-		methods = make([]server.Method, 0, 2)
+		methods = make([]server.Method, 0, 3)
 	}
 
 	methods = append(methods, server.Method{
@@ -178,6 +200,18 @@ func Publications_Methods(methods []server.Method, s Publications_Server) []serv
 		},
 	})
 
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xfddc20d968f417dd,
+			MethodID:      2,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications",
+			MethodName:    "upload",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Upload(ctx, Publications_upload{call})
+		},
+	})
+
 	return methods
 }
 
@@ -194,7 +228,7 @@ func (c Publications_create) Args() Publications_create_Params {
 
 // AllocResults allocates the results struct.
 func (c Publications_create) AllocResults() (Publications_create_Results, error) {
-	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 8, PointerCount: 0})
 	return Publications_create_Results(r), err
 }
 
@@ -215,6 +249,23 @@ func (c Publications_push) AllocResults() (Publications_push_Results, error) {
 	return Publications_push_Results(r), err
 }
 
+// Publications_upload holds the state for a server call to Publications.upload.
+// See server.Call for documentation.
+type Publications_upload struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Publications_upload) Args() Publications_upload_Params {
+	return Publications_upload_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c Publications_upload) AllocResults() (Publications_upload_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_upload_Results(r), err
+}
+
 // Publications_List is a list of Publications.
 type Publications_List = capnp.CapList[Publications]
 
@@ -222,6 +273,502 @@ type Publications_List = capnp.CapList[Publications]
 func NewPublications_List(s *capnp.Segment, sz int32) (Publications_List, error) {
 	l, err := capnp.NewPointerList(s, sz)
 	return capnp.CapList[Publications](l), err
+}
+
+type Publications_Callback capnp.Client
+
+// Publications_Callback_TypeID is the unique identifier for the type Publications_Callback.
+const Publications_Callback_TypeID = 0xb4928ae23403b190
+
+func (c Publications_Callback) Write(ctx context.Context, params func(Publications_Callback_write_Params) error) (Publications_Callback_write_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xb4928ae23403b190,
+			MethodID:      0,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications.Callback",
+			MethodName:    "write",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 1}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Publications_Callback_write_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Publications_Callback_write_Results_Future{Future: ans.Future()}, release
+
+}
+
+func (c Publications_Callback) Done(ctx context.Context, params func(Publications_Callback_done_Params) error) (Publications_Callback_done_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xb4928ae23403b190,
+			MethodID:      1,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications.Callback",
+			MethodName:    "done",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 0, PointerCount: 1}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Publications_Callback_done_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Publications_Callback_done_Results_Future{Future: ans.Future()}, release
+
+}
+
+func (c Publications_Callback) WaitStreaming() error {
+	return capnp.Client(c).WaitStreaming()
+}
+
+// String returns a string that identifies this capability for debugging
+// purposes.  Its format should not be depended on: in particular, it
+// should not be used to compare clients.  Use IsSame to compare clients
+// for equality.
+func (c Publications_Callback) String() string {
+	return "Publications_Callback(" + capnp.Client(c).String() + ")"
+}
+
+// AddRef creates a new Client that refers to the same capability as c.
+// If c is nil or has resolved to null, then AddRef returns nil.
+func (c Publications_Callback) AddRef() Publications_Callback {
+	return Publications_Callback(capnp.Client(c).AddRef())
+}
+
+// Release releases a capability reference.  If this is the last
+// reference to the capability, then the underlying resources associated
+// with the capability will be released.
+//
+// Release will panic if c has already been released, but not if c is
+// nil or resolved to null.
+func (c Publications_Callback) Release() {
+	capnp.Client(c).Release()
+}
+
+// Resolve blocks until the capability is fully resolved or the Context
+// expires.
+func (c Publications_Callback) Resolve(ctx context.Context) error {
+	return capnp.Client(c).Resolve(ctx)
+}
+
+func (c Publications_Callback) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Client(c).EncodeAsPtr(seg)
+}
+
+func (Publications_Callback) DecodeFromPtr(p capnp.Ptr) Publications_Callback {
+	return Publications_Callback(capnp.Client{}.DecodeFromPtr(p))
+}
+
+// IsValid reports whether c is a valid reference to a capability.
+// A reference is invalid if it is nil, has resolved to null, or has
+// been released.
+func (c Publications_Callback) IsValid() bool {
+	return capnp.Client(c).IsValid()
+}
+
+// IsSame reports whether c and other refer to a capability created by the
+// same call to NewClient.  This can return false negatives if c or other
+// are not fully resolved: use Resolve if this is an issue.  If either
+// c or other are released, then IsSame panics.
+func (c Publications_Callback) IsSame(other Publications_Callback) bool {
+	return capnp.Client(c).IsSame(capnp.Client(other))
+}
+
+// Update the flowcontrol.FlowLimiter used to manage flow control for
+// this client. This affects all future calls, but not calls already
+// waiting to send. Passing nil sets the value to flowcontrol.NopLimiter,
+// which is also the default.
+func (c Publications_Callback) SetFlowLimiter(lim fc.FlowLimiter) {
+	capnp.Client(c).SetFlowLimiter(lim)
+}
+
+// Get the current flowcontrol.FlowLimiter used to manage flow control
+// for this client.
+func (c Publications_Callback) GetFlowLimiter() fc.FlowLimiter {
+	return capnp.Client(c).GetFlowLimiter()
+}
+
+// A Publications_Callback_Server is a Publications_Callback with a local implementation.
+type Publications_Callback_Server interface {
+	Write(context.Context, Publications_Callback_write) error
+
+	Done(context.Context, Publications_Callback_done) error
+}
+
+// Publications_Callback_NewServer creates a new Server from an implementation of Publications_Callback_Server.
+func Publications_Callback_NewServer(s Publications_Callback_Server) *server.Server {
+	c, _ := s.(server.Shutdowner)
+	return server.New(Publications_Callback_Methods(nil, s), s, c)
+}
+
+// Publications_Callback_ServerToClient creates a new Client from an implementation of Publications_Callback_Server.
+// The caller is responsible for calling Release on the returned Client.
+func Publications_Callback_ServerToClient(s Publications_Callback_Server) Publications_Callback {
+	return Publications_Callback(capnp.NewClient(Publications_Callback_NewServer(s)))
+}
+
+// Publications_Callback_Methods appends Methods to a slice that invoke the methods on s.
+// This can be used to create a more complicated Server.
+func Publications_Callback_Methods(methods []server.Method, s Publications_Callback_Server) []server.Method {
+	if cap(methods) == 0 {
+		methods = make([]server.Method, 0, 2)
+	}
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xb4928ae23403b190,
+			MethodID:      0,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications.Callback",
+			MethodName:    "write",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Write(ctx, Publications_Callback_write{call})
+		},
+	})
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xb4928ae23403b190,
+			MethodID:      1,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications.Callback",
+			MethodName:    "done",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Done(ctx, Publications_Callback_done{call})
+		},
+	})
+
+	return methods
+}
+
+// Publications_Callback_write holds the state for a server call to Publications_Callback.write.
+// See server.Call for documentation.
+type Publications_Callback_write struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Publications_Callback_write) Args() Publications_Callback_write_Params {
+	return Publications_Callback_write_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c Publications_Callback_write) AllocResults() (Publications_Callback_write_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_write_Results(r), err
+}
+
+// Publications_Callback_done holds the state for a server call to Publications_Callback.done.
+// See server.Call for documentation.
+type Publications_Callback_done struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Publications_Callback_done) Args() Publications_Callback_done_Params {
+	return Publications_Callback_done_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c Publications_Callback_done) AllocResults() (Publications_Callback_done_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_done_Results(r), err
+}
+
+// Publications_Callback_List is a list of Publications_Callback.
+type Publications_Callback_List = capnp.CapList[Publications_Callback]
+
+// NewPublications_Callback creates a new list of Publications_Callback.
+func NewPublications_Callback_List(s *capnp.Segment, sz int32) (Publications_Callback_List, error) {
+	l, err := capnp.NewPointerList(s, sz)
+	return capnp.CapList[Publications_Callback](l), err
+}
+
+type Publications_Callback_write_Params capnp.Struct
+
+// Publications_Callback_write_Params_TypeID is the unique identifier for the type Publications_Callback_write_Params.
+const Publications_Callback_write_Params_TypeID = 0x8c6625092276093d
+
+func NewPublications_Callback_write_Params(s *capnp.Segment) (Publications_Callback_write_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_Callback_write_Params(st), err
+}
+
+func NewRootPublications_Callback_write_Params(s *capnp.Segment) (Publications_Callback_write_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_Callback_write_Params(st), err
+}
+
+func ReadRootPublications_Callback_write_Params(msg *capnp.Message) (Publications_Callback_write_Params, error) {
+	root, err := msg.Root()
+	return Publications_Callback_write_Params(root.Struct()), err
+}
+
+func (s Publications_Callback_write_Params) String() string {
+	str, _ := text.Marshal(0x8c6625092276093d, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_Callback_write_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_Callback_write_Params) DecodeFromPtr(p capnp.Ptr) Publications_Callback_write_Params {
+	return Publications_Callback_write_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_Callback_write_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_Callback_write_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_Callback_write_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_Callback_write_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_Callback_write_Params) Chunk() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return []byte(p.Data()), err
+}
+
+func (s Publications_Callback_write_Params) HasChunk() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_Callback_write_Params) SetChunk(v []byte) error {
+	return capnp.Struct(s).SetData(0, v)
+}
+
+// Publications_Callback_write_Params_List is a list of Publications_Callback_write_Params.
+type Publications_Callback_write_Params_List = capnp.StructList[Publications_Callback_write_Params]
+
+// NewPublications_Callback_write_Params creates a new list of Publications_Callback_write_Params.
+func NewPublications_Callback_write_Params_List(s *capnp.Segment, sz int32) (Publications_Callback_write_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Publications_Callback_write_Params](l), err
+}
+
+// Publications_Callback_write_Params_Future is a wrapper for a Publications_Callback_write_Params promised by a client call.
+type Publications_Callback_write_Params_Future struct{ *capnp.Future }
+
+func (f Publications_Callback_write_Params_Future) Struct() (Publications_Callback_write_Params, error) {
+	p, err := f.Future.Ptr()
+	return Publications_Callback_write_Params(p.Struct()), err
+}
+
+type Publications_Callback_write_Results capnp.Struct
+
+// Publications_Callback_write_Results_TypeID is the unique identifier for the type Publications_Callback_write_Results.
+const Publications_Callback_write_Results_TypeID = 0xc7b7a97070ce93e5
+
+func NewPublications_Callback_write_Results(s *capnp.Segment) (Publications_Callback_write_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_write_Results(st), err
+}
+
+func NewRootPublications_Callback_write_Results(s *capnp.Segment) (Publications_Callback_write_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_write_Results(st), err
+}
+
+func ReadRootPublications_Callback_write_Results(msg *capnp.Message) (Publications_Callback_write_Results, error) {
+	root, err := msg.Root()
+	return Publications_Callback_write_Results(root.Struct()), err
+}
+
+func (s Publications_Callback_write_Results) String() string {
+	str, _ := text.Marshal(0xc7b7a97070ce93e5, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_Callback_write_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_Callback_write_Results) DecodeFromPtr(p capnp.Ptr) Publications_Callback_write_Results {
+	return Publications_Callback_write_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_Callback_write_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_Callback_write_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_Callback_write_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_Callback_write_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+
+// Publications_Callback_write_Results_List is a list of Publications_Callback_write_Results.
+type Publications_Callback_write_Results_List = capnp.StructList[Publications_Callback_write_Results]
+
+// NewPublications_Callback_write_Results creates a new list of Publications_Callback_write_Results.
+func NewPublications_Callback_write_Results_List(s *capnp.Segment, sz int32) (Publications_Callback_write_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return capnp.StructList[Publications_Callback_write_Results](l), err
+}
+
+// Publications_Callback_write_Results_Future is a wrapper for a Publications_Callback_write_Results promised by a client call.
+type Publications_Callback_write_Results_Future struct{ *capnp.Future }
+
+func (f Publications_Callback_write_Results_Future) Struct() (Publications_Callback_write_Results, error) {
+	p, err := f.Future.Ptr()
+	return Publications_Callback_write_Results(p.Struct()), err
+}
+
+type Publications_Callback_done_Params capnp.Struct
+
+// Publications_Callback_done_Params_TypeID is the unique identifier for the type Publications_Callback_done_Params.
+const Publications_Callback_done_Params_TypeID = 0x90be9e0983809cf5
+
+func NewPublications_Callback_done_Params(s *capnp.Segment) (Publications_Callback_done_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_Callback_done_Params(st), err
+}
+
+func NewRootPublications_Callback_done_Params(s *capnp.Segment) (Publications_Callback_done_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_Callback_done_Params(st), err
+}
+
+func ReadRootPublications_Callback_done_Params(msg *capnp.Message) (Publications_Callback_done_Params, error) {
+	root, err := msg.Root()
+	return Publications_Callback_done_Params(root.Struct()), err
+}
+
+func (s Publications_Callback_done_Params) String() string {
+	str, _ := text.Marshal(0x90be9e0983809cf5, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_Callback_done_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_Callback_done_Params) DecodeFromPtr(p capnp.Ptr) Publications_Callback_done_Params {
+	return Publications_Callback_done_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_Callback_done_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_Callback_done_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_Callback_done_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_Callback_done_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_Callback_done_Params) Sig() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return []byte(p.Data()), err
+}
+
+func (s Publications_Callback_done_Params) HasSig() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_Callback_done_Params) SetSig(v []byte) error {
+	return capnp.Struct(s).SetData(0, v)
+}
+
+// Publications_Callback_done_Params_List is a list of Publications_Callback_done_Params.
+type Publications_Callback_done_Params_List = capnp.StructList[Publications_Callback_done_Params]
+
+// NewPublications_Callback_done_Params creates a new list of Publications_Callback_done_Params.
+func NewPublications_Callback_done_Params_List(s *capnp.Segment, sz int32) (Publications_Callback_done_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Publications_Callback_done_Params](l), err
+}
+
+// Publications_Callback_done_Params_Future is a wrapper for a Publications_Callback_done_Params promised by a client call.
+type Publications_Callback_done_Params_Future struct{ *capnp.Future }
+
+func (f Publications_Callback_done_Params_Future) Struct() (Publications_Callback_done_Params, error) {
+	p, err := f.Future.Ptr()
+	return Publications_Callback_done_Params(p.Struct()), err
+}
+
+type Publications_Callback_done_Results capnp.Struct
+
+// Publications_Callback_done_Results_TypeID is the unique identifier for the type Publications_Callback_done_Results.
+const Publications_Callback_done_Results_TypeID = 0xcd754537fa2ac00e
+
+func NewPublications_Callback_done_Results(s *capnp.Segment) (Publications_Callback_done_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_done_Results(st), err
+}
+
+func NewRootPublications_Callback_done_Results(s *capnp.Segment) (Publications_Callback_done_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	return Publications_Callback_done_Results(st), err
+}
+
+func ReadRootPublications_Callback_done_Results(msg *capnp.Message) (Publications_Callback_done_Results, error) {
+	root, err := msg.Root()
+	return Publications_Callback_done_Results(root.Struct()), err
+}
+
+func (s Publications_Callback_done_Results) String() string {
+	str, _ := text.Marshal(0xcd754537fa2ac00e, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_Callback_done_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_Callback_done_Results) DecodeFromPtr(p capnp.Ptr) Publications_Callback_done_Results {
+	return Publications_Callback_done_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_Callback_done_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_Callback_done_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_Callback_done_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_Callback_done_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+
+// Publications_Callback_done_Results_List is a list of Publications_Callback_done_Results.
+type Publications_Callback_done_Results_List = capnp.StructList[Publications_Callback_done_Results]
+
+// NewPublications_Callback_done_Results creates a new list of Publications_Callback_done_Results.
+func NewPublications_Callback_done_Results_List(s *capnp.Segment, sz int32) (Publications_Callback_done_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	return capnp.StructList[Publications_Callback_done_Results](l), err
+}
+
+// Publications_Callback_done_Results_Future is a wrapper for a Publications_Callback_done_Results promised by a client call.
+type Publications_Callback_done_Results_Future struct{ *capnp.Future }
+
+func (f Publications_Callback_done_Results_Future) Struct() (Publications_Callback_done_Results, error) {
+	p, err := f.Future.Ptr()
+	return Publications_Callback_done_Results(p.Struct()), err
 }
 
 type Publications_create_Params capnp.Struct
@@ -370,12 +917,12 @@ type Publications_create_Results capnp.Struct
 const Publications_create_Results_TypeID = 0x9d09768207bbb14b
 
 func NewPublications_create_Results(s *capnp.Segment) (Publications_create_Results, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0})
 	return Publications_create_Results(st), err
 }
 
 func NewRootPublications_create_Results(s *capnp.Segment) (Publications_create_Results, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0})
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0})
 	return Publications_create_Results(st), err
 }
 
@@ -411,13 +958,20 @@ func (s Publications_create_Results) Message() *capnp.Message {
 func (s Publications_create_Results) Segment() *capnp.Segment {
 	return capnp.Struct(s).Segment()
 }
+func (s Publications_create_Results) Exists() bool {
+	return capnp.Struct(s).Bit(0)
+}
+
+func (s Publications_create_Results) SetExists(v bool) {
+	capnp.Struct(s).SetBit(0, v)
+}
 
 // Publications_create_Results_List is a list of Publications_create_Results.
 type Publications_create_Results_List = capnp.StructList[Publications_create_Results]
 
 // NewPublications_create_Results creates a new list of Publications_create_Results.
 func NewPublications_create_Results_List(s *capnp.Segment, sz int32) (Publications_create_Results_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 0}, sz)
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 0}, sz)
 	return capnp.StructList[Publications_create_Results](l), err
 }
 
@@ -634,35 +1188,254 @@ func (f Publications_push_Results_Future) Struct() (Publications_push_Results, e
 	return Publications_push_Results(p.Struct()), err
 }
 
-const schema_9cf9878fd3dd8473 = "x\xda\xa4\x931h\x14A\x14\x86\xdf?3\x97Q\xc8" +
-	"\x91\x1d\xf6@\x14$*Zhq1\xb9\xee\x9a\x9cX" +
-	"X\xd8\xdc\xa6Vt\xb2Y\xb2\x8b\xbb{\xeb\xcen4" +
-	"X)\xeaa%\x16vJ*\x0bK-\xd5\x146\xd7" +
-	"\x8a\xda\x181\x08\"\x88\x82\x9d\x08)de\x12/\\" +
-	"!\x04c\xf7\xd8\xf7\xfd\xf0>\xf6\x9f\x93\x09:b\xba" +
-	"\xde\xaf\x11\xf3:\xb5\xb1j\xed\xf5u\xf9\xccyu\x8b" +
-	"T\x13D5!\x89Z\x8f\xd9\x1b\x10\xdcU\xf6\x85P" +
-	"}^\xf9\xee\x9f9u\xfb\xce(p\x8f\x7f\xb2\xc0#" +
-	"n\x81\xb3O\x9e\xcb\x1bK{\x1fn\x01\x9b\xfbe\xf1" +
-	"\x0d$\xaa\xd5\xe3?W\xde\xb5\xae}\x1c\xd9$\xe2\xbd" +
-	"\xdd\xac\xef\xfb\x11\xae\x1d\xfa\xf0\x8b\xd4a^\x99\x9b\xeb" +
-	"o\xef\xf67\x1e\x10\xa1\xa5E\x0e\xb7\xb4\xa8{Y\xf4" +
-	"\xdd\x97B\xd2r\x95]Z\x9c\x9a\xd7&\x1aK\xb3\xbc" +
-	"\xb7\x14-\x04\xf9\xd4ph\xfa:K\xb3v\xb7\x9c\x8f" +
-	"#_\x17Q/5\xcd\xac4\xe1\xd1\xae\xceu\x02\xe3" +
-	"9\\\x10\x09\x10)}\x80\xc8;\xc7\xe1\x85\x0c\x0ah" +
-	"\xc0~\x0c\x8e\x10y\x179\xbc\x98A1\xd6\x00#R" +
-	"\x91%\x178\xbc\x8cAq\xde\x00'R\x89%C\x0e" +
-	"\xaf`\xe0\xa9\xc181\x8c\x13d\x1e\xc4\xc3\x99\x17W" +
-	"\xe1T\x176\xca\x83\xf2\xbc\xfb\x95\x08p\x08\xd2D\x8b" +
-	"\xa8\x13C\x9d\xf0\xaf&~\x1e\xe8\"\xb0.R'\xbb" +
-	"ti\xff\xcdefG\x97Y\xe3\x87A\xa2\xe1T\xa7" +
-	"\x07/\x06\xf7g\x06O\xff\xf8L\xf6\xae\xa4A\xfe\x9f" +
-	"Fs\x81\x99(\xe3\xc2\xec\xea\xd7\xce\x05\xa6\x8c\xf9H" +
-	"X\xec\x14\x9e\xdcLw\x01o\x0f\xaf\x11mw\x1a\xc3" +
-	"\xee\xaa\xe961uL\x02\xdb\x0f\x02\xc3\xf6\xaa\xfd'" +
-	"\x88\xa9\xba\x9c\xdd\xba\xbd\x83\x09{E\x07]\xe0w\x00" +
-	"\x00\x00\xff\xff\xear\xe9\x96"
+type Publications_upload_Params capnp.Struct
+
+// Publications_upload_Params_TypeID is the unique identifier for the type Publications_upload_Params.
+const Publications_upload_Params_TypeID = 0xd067b888abba0bca
+
+func NewPublications_upload_Params(s *capnp.Segment) (Publications_upload_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
+	return Publications_upload_Params(st), err
+}
+
+func NewRootPublications_upload_Params(s *capnp.Segment) (Publications_upload_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
+	return Publications_upload_Params(st), err
+}
+
+func ReadRootPublications_upload_Params(msg *capnp.Message) (Publications_upload_Params, error) {
+	root, err := msg.Root()
+	return Publications_upload_Params(root.Struct()), err
+}
+
+func (s Publications_upload_Params) String() string {
+	str, _ := text.Marshal(0xd067b888abba0bca, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_upload_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_upload_Params) DecodeFromPtr(p capnp.Ptr) Publications_upload_Params {
+	return Publications_upload_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_upload_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_upload_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_upload_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_upload_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_upload_Params) Ns() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Publications_upload_Params) HasNs() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_upload_Params) NsBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Publications_upload_Params) SetNs(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Publications_upload_Params) Rel() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Publications_upload_Params) HasRel() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Publications_upload_Params) RelBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Publications_upload_Params) SetRel(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s Publications_upload_Params) Size() uint64 {
+	return capnp.Struct(s).Uint64(0)
+}
+
+func (s Publications_upload_Params) SetSize(v uint64) {
+	capnp.Struct(s).SetUint64(0, v)
+}
+
+// Publications_upload_Params_List is a list of Publications_upload_Params.
+type Publications_upload_Params_List = capnp.StructList[Publications_upload_Params]
+
+// NewPublications_upload_Params creates a new list of Publications_upload_Params.
+func NewPublications_upload_Params_List(s *capnp.Segment, sz int32) (Publications_upload_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2}, sz)
+	return capnp.StructList[Publications_upload_Params](l), err
+}
+
+// Publications_upload_Params_Future is a wrapper for a Publications_upload_Params promised by a client call.
+type Publications_upload_Params_Future struct{ *capnp.Future }
+
+func (f Publications_upload_Params_Future) Struct() (Publications_upload_Params, error) {
+	p, err := f.Future.Ptr()
+	return Publications_upload_Params(p.Struct()), err
+}
+
+type Publications_upload_Results capnp.Struct
+
+// Publications_upload_Results_TypeID is the unique identifier for the type Publications_upload_Results.
+const Publications_upload_Results_TypeID = 0xd422be623bb0f731
+
+func NewPublications_upload_Results(s *capnp.Segment) (Publications_upload_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_upload_Results(st), err
+}
+
+func NewRootPublications_upload_Results(s *capnp.Segment) (Publications_upload_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_upload_Results(st), err
+}
+
+func ReadRootPublications_upload_Results(msg *capnp.Message) (Publications_upload_Results, error) {
+	root, err := msg.Root()
+	return Publications_upload_Results(root.Struct()), err
+}
+
+func (s Publications_upload_Results) String() string {
+	str, _ := text.Marshal(0xd422be623bb0f731, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_upload_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_upload_Results) DecodeFromPtr(p capnp.Ptr) Publications_upload_Results {
+	return Publications_upload_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_upload_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_upload_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_upload_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_upload_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_upload_Results) Callback() Publications_Callback {
+	p, _ := capnp.Struct(s).Ptr(0)
+	return Publications_Callback(p.Interface().Client())
+}
+
+func (s Publications_upload_Results) HasCallback() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_upload_Results) SetCallback(v Publications_Callback) error {
+	if !v.IsValid() {
+		return capnp.Struct(s).SetPtr(0, capnp.Ptr{})
+	}
+	seg := s.Segment()
+	in := capnp.NewInterface(seg, seg.Message().CapTable().Add(capnp.Client(v)))
+	return capnp.Struct(s).SetPtr(0, in.ToPtr())
+}
+
+// Publications_upload_Results_List is a list of Publications_upload_Results.
+type Publications_upload_Results_List = capnp.StructList[Publications_upload_Results]
+
+// NewPublications_upload_Results creates a new list of Publications_upload_Results.
+func NewPublications_upload_Results_List(s *capnp.Segment, sz int32) (Publications_upload_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Publications_upload_Results](l), err
+}
+
+// Publications_upload_Results_Future is a wrapper for a Publications_upload_Results promised by a client call.
+type Publications_upload_Results_Future struct{ *capnp.Future }
+
+func (f Publications_upload_Results_Future) Struct() (Publications_upload_Results, error) {
+	p, err := f.Future.Ptr()
+	return Publications_upload_Results(p.Struct()), err
+}
+func (p Publications_upload_Results_Future) Callback() Publications_Callback {
+	return Publications_Callback(p.Future.Field(0, nil).Client())
+}
+
+const schema_9cf9878fd3dd8473 = "x\xda\xacU]h\x1cE\x1c\xff\xfff\xf6vzx" +
+	"gn\xd8H\xb5Pb\x0f\xfb`\xc0\xabI\x84\xd2\x88" +
+	"\xdcI\x0cj\xb5pS|\xac\xe8\xe6\xb2\xe6\x96\xdc\xc7" +
+	"\xba{\x9b\xb6\xfa\xe2W\xad\x15\xc5\xa2\xf4\xad\xb5\xf8(" +
+	"\"ZQ\x94\xa8\xc5\x97\xa6 \xf8\xed\x83\x11\x83P," +
+	"\xa2 \"\xf8A\x85\xb02{\xb7w[\xac41}" +
+	"\x1b\x98\xdf\xcc\xefc\xfe\xff\xf9\xdf|\x84U\x8c\xb1\xfc" +
+	"\xaf\x82\x98\xda\x971\xa3\xe5/\x1e\x17\x8b\x85\xcf\x0e\x91" +
+	",\x81(c\x08\xa2\x89\x15\xfe%\x08\xd6o\xfcGB" +
+	"\xf4\xc3\xc9_jw\xde\xfe\xf4\x914\xe0\x8cqN\x03" +
+	"\x96\x0d\x0d\xb8-\xbbP\xccn\x7f\xe89\x92;5\x00" +
+	"\x1a\xf0z\xa6\xc8\x08\xd6\x99L\x99\x10\xfdq\xfc\xb1'" +
+	"\xb3/\x9f>\x9a\x06\x9c\xcfl\xd1\x80\xd5\x18p\xcf\xa9" +
+	"\xf7\xc5\x13\x0b\xd9\x13\xa4J\x00QL\xb1\xd5\xfcYS" +
+	"\x8c\x99\x1ap\xf4\x14\xbf\xe5\xdc\xb3/\xbeM\xb2\xc4\xa3" +
+	"\x95\xcd\xbf\xd7\x97\xaf\xffn\x95\x08\x13\xca\\\x84\xe5\x9a" +
+	"\x82\xc8r\xcc\xc3\xd6;z\x15\x9d\x7f\xe9S\xcf{\xf5" +
+	"\xdd\xb3]\xbe\xf8\xb6\x13\xe6(##\xba\xfa\xa3\xd1\xbf" +
+	"wN\x87\x9f\xa4v\x8e\x99E\xbd\xf3\xf1U\x8b\xaf=" +
+	"\xf3\xde\xdc\xe7=\x09\x19\xa6\xf7\x9e7c\x9b\xaf\x98o" +
+	"\x10\xa2\xb1\xbf\xde\xbcu\xe6t\xf1\xeb^\x0e\xb1\x8b]" +
+	"\"\x16\xb9Gh\x91\x1f\xde\xf8\xe7\xc9o&\x1e\xfd\xbe" +
+	"\x0b\x88/\x7fX|\x0b2\x06\x8a\xe56\x1e\x05O\xad" +
+	"|\xf5\xc2\xe1\x0b\xc7\xb5|G\xf8\xb0\x0e\x8a\xcdD\xd6" +
+	"!q\xd6Z\x15\x82\x0eF\xde\xfc\xdc\x8e\x19;p\xcd" +
+	"\x96\xe7\xb7\x17\xdcY\xc7\xdf\x91,J5\xdbky\x93" +
+	"\xd5p\xa6\xe1\xd6\xec\x8e\xdbn\x05%/\x0c\xea7T" +
+	"m\xdfn\"P\x05n\x10\x19 \x92\xf6\x16\"\xb5\x8f" +
+	"C\xd5\x19$0\xac]I\xa7H\xa4\x1e\xe4P\x0d\x06" +
+	"\xc9\xd80\x18\x91t5r\x96Cy\x0c\x92\xf3ap" +
+	"\"\xd9\xd4\xc8:\x87\xea0\xf0V\x80\x1c1\xe4\x08\xc2" +
+	"w\x1a\xc9\x9aw\x0e\xa0\x10=p!\xdc*\xee\xb7~" +
+	"\"\x02\x0a\x04\x11\xb8s\xc8\x13C\x9e\xb0^'5\xdf" +
+	"\xb1;\x8e\xf6\"\xec\xe6\xff\xf42y)/\xe3\x97\xf5" +
+	"R\x0eju\xa7i\xa3\x10M-}\xb0tl|\xe9" +
+	"\xad\x9e\x9f\x91\xf6\xfe\x96\xe3\xff\xcb\x91X\x9b\xa3)\xbb" +
+	"\xd1\x98\xb1k\xf3\xa5\xfd\xbe\x9brf\xf4\x9d\xe5\xb5\xb4" +
+	"M\x1cj\x98a\xa4V\x0f[\xf3\x1b\xa6\x9am\xb7b" +
+	"&\x9b_\xccT\x1c0]\x81G\xda\xeb\x04Ca\xa3" +
+	"s\x11\xc3\xe4\x80\xa1\xec\x1cp\x83N\x00\x10\x03R$" +
+	"\x99\xb5\x9a)w\xddT\x01\xb5\x89g\x88\xfa\xbf\x0c\x92" +
+	"\xee\x96c\xe3\xc4\xe4v\x81\xc1\x07\x83\xa4\xbf\xe5u\xa3" +
+	"\xc4d^\x8c\xc4\xb9W0\xa4C\xa9\xa0\x8a\x8d\xbe`" +
+	"b{c\xaf\xb3\xd7\x09B\x91\xbee\x8d\xd9\x87^\xa3" +
+	"m\xcf\xf6\xcb(\xd7\x8f~Z7H\x85C\xdd\x9bj" +
+	"\x90\xbb\xf5\x8b\xdf\xc1\xa1\xaa\x0c\xe8\xf5\xc7\x9eQ\"u" +
+	"\x17\x87\xba\xef?[a(p\x1fq\x90%\x86\xec\xfa" +
+	"\xab\xa3\xa7\xf0R\xd5\xb1\x9bH\xe58\xd4\xb5\x0cQ\xad" +
+	"\x17\x07\x11A\x0e~w\x02\xe4\xfa9\xe3\x0fPG\xda" +
+	"\xe0\xa9H\x8d\xcb\x1d\x1e\x89O+\x03\xe9\xf1\x82\xdd\xd1" +
+	"\xd4@\x9b\xca\xc5\xa5\x97L@$sJ\xaaIbr" +
+	"Z\x97^2>\x91\xfc\xfer\x97.\xbd\x9b\x04X\x7f" +
+	"\xa6 \x19\x1dr\x9b>w\x8d(w\x9b\xa8\x82!\xad" +
+	"\xbd\x82r7\xb6\xb8@\xff\x09\x00\x00\xff\xff\x9a\x16+" +
+	"\xa1"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
@@ -670,7 +1443,14 @@ func RegisterSchema(reg *schemas.Registry) {
 		Nodes: []uint64{
 			0x85cf10ba0781d1d9,
 			0x8986414763ed9fe4,
+			0x8c6625092276093d,
+			0x90be9e0983809cf5,
 			0x9d09768207bbb14b,
+			0xb4928ae23403b190,
+			0xc7b7a97070ce93e5,
+			0xcd754537fa2ac00e,
+			0xd067b888abba0bca,
+			0xd422be623bb0f731,
 			0xdf7b33d89ff629bd,
 			0xfddc20d968f417dd,
 		},

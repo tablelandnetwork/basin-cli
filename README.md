@@ -15,7 +15,7 @@
   - [Postgres Setup](#postgres-setup)
   - [Create a publication](#create-a-publication)
   - [Start replicating a publication](#start-replicating-a-publication)
-  - [Create a wallet](#create-a-wallet)
+  - [Upload a Parquet file](#upload-a-parquet-file)
 - [Development](#development)
   - [Running](#running)
   - [Run tests](#run-tests)
@@ -78,6 +78,15 @@ Use `basin publication start` to start a daemon that will continuously push chan
 
 ```bash
 basin publication start --private-key [PRIVATE_KEY] namespace.relation_name
+```
+
+## Upload a Parquet file
+
+Before uploading a Parquet file, you need to [Create a publication](#create-a-publication), if not already created. You can omit the `--dburi` flag, in this case.
+Then, use `basin publication upload` to upload a Parquet file.
+
+```bash
+basin publication upload --name [namespace.relation_name] --private-key [PRIVATE_KEY] filepath
 ```
 
 # Development

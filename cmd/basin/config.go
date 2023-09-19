@@ -13,16 +13,22 @@ import (
 const DefaultProviderHost = "34.73.36.206:3000"
 
 type config struct {
-	DBS struct {
-		Postgres struct {
-			User     string `yaml:"user"`
-			Password string `yaml:"password"`
-			Host     string `yaml:"host"`
-			Port     int    `yaml:"port"`
-			Database string `yaml:"database"`
-		} `yaml:"postgres"`
-	} `yaml:"dbs"`
+	Publications map[string]publication `yaml:"publications"`
+}
+
+type publication struct {
+	User         string `yaml:"user"`
+	Password     string `yaml:"password"`
+	Host         string `yaml:"host"`
+	Port         int    `yaml:"port"`
+	Database     string `yaml:"database"`
 	ProviderHost string `yaml:"provider_host"`
+}
+
+func newConfig() *config {
+	return &config{
+		Publications: make(map[string]publication),
+	}
 }
 
 func loadConfig(path string) (*config, error) {
@@ -31,7 +37,7 @@ func loadConfig(path string) (*config, error) {
 		return &config{}, err
 	}
 
-	conf := &config{}
+	conf := newConfig()
 	if err := yaml.Unmarshal(buf, conf); err != nil {
 		return &config{}, err
 	}
