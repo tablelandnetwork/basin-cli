@@ -173,15 +173,9 @@ func (bp *BasinProvider) Upload(
 			break
 		}
 		signer.Sum(buf)
-
-		f, release := callback.Write(ctx, func(p Publications_Callback_write_Params) error {
-			return p.SetChunk(buf)
-		})
-		defer release()
-		if _, err := f.Struct(); err != nil {
-			return fmt.Errorf("waiting for write: %s", err)
+		if err := bp.write(ctx, callback, buf); err != nil {
+			return fmt.Errorf("write chunk: %s", err)
 		}
-
 		_, _ = progress.Write(buf)
 	}
 
@@ -224,6 +218,18 @@ func (bp *BasinProvider) Reconnect() error {
 // Close the connection with the Basin Provider.
 func (bp *BasinProvider) Close() {
 	bp.cancel()
+}
+
+func (bp *BasinProvider) write(ctx context.Context, callback Publications_Callback, buf []byte) error {
+	f, release := callback.Write(ctx, func(p Publications_Callback_write_Params) error {
+		return p.SetChunk(buf)
+	})
+	defer release()
+	if _, err := f.Struct(); err != nil {
+		return fmt.Errorf("waiting for write: %s", err)
+	}
+
+	return nil
 }
 
 // BasinServerMock is a mocked version of a server implementation using for testing.
