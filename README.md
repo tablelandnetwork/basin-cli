@@ -41,9 +41,11 @@ go install ./cmd/basin
 
 ## Postgres Setup
 
+### Self-hosted
+
 - Make sure you have access to a superuser or a role with `LOGIN` and `REPLICATION` options.
 For example, you can create a new role such as `CREATE ROLE basin WITH PASSWORD NULL LOGIN REPLICATION;`.
-- Check that your Postgres installation has the [wal2json](https://github.com/eulerto/wal2json) plugin installed. If you're using AWS RDS or Google Cloud SQL, that is already installed.
+- Check that your Postgres installation has the [wal2json](https://github.com/eulerto/wal2json) plugin installed.
 - Check if logical replication is enabled:
 
     ```sql
@@ -51,6 +53,27 @@ For example, you can create a new role such as `CREATE ROLE basin WITH PASSWORD 
     ```
 
     The `wal_level` setting must be set to logical: `ALTER SYSTEM SET wal_level = logical;`.
+- Restart the database in order for the new `wal_level` to take effect (be careful!)
+
+### Amazon RDS
+
+- Make sure you have a user with the `rds_superuser` role, and use `psql` to connect to your database.
+- Check if logical replication is enabled:
+
+    ```sql
+        SELECT name, setting
+        FROM pg_settings
+        WHERE name = 'rds.logical_replication';
+    ```
+
+- If it's on, go to [Create a publication](#create-a-publication)
+- If it's off, follow the next steps:
+    - [Create a custom RDS parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithDBInstanceParamGroups.html#USER_WorkingWithParamGroups.Creating)
+    - After creation, edit it and set the `rds.logical_replication` parameter to `1`
+    - [Associate the recently created parameter group with you DB instance](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithDBInstanceParamGroups.html#USER_WorkingWithParamGroups.Associating)
+        - You can choose **Apply immediately** to apply the changes immediately
+        - You'll probably need to reboot the instance for changes to take effect (be careful!)
+- After reboot, check if logical replication is enabled
 
 ## Create a publication
 
