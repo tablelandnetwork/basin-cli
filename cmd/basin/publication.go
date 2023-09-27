@@ -39,6 +39,7 @@ func newPublicationCommand() *cli.Command {
 			newPublicationCreateCommand(),
 			newPublicationStartCommand(),
 			newPublicationUploadCommand(),
+			newPublicationListCommand(),
 		},
 	}
 }
@@ -277,6 +278,51 @@ func newPublicationUploadCommand() *cli.Command {
 			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey)
 			if err := basinStreamer.Upload(cCtx.Context, filepath, bar); err != nil {
 				return fmt.Errorf("upload: %s", err)
+			}
+
+			return nil
+		},
+	}
+}
+
+func newPublicationListCommand() *cli.Command {
+	var owner, provider string
+
+	return &cli.Command{
+		Name:  "list",
+		Usage: "list publications of a given address",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "address",
+				Usage:       "Ethereum wallet address",
+				Destination: &owner,
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "provider",
+				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Destination: &provider,
+				Value:       DefaultProviderHost,
+			},
+		},
+		Action: func(cCtx *cli.Context) error {
+			if !common.IsHexAddress(owner) {
+				return fmt.Errorf("%s is not a valid Ethereum wallet address", owner)
+			}
+
+			bp, err := basinprovider.New(cCtx.Context, provider)
+			if err != nil {
+				return fmt.Errorf("new basin provider: %s", err)
+			}
+			defer bp.Close()
+
+			publications, err := bp.List(cCtx.Context, common.HexToAddress(owner))
+			if err != nil {
+				return fmt.Errorf("failed to list publications: %s", err)
+			}
+
+			for _, pub := range publications {
+				fmt.Printf("%s\n", pub)
 			}
 
 			return nil

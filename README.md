@@ -16,6 +16,7 @@
   - [Create a publication](#create-a-publication)
   - [Start replicating a publication](#start-replicating-a-publication)
   - [Upload a Parquet file](#upload-a-parquet-file)
+  - [Listing Publications](#listing-publications)
 - [Development](#development)
   - [Running](#running)
   - [Run tests](#run-tests)
@@ -110,6 +111,14 @@ Then, use `basin publication upload` to upload a Parquet file.
 
 ```bash
 basin publication upload --name [namespace.relation_name] --private-key [PRIVATE_KEY] filepath
+```
+
+## Listing Publications
+
+You can list the publications from an address by running:
+
+```bash
+basin publication list --address [ETH_ADDRESS]
 ```
 
 # Development
