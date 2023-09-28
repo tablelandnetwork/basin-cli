@@ -203,6 +203,37 @@ func (bp *BasinProvider) Upload(
 	return nil
 }
 
+// List lists all publications from a given address.
+func (bp *BasinProvider) List(ctx context.Context, owner common.Address) ([]string, error) {
+	f, release := bp.p.List(ctx, func(call Publications_list_Params) error {
+		if err := call.SetOwner(owner.Bytes()); err != nil {
+			return fmt.Errorf("setting owner")
+		}
+		return nil
+	})
+	defer release()
+
+	results, err := f.Struct()
+	if err != nil {
+		return []string{}, fmt.Errorf("waiting list results: %s", err)
+	}
+
+	textList, err := results.Publications()
+	if err != nil {
+		return []string{}, fmt.Errorf("init publications: %s", err)
+	}
+
+	pubs := make([]string, textList.Len())
+	for i := 0; i < textList.Len(); i++ {
+		pubs[i], err = textList.At(i)
+		if err != nil {
+			return []string{}, fmt.Errorf("failed to get string from text list: %s", err)
+		}
+	}
+
+	return pubs, nil
+}
+
 // Reconnect with the Basin Provider.
 func (bp *BasinProvider) Reconnect() error {
 	bp.cancel()
@@ -355,6 +386,32 @@ func (s *BasinServerMock) Upload(_ context.Context, call Publications_upload) er
 	}
 
 	s.uploads[fmt.Sprintf("%s.%s", ns, rel)] = callback
+	return nil
+}
+
+// List lists all publications from a given address.
+func (s *BasinServerMock) List(_ context.Context, call Publications_list) error {
+	results, err := call.AllocResults()
+	if err != nil {
+		return err
+	}
+
+	list, err := results.NewPublications(int32(len(s.publications)))
+	if err != nil {
+		return err
+	}
+	var i int
+	for pub := range s.publications {
+		if err := list.Set(i, pub); err != nil {
+			return err
+		}
+		i++
+	}
+
+	if err := results.SetPublications(list); err != nil {
+		return fmt.Errorf("set publications: %s", err)
+	}
+
 	return nil
 }
 

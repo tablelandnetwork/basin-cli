@@ -118,6 +118,10 @@ func (bp *basinProviderMock) Push(
 	return nil
 }
 
+func (bp *basinProviderMock) List(_ context.Context, _ common.Address) ([]string, error) {
+	return []string{}, nil
+}
+
 func (bp *basinProviderMock) Reconnect() error {
 	return nil
 }

@@ -18,7 +18,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-func TestBasinProvider_Create(t *testing.T) {
+func TestBasinProvider_CreateAndList(t *testing.T) {
 	// in this test we create a fake tx,
 	// send to the server, the server deserialize it and send the value back
 
@@ -26,6 +26,14 @@ func TestBasinProvider_Create(t *testing.T) {
 	exists, err := bp.Create(context.Background(), "n", "t", basincapnp.Schema{}, common.HexToAddress(""))
 	require.NoError(t, err)
 	require.False(t, exists)
+
+	exists, err = bp.Create(context.Background(), "n", "t2", basincapnp.Schema{}, common.HexToAddress(""))
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	pubs, err := bp.List(context.Background(), common.HexToAddress(""))
+	require.NoError(t, err)
+	require.Equal(t, []string{"n.t", "n.t2"}, pubs)
 }
 
 func TestBasinProvider_Push(t *testing.T) {
