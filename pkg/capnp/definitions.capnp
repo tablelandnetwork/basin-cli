@@ -38,3 +38,9 @@ struct Schema {
 		isPartOfPrimaryKey @3 :Bool;
 	}
 }
+
+struct DealInfo {
+    id @0 :UInt64;
+    selectorPath @1 :Text;
+    cid @2 :Text;
+}

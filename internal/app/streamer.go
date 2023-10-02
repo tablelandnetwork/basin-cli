@@ -7,7 +7,6 @@ import (
 
 	"capnproto.org/go/capnp/v3"
 	"capnproto.org/go/capnp/v3/exc"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pglogrepl"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
@@ -20,14 +19,6 @@ type Replicator interface {
 	StartReplication(ctx context.Context) (chan *pgrepl.Tx, string, error)
 	Commit(ctx context.Context, lsn pglogrepl.LSN) error
 	Shutdown()
-}
-
-// BasinProvider ...
-type BasinProvider interface {
-	Create(context.Context, string, string, basincapnp.Schema, common.Address) (bool, error)
-	Push(context.Context, string, string, basincapnp.Tx, []byte) error
-	List(context.Context, common.Address) ([]string, error)
-	Reconnect() error
 }
 
 // BasinStreamer contains logic of streaming Postgres changes to Basin Provider.

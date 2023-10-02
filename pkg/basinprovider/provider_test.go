@@ -3,6 +3,7 @@ package basinprovider
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"encoding/hex"
 	"testing"
 
@@ -63,27 +64,54 @@ func TestBasinProvider_Upload(t *testing.T) {
 	privateKey, err := crypto.HexToECDSA(pk)
 	require.NoError(t, err)
 
-	// Upload data 1
+	// Upload data 1 on test.test
+	filedata1 := []byte{'H', 'e', 'l', 'l', 'o'}
 	{
-		filedata := []byte{'H', 'e', 'l', 'l', 'o'}
-
-		buf := bytes.NewReader(filedata)
+		buf := bytes.NewReader(filedata1)
 		err := client.Upload(
 			context.Background(), "test", "test", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}),
 		)
 		require.NoError(t, err)
-		require.Equal(t, filedata, server.uploads["test.test"].bytes)
-		require.Equal(t, "801fb03a3a34fd9d3ac5445f693df74c822d2e8cfa736191e7919e099931d8a51cd0a62fc67da6d8f0aab4302c18aa0cf381c973a8817b7062805f19d03f88ce00", hex.EncodeToString(server.uploads["test.test"].sig)) // nolint
+		require.Equal(t, filedata1, server.uploads["test.test"][0].bytes)
+		require.Equal(t, "801fb03a3a34fd9d3ac5445f693df74c822d2e8cfa736191e7919e099931d8a51cd0a62fc67da6d8f0aab4302c18aa0cf381c973a8817b7062805f19d03f88ce00", hex.EncodeToString(server.uploads["test.test"][0].sig)) // nolint
 	}
-	{
-		// Upload data 2
-		filedata := []byte{'W', 'o', 'r', 'l', 'd'}
 
-		buf := bytes.NewReader(filedata)
+	// Upload data 2 on test2.test2
+	filedata2 := []byte{'W', 'o', 'r', 'l', 'd'}
+	{
+		buf := bytes.NewReader(filedata2)
 		err := client.Upload(context.Background(), "test2", "test2", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{})) // nolint
 		require.NoError(t, err)
-		require.Equal(t, filedata, server.uploads["test2.test2"].bytes)
-		require.Equal(t, "3ad572a3483971285f3c6dc0e71d234a58543876f98b23183dc4e60008c1a92310f42202858b48ad917588535c2234c85413e124a2dcdd0759df9c555a9f585901", hex.EncodeToString(server.uploads["test2.test2"].sig)) // nolint
+		require.Equal(t, filedata2, server.uploads["test2.test2"][0].bytes)
+		require.Equal(t, "3ad572a3483971285f3c6dc0e71d234a58543876f98b23183dc4e60008c1a92310f42202858b48ad917588535c2234c85413e124a2dcdd0759df9c555a9f585901", hex.EncodeToString(server.uploads["test2.test2"][0].sig)) // nolint
+	}
+
+	// Upload data 3 on test.test
+	filedata3 := []byte{'W', 'O', 'R', 'L', 'D'}
+	{
+		buf := bytes.NewReader(filedata3)
+		err := client.Upload(context.Background(), "test", "test", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{})) // nolint
+		require.NoError(t, err)
+		require.Equal(t, filedata3, server.uploads["test.test"][1].bytes)
+		require.Equal(t, "94dcba2012dd83edf1e379bbdc640e95321ea30d5318e1f5dfd46154603bba4970729b44a71844e3f4e07955dfb529ccf60d31b74a9971649d64fd8c12a32a7d00", hex.EncodeToString(server.uploads["test.test"][1].sig)) // nolint
+	}
+
+	// check latest 2 deals for test2.test2, should return filedata2
+	{
+		dealInfo, err := client.LatestDeals(context.Background(), "test2", "test2", 2)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(dealInfo))
+		hash := sha1.Sum(filedata2)
+		require.Equal(t, "70c07ec18ef89c5309bbb0937f3a6342411e1fdd", hex.EncodeToString(hash[:]))
+	}
+
+	// check deals for test.test, limit 1, offset 1, should return filedata3
+	{
+		dealInfo, err := client.Deals(context.Background(), "test", "test", 1, 1)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(dealInfo))
+		hash := sha1.Sum(filedata3)
+		require.Equal(t, hex.EncodeToString(hash[:]), "1a5db926797b9ae16ad56ec2c143e51a5172a862")
 	}
 }
 

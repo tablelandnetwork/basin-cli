@@ -97,6 +97,46 @@ func (c Publications) List(ctx context.Context, params func(Publications_list_Pa
 
 }
 
+func (c Publications) Deals(ctx context.Context, params func(Publications_deals_Params) error) (Publications_deals_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xfddc20d968f417dd,
+			MethodID:      4,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications",
+			MethodName:    "deals",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 16, PointerCount: 2}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Publications_deals_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Publications_deals_Results_Future{Future: ans.Future()}, release
+
+}
+
+func (c Publications) LatestDeals(ctx context.Context, params func(Publications_latestDeals_Params) error) (Publications_latestDeals_Results_Future, capnp.ReleaseFunc) {
+
+	s := capnp.Send{
+		Method: capnp.Method{
+			InterfaceID:   0xfddc20d968f417dd,
+			MethodID:      5,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications",
+			MethodName:    "latestDeals",
+		},
+	}
+	if params != nil {
+		s.ArgsSize = capnp.ObjectSize{DataSize: 8, PointerCount: 2}
+		s.PlaceArgs = func(s capnp.Struct) error { return params(Publications_latestDeals_Params(s)) }
+	}
+
+	ans, release := capnp.Client(c).SendCall(ctx, s)
+	return Publications_latestDeals_Results_Future{Future: ans.Future()}, release
+
+}
+
 func (c Publications) WaitStreaming() error {
 	return capnp.Client(c).WaitStreaming()
 }
@@ -177,6 +217,10 @@ type Publications_Server interface {
 	Upload(context.Context, Publications_upload) error
 
 	List(context.Context, Publications_list) error
+
+	Deals(context.Context, Publications_deals) error
+
+	LatestDeals(context.Context, Publications_latestDeals) error
 }
 
 // Publications_NewServer creates a new Server from an implementation of Publications_Server.
@@ -195,7 +239,7 @@ func Publications_ServerToClient(s Publications_Server) Publications {
 // This can be used to create a more complicated Server.
 func Publications_Methods(methods []server.Method, s Publications_Server) []server.Method {
 	if cap(methods) == 0 {
-		methods = make([]server.Method, 0, 4)
+		methods = make([]server.Method, 0, 6)
 	}
 
 	methods = append(methods, server.Method{
@@ -243,6 +287,30 @@ func Publications_Methods(methods []server.Method, s Publications_Server) []serv
 		},
 		Impl: func(ctx context.Context, call *server.Call) error {
 			return s.List(ctx, Publications_list{call})
+		},
+	})
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xfddc20d968f417dd,
+			MethodID:      4,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications",
+			MethodName:    "deals",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.Deals(ctx, Publications_deals{call})
+		},
+	})
+
+	methods = append(methods, server.Method{
+		Method: capnp.Method{
+			InterfaceID:   0xfddc20d968f417dd,
+			MethodID:      5,
+			InterfaceName: "pkg/basinprovider/provider.capnp:Publications",
+			MethodName:    "latestDeals",
+		},
+		Impl: func(ctx context.Context, call *server.Call) error {
+			return s.LatestDeals(ctx, Publications_latestDeals{call})
 		},
 	})
 
@@ -315,6 +383,40 @@ func (c Publications_list) Args() Publications_list_Params {
 func (c Publications_list) AllocResults() (Publications_list_Results, error) {
 	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
 	return Publications_list_Results(r), err
+}
+
+// Publications_deals holds the state for a server call to Publications.deals.
+// See server.Call for documentation.
+type Publications_deals struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Publications_deals) Args() Publications_deals_Params {
+	return Publications_deals_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c Publications_deals) AllocResults() (Publications_deals_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_deals_Results(r), err
+}
+
+// Publications_latestDeals holds the state for a server call to Publications.latestDeals.
+// See server.Call for documentation.
+type Publications_latestDeals struct {
+	*server.Call
+}
+
+// Args returns the call's arguments.
+func (c Publications_latestDeals) Args() Publications_latestDeals_Params {
+	return Publications_latestDeals_Params(c.Call.Args())
+}
+
+// AllocResults allocates the results struct.
+func (c Publications_latestDeals) AllocResults() (Publications_latestDeals_Results, error) {
+	r, err := c.Call.AllocResults(capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_latestDeals_Results(r), err
 }
 
 // Publications_List is a list of Publications.
@@ -1597,75 +1699,492 @@ func (f Publications_list_Results_Future) Struct() (Publications_list_Results, e
 	return Publications_list_Results(p.Struct()), err
 }
 
-const schema_9cf9878fd3dd8473 = "x\xda\xacV_h[U\x18\xff~\xe7\xdc\xdc\x93`" +
-	"\xdb\xe4\x90\xc2\xdc \xd4\x05\x07\xb6`f[\xc7\xb02" +
-	"\x92R\x87nZ\xc8\x1d\x8a\x0c\x14w\x9b\\\x9bk\xd3" +
-	"\xe4.7\xe9\xaa\xbe\xf8\x7fN\x04\x87\xa2\xf80-\xf8" +
-	"V|\xd0\x89\xa0T7|\xb1\x82\xe0\x7f\x1f\xacX\x85" +
-	"\xa1\x88\xa2\x0f\x13\xa7T6\xae\x9c\x9b\xdc\xe4\x0e;\xd6" +
-	"\xd8\xbd]8\xbf\xef\xfc\xfe\x9c\xef\x9c\xef\xde\xf0=\xcb" +
-	"i\xc3\xbd\x0bQbF1\xa2{+_<*\x96\x12" +
-	"\x9f=I2\x03\xa2\x88&\x88Fwi_\x82\x90\xdc" +
-	"\xa7\xfdL\xf0~\\\xf8\xbdp\xeb\xf8S\xc7\xc2\x80T" +
-	"\xe4\x8c\x02\x0cG\x14`Ol.\x1d\xdbq\xff\xb3$" +
-	"w+\x00\x14 \xa2\xa7\x19!\x99\xd2\xb3\x04\xef\xdc\x89" +
-	"G\x1e\x8f\xbdz\xfax\x18\xb0G\xdf\xa6\x00w\xf9\x80" +
-	"\xdbO\xbe'\x1e\x9b\x8b\xbdBF\x06 \xf2)\x1a\xfa" +
-	"\xaf\x8a\xe2\x98\x0f(\x1d:??\xfe2{\xad\xa5\xc1" +
-	"\xdfaQ\xf7E\x9e\xf2\x01\xc7O\xf2\x1b\xcf<\xf3\xfc" +
-	"\xdb$3\xdc[\xdd\xf2gi\xe5\x9a\xef.\x10at" +
-	"U_B\xf2\x9c.\x88\x92g\xf5\xa3\xc9q!\x88\xbc" +
-	"\x9f^\xf8\xd4q\x16\xdf\xf9\xa8)\xc8\xa7\x1b\x14C\x8c" +
-	"4\xaf\xef\x83\xa1\x7fv\xefm|\x12Z\xd9.\xd2j" +
-	"\xe5\xe3\xab\x96^\x7f\xfa\xdd\xe9\xcf[\x1a#L\xadm" +
-	"\x15~\x0e\xd7\x8b7\x08\xde\xf0\xdfo\xde<u:\xfd" +
-	"uX\xe4\x87\xc2w\xb1\"\x94\xc8S\x83\x7f-|3" +
-	"\xfa\xf0\x0fM\x80\xbf\xf9\x05\xf1-H\xf3\xce\x1f\xbe\xfb" +
-	"\xa5\xc5?R\xbf\x85K\xcf\xaa%$#QU\xda\xb6" +
-	"$\xb7s\xcf}b\xf5\xab\xe7\x8e\xae\x9dP\xfen\x8a" +
-	"\xd6\x90\x9c\x8cn!\x1a=\x18\x15H\xaeE\x05=\xe8" +
-	"93\xd3;\xa7L\xd7\xd6+N\xad:g\x17\xad\xda" +
-	"\xce\xe0#S0\x9d\x8a3\x96oL\x95\xed\x82Y\xb7" +
-	"\xab\x157\xe34\xdc\xd2\xb5y\xb3f\xce\xc25\x12\\" +
-	"#\xd2@$\xcdmD\xc6=\x1cF\x89A\x02\xfd\xca" +
-	"\xb7\xb4\xd2D\xc6!\x0e\xa3\xcc \x19\xeb\x07#\x92\xb6" +
-	"B\x169\x0c\x87Ar\xde\x0fN$g\x15\xb2\xc4a" +
-	"\xd4\x19x\xc5E\x0f1\xf4\x10D\xcd*\x07\xdf\xbc>" +
-	"\x8f\x84w\xdfZ#%\xeeM\xfeB\x04$\x08\xc2\xb5" +
-	"\xa7\xd1K\x0c\xbd\x84n\x9d\x14j\x96Y\xb7\x94\x17a" +
-	"\xce\xfeO/c\xeby\x19\xb9\xac\x97\xac[(Y\xb3" +
-	"&\x12\xde\xc4\xf2\xfb\xcb/\x8e,\xbf\xd5\xf23P=" +
-	"R\xb1j\xffq$6\xe6h\xc2,\x97\xa7\xcc\xc2L" +
-	"\xe6H\xcd\x0e9\xd3\xda\xcez\x95\xb4(\x87\xd1\xcf0" +
-	"P(5*3\x9b\xa6*V+>\x93\xc9/fJ" +
-	"w\x98\xae\xc0!\x1d\xb0\xdcx\xa3\\\xbf\x88a\xac\xc3" +
-	"\x90\xb5\xe6m\xb7\xee\x02\xc4\x80\xeeI\xca\xb6[o\xf7" +
-	"\xf4%\xd2Z\xff`\"\x1bM+\xdb\x8c+\x0f\x18Q" +
-	"\x1e!j\xbf\x84\x08\x1e\x189<BL\xee\x10\xe8<" +
-	"\x82\x08\x9e\x18\xb9u\x88\x98\xec\x15\x03\xfe\xc1\xe6\x10W" +
-	"\xa9\xe7\x90\xc7f[$\xc8us\xc7\x7f\xc0r\x1b\"" +
-	"\xbc\xcb\x06so8\xe5\xaaYl\xf7iO;\xf9\xbd" +
-	"\xea\x06\xe68\x8c;B7p\x9fj\xa9[8\x8c<" +
-	"\x03Z\x17pr\x88\xc8\xb8\x8d\xc3\xb8\xf3\x92w-\xee" +
-	"\xda\x0fY\x88\x11C\xac\xfb\xceh)\\\xaf\xfd\xf6\x13" +
-	"\x19=\x1c\xc6\xd5\x0c^\xa1\x15\x07\x11Av\x06\x0c\x01" +
-	"\xb2{N\xff\x85U\x91\x96y\xf7\x91\xfa\xad\x1c\x14\x87" +
-	"\xe5>\xd0\x92{\x1d\x83\xe7\xb4*(\xaej\xd0G\xc8" +
-	"s\xf8y\xf5\x85\xe4j\x97c\x1c\xf0)\x0d\x0d\xe1\x99" +
-	"\x8a\xfd\xdeD'\x0d#\xe17{\xf0_\x80`z\xcb" +
-	"\xc3c\xc4\xa4\xa5\x9a=\xf8\xa9@0\xf2\xe4A\xd5\xec" +
-	"\x93\x02\xac=H\x11\xccK9\xae\xeav\x09\xf0\xf6\x9c" +
-	"G0\x10\xe5\xa0\xaaK\x89l\xf3\xcd\xc8!\xae\x92\xcc" +
-	"!\xdb<\xc4\x1c\xe2*\x1c\xff\xd6\xfc\x1b\x00\x00\xff\xff" +
-	"\x9d\x1a\x80L"
+type Publications_deals_Params capnp.Struct
+
+// Publications_deals_Params_TypeID is the unique identifier for the type Publications_deals_Params.
+const Publications_deals_Params_TypeID = 0x889bad5ee80bd4ae
+
+func NewPublications_deals_Params(s *capnp.Segment) (Publications_deals_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 2})
+	return Publications_deals_Params(st), err
+}
+
+func NewRootPublications_deals_Params(s *capnp.Segment) (Publications_deals_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 2})
+	return Publications_deals_Params(st), err
+}
+
+func ReadRootPublications_deals_Params(msg *capnp.Message) (Publications_deals_Params, error) {
+	root, err := msg.Root()
+	return Publications_deals_Params(root.Struct()), err
+}
+
+func (s Publications_deals_Params) String() string {
+	str, _ := text.Marshal(0x889bad5ee80bd4ae, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_deals_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_deals_Params) DecodeFromPtr(p capnp.Ptr) Publications_deals_Params {
+	return Publications_deals_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_deals_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_deals_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_deals_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_deals_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_deals_Params) Ns() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Publications_deals_Params) HasNs() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_deals_Params) NsBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Publications_deals_Params) SetNs(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Publications_deals_Params) Rel() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Publications_deals_Params) HasRel() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Publications_deals_Params) RelBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Publications_deals_Params) SetRel(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s Publications_deals_Params) Limit() uint32 {
+	return capnp.Struct(s).Uint32(0)
+}
+
+func (s Publications_deals_Params) SetLimit(v uint32) {
+	capnp.Struct(s).SetUint32(0, v)
+}
+
+func (s Publications_deals_Params) Offset() uint64 {
+	return capnp.Struct(s).Uint64(8)
+}
+
+func (s Publications_deals_Params) SetOffset(v uint64) {
+	capnp.Struct(s).SetUint64(8, v)
+}
+
+// Publications_deals_Params_List is a list of Publications_deals_Params.
+type Publications_deals_Params_List = capnp.StructList[Publications_deals_Params]
+
+// NewPublications_deals_Params creates a new list of Publications_deals_Params.
+func NewPublications_deals_Params_List(s *capnp.Segment, sz int32) (Publications_deals_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 16, PointerCount: 2}, sz)
+	return capnp.StructList[Publications_deals_Params](l), err
+}
+
+// Publications_deals_Params_Future is a wrapper for a Publications_deals_Params promised by a client call.
+type Publications_deals_Params_Future struct{ *capnp.Future }
+
+func (f Publications_deals_Params_Future) Struct() (Publications_deals_Params, error) {
+	p, err := f.Future.Ptr()
+	return Publications_deals_Params(p.Struct()), err
+}
+
+type Publications_deals_Results capnp.Struct
+
+// Publications_deals_Results_TypeID is the unique identifier for the type Publications_deals_Results.
+const Publications_deals_Results_TypeID = 0x8b0e78e7cb3c1c68
+
+func NewPublications_deals_Results(s *capnp.Segment) (Publications_deals_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_deals_Results(st), err
+}
+
+func NewRootPublications_deals_Results(s *capnp.Segment) (Publications_deals_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_deals_Results(st), err
+}
+
+func ReadRootPublications_deals_Results(msg *capnp.Message) (Publications_deals_Results, error) {
+	root, err := msg.Root()
+	return Publications_deals_Results(root.Struct()), err
+}
+
+func (s Publications_deals_Results) String() string {
+	str, _ := text.Marshal(0x8b0e78e7cb3c1c68, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_deals_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_deals_Results) DecodeFromPtr(p capnp.Ptr) Publications_deals_Results {
+	return Publications_deals_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_deals_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_deals_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_deals_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_deals_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_deals_Results) Deals() (capnp2.DealInfo_List, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return capnp2.DealInfo_List(p.List()), err
+}
+
+func (s Publications_deals_Results) HasDeals() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_deals_Results) SetDeals(v capnp2.DealInfo_List) error {
+	return capnp.Struct(s).SetPtr(0, v.ToPtr())
+}
+
+// NewDeals sets the deals field to a newly
+// allocated capnp2.DealInfo_List, preferring placement in s's segment.
+func (s Publications_deals_Results) NewDeals(n int32) (capnp2.DealInfo_List, error) {
+	l, err := capnp2.NewDealInfo_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return capnp2.DealInfo_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(0, l.ToPtr())
+	return l, err
+}
+
+// Publications_deals_Results_List is a list of Publications_deals_Results.
+type Publications_deals_Results_List = capnp.StructList[Publications_deals_Results]
+
+// NewPublications_deals_Results creates a new list of Publications_deals_Results.
+func NewPublications_deals_Results_List(s *capnp.Segment, sz int32) (Publications_deals_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Publications_deals_Results](l), err
+}
+
+// Publications_deals_Results_Future is a wrapper for a Publications_deals_Results promised by a client call.
+type Publications_deals_Results_Future struct{ *capnp.Future }
+
+func (f Publications_deals_Results_Future) Struct() (Publications_deals_Results, error) {
+	p, err := f.Future.Ptr()
+	return Publications_deals_Results(p.Struct()), err
+}
+
+type Publications_latestDeals_Params capnp.Struct
+
+// Publications_latestDeals_Params_TypeID is the unique identifier for the type Publications_latestDeals_Params.
+const Publications_latestDeals_Params_TypeID = 0x90b6622e0669b417
+
+func NewPublications_latestDeals_Params(s *capnp.Segment) (Publications_latestDeals_Params, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
+	return Publications_latestDeals_Params(st), err
+}
+
+func NewRootPublications_latestDeals_Params(s *capnp.Segment) (Publications_latestDeals_Params, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2})
+	return Publications_latestDeals_Params(st), err
+}
+
+func ReadRootPublications_latestDeals_Params(msg *capnp.Message) (Publications_latestDeals_Params, error) {
+	root, err := msg.Root()
+	return Publications_latestDeals_Params(root.Struct()), err
+}
+
+func (s Publications_latestDeals_Params) String() string {
+	str, _ := text.Marshal(0x90b6622e0669b417, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_latestDeals_Params) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_latestDeals_Params) DecodeFromPtr(p capnp.Ptr) Publications_latestDeals_Params {
+	return Publications_latestDeals_Params(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_latestDeals_Params) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_latestDeals_Params) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_latestDeals_Params) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_latestDeals_Params) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_latestDeals_Params) Ns() (string, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.Text(), err
+}
+
+func (s Publications_latestDeals_Params) HasNs() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_latestDeals_Params) NsBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return p.TextBytes(), err
+}
+
+func (s Publications_latestDeals_Params) SetNs(v string) error {
+	return capnp.Struct(s).SetText(0, v)
+}
+
+func (s Publications_latestDeals_Params) Rel() (string, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.Text(), err
+}
+
+func (s Publications_latestDeals_Params) HasRel() bool {
+	return capnp.Struct(s).HasPtr(1)
+}
+
+func (s Publications_latestDeals_Params) RelBytes() ([]byte, error) {
+	p, err := capnp.Struct(s).Ptr(1)
+	return p.TextBytes(), err
+}
+
+func (s Publications_latestDeals_Params) SetRel(v string) error {
+	return capnp.Struct(s).SetText(1, v)
+}
+
+func (s Publications_latestDeals_Params) N() uint32 {
+	return capnp.Struct(s).Uint32(0)
+}
+
+func (s Publications_latestDeals_Params) SetN(v uint32) {
+	capnp.Struct(s).SetUint32(0, v)
+}
+
+// Publications_latestDeals_Params_List is a list of Publications_latestDeals_Params.
+type Publications_latestDeals_Params_List = capnp.StructList[Publications_latestDeals_Params]
+
+// NewPublications_latestDeals_Params creates a new list of Publications_latestDeals_Params.
+func NewPublications_latestDeals_Params_List(s *capnp.Segment, sz int32) (Publications_latestDeals_Params_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 8, PointerCount: 2}, sz)
+	return capnp.StructList[Publications_latestDeals_Params](l), err
+}
+
+// Publications_latestDeals_Params_Future is a wrapper for a Publications_latestDeals_Params promised by a client call.
+type Publications_latestDeals_Params_Future struct{ *capnp.Future }
+
+func (f Publications_latestDeals_Params_Future) Struct() (Publications_latestDeals_Params, error) {
+	p, err := f.Future.Ptr()
+	return Publications_latestDeals_Params(p.Struct()), err
+}
+
+type Publications_latestDeals_Results capnp.Struct
+
+// Publications_latestDeals_Results_TypeID is the unique identifier for the type Publications_latestDeals_Results.
+const Publications_latestDeals_Results_TypeID = 0xe7da36d32d5316b8
+
+func NewPublications_latestDeals_Results(s *capnp.Segment) (Publications_latestDeals_Results, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_latestDeals_Results(st), err
+}
+
+func NewRootPublications_latestDeals_Results(s *capnp.Segment) (Publications_latestDeals_Results, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1})
+	return Publications_latestDeals_Results(st), err
+}
+
+func ReadRootPublications_latestDeals_Results(msg *capnp.Message) (Publications_latestDeals_Results, error) {
+	root, err := msg.Root()
+	return Publications_latestDeals_Results(root.Struct()), err
+}
+
+func (s Publications_latestDeals_Results) String() string {
+	str, _ := text.Marshal(0xe7da36d32d5316b8, capnp.Struct(s))
+	return str
+}
+
+func (s Publications_latestDeals_Results) EncodeAsPtr(seg *capnp.Segment) capnp.Ptr {
+	return capnp.Struct(s).EncodeAsPtr(seg)
+}
+
+func (Publications_latestDeals_Results) DecodeFromPtr(p capnp.Ptr) Publications_latestDeals_Results {
+	return Publications_latestDeals_Results(capnp.Struct{}.DecodeFromPtr(p))
+}
+
+func (s Publications_latestDeals_Results) ToPtr() capnp.Ptr {
+	return capnp.Struct(s).ToPtr()
+}
+func (s Publications_latestDeals_Results) IsValid() bool {
+	return capnp.Struct(s).IsValid()
+}
+
+func (s Publications_latestDeals_Results) Message() *capnp.Message {
+	return capnp.Struct(s).Message()
+}
+
+func (s Publications_latestDeals_Results) Segment() *capnp.Segment {
+	return capnp.Struct(s).Segment()
+}
+func (s Publications_latestDeals_Results) Deals() (capnp2.DealInfo_List, error) {
+	p, err := capnp.Struct(s).Ptr(0)
+	return capnp2.DealInfo_List(p.List()), err
+}
+
+func (s Publications_latestDeals_Results) HasDeals() bool {
+	return capnp.Struct(s).HasPtr(0)
+}
+
+func (s Publications_latestDeals_Results) SetDeals(v capnp2.DealInfo_List) error {
+	return capnp.Struct(s).SetPtr(0, v.ToPtr())
+}
+
+// NewDeals sets the deals field to a newly
+// allocated capnp2.DealInfo_List, preferring placement in s's segment.
+func (s Publications_latestDeals_Results) NewDeals(n int32) (capnp2.DealInfo_List, error) {
+	l, err := capnp2.NewDealInfo_List(capnp.Struct(s).Segment(), n)
+	if err != nil {
+		return capnp2.DealInfo_List{}, err
+	}
+	err = capnp.Struct(s).SetPtr(0, l.ToPtr())
+	return l, err
+}
+
+// Publications_latestDeals_Results_List is a list of Publications_latestDeals_Results.
+type Publications_latestDeals_Results_List = capnp.StructList[Publications_latestDeals_Results]
+
+// NewPublications_latestDeals_Results creates a new list of Publications_latestDeals_Results.
+func NewPublications_latestDeals_Results_List(s *capnp.Segment, sz int32) (Publications_latestDeals_Results_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 1}, sz)
+	return capnp.StructList[Publications_latestDeals_Results](l), err
+}
+
+// Publications_latestDeals_Results_Future is a wrapper for a Publications_latestDeals_Results promised by a client call.
+type Publications_latestDeals_Results_Future struct{ *capnp.Future }
+
+func (f Publications_latestDeals_Results_Future) Struct() (Publications_latestDeals_Results, error) {
+	p, err := f.Future.Ptr()
+	return Publications_latestDeals_Results(p.Struct()), err
+}
+
+const schema_9cf9878fd3dd8473 = "x\xda\xa4Voh[\xe5\x17>\xe7}\x93\xde\xdc\xa4" +
+	"i\xf2.\xe5\xd7\xfd\x86#\x1aV\x98\x85e\xb6\x15\xc7" +
+	"\xaa\x92\x94\xae\xa8\xd3B\xee\x14\x86`u7\xe9ms" +
+	"\xed\xcd\x1fso\xba\xa2\x08N\xe7:\xffaU&\xca" +
+	"\xa6\x03\xc1\x0fE\xa6V\xa6\x8eN\x87\x82TT\xfc3" +
+	"\xb7\x0f\xb6X\x86\xc3Q\x15\xfd\xa0XGer\xe5\xbd" +
+	"\xc9\xbd\xb9jG\x9b\xf6\xdb\x0dy\xdes\xce\xf3<\xe7" +
+	"\xbc\xef\xb9\xe6\x1cMz\xda\x83\xbb\xfd@\xa4Qo\x83" +
+	"9sz\x9f0\x15\xfe\xf2Q`q\x04\xf0z\x04\x80" +
+	"N\xe6\xfd\x1a\x01#\xad\xdey@\xf3\xf5\xb3\x81\x1f\xee" +
+	">v\xf8 Hq$\x00^\xc2\x11\x8b\xdeY\x8e\x08" +
+	"6p\xc4\xf7G\x7f\xc9\xdc\xd4}\xe01w\x88\xef\x1a" +
+	"\xces\xc0\x82\x05\xc8^q\xc3g\xf3\xa3MOT\x01" +
+	"\xc8\x01\x9f\x08\x16`NH\x00\x9a7\x8a#1\xb1u" +
+	"\xf0I`\xdb\x1c@\xd0\x17#\xbc\x08\x1f\x07\xb4\x1cW" +
+	"\x1b\xe2\xe9w\xc6y\x11h\x17\xd1\xeb\xf3sD\xbf\xef" +
+	"\x0d@s\xe1\xc8C\x8f\x88/\x9f\x1aw\x87X\xf0m" +
+	"\xe0\x80\xa0\xc8C\xdc:yRxxD|\xa9\x1a\xc2" +
+	"\xaar\x8b\xf8\x13/\xa2\xdb\x02d\xf7\\\x1a\xed~\x81" +
+	"\xbc\xe2\xaeR\x16-%\xca\x16`|\x92^{\xfe\xf1" +
+	"g\x8f\x03\x8bSs\xae\xe5\xf7\xec\xcc\x95\xdf\xfe\x05\x80" +
+	"\x9d\x87\xc4)\x8c\x1c\x13\x05\x80\xc8\x848\x16Y\xe4_" +
+	"\xe6\x85\xe7\xbe(\x16'\xde\xfd\xb8RPE\x14\xb1\x8d" +
+	"\x80\xc7l\xfa\xa0\xed\xcfm\xbd\xe5\xcf]\xff\xcc\x881" +
+	"\xfe\xcf\xa7\x81\xa9\xd7\x0e\x9e\x18\xfa\xea\x1f4O\x8b\x96" +
+	"R\x17DN\xb3\xfd\xe2\x9b\xd7\xa7O\xc5\xce\xba\x8b|" +
+	"\xd0o\xb1x\xc6\xcf\x8b|\xff\xea?\x8e~\xd3\xf9\xc0" +
+	"\xb9\x0a\xc0\x0a\xfe\xb6\x7f\x16\xc1c\x9e\xf8\xdf\xed[\xce" +
+	"\\7;\xef>:\xe1_\xc7\x15\xfa\xd0:z\xe9\xbe" +
+	"\xdd\xcfO\xfc\xb6\xf1g7\xe0W\xbfe\xb47\xc0\x01" +
+	"\x0egv\x155\xf5\xfdsg\x9e\x1e[<\xc2\x05\xd8" +
+	"\x1e(a\xa4/\xd0\x02\xd0yg`\x0c#}\x8d\x02" +
+	"\xec7\x8b\xc3C[\xd3\xb2\xae6\xe4\x8b\xa5\xc2\x88:" +
+	"\xa0\x94\xb6\xda\x1f\xf1\x8c\\\xcc\x17\xbbR\xe5\xb4\xa6f" +
+	"dC-\xe4\xf5x\xb1\xacg7\xa5\xe4\x92\x9cC]" +
+	"\x0aS\x0f\x80\x07\x01\x98\xbc\x01@\xba\x8b\xa2\x94%\xc8" +
+	"\x10\x9b\xb90L\x89\x01H{(J\x1aAFH3" +
+	"\xefL\xa6r\xe4\x00E\xa9H\x90Q\xda\x8c\x14\x80\xe5" +
+	"82KQ2\x08\xd2\xbc\x8e\x8d@\xb0\x11P()" +
+	"\x9a\xfdM\x8dQ\x0c\x9b\xf7,\x967\x0a\xfd\x91\x1f\x01" +
+	"\x10\xc3\x80\x82\xae\x0ea\x10\x08\x06\x01\xebe2\xa0\xc8" +
+	"\x9anQ\xa1\xb9\xba\xa8\xa0\xcd\xa4\xc3\xcd\x04\xabL\xba" +
+	"\x96e\x12\xd5\xd4\x9cj\xa0\x0f\x08\xfa\x00\x13\x85\xc1A" +
+	"]1P\x04\x82b\xfd,2%E6\x14NC\x90" +
+	"s\xabt\xa4k)G:\x96\xe5\x91\xd03Y%'" +
+	"c\xd8\xec\x99~o\xfaP\xc7\xf4[UW\xa2\x85\xbd" +
+	"y\xa5\xb46_v)zY\xd0\x0c]\xf28\x8c\x82" +
+	"\xbc$\x1fEi\x13\xc1\xa8\x85\xc2&\xc0\x14E\x0c\x9b" +
+	"\x076\x9f,\x7ft\xf1\xf04\xaf\xa0\xc9\x95SXY" +
+	"\xce\x1eY\xd3\xd2rf8\xbe\xb7\xa4\xba\xd4\\\"w" +
+	"3\xc1h&[\xce\x0f\xff\x87\xde\x0aSi\xb2\xa1\xe8" +
+	"\xc6\x0e\xa7\xf9r:\x80\xd4\xe8$\xea\xe5\xb6%)J" +
+	"\xb7\xb9l\xbb\x85\xdb\xb6\x83\xa2\x94\xaau_\xdf:\x00" +
+	"\xe9f\x8a\xd2\x1d\x975\x08\xf3v\x93\xadZ\x8f\x81B" +
+	"^qf\xc4%G\xac&\xc7Zf\xb0\xda\xbd\xbb\x14" +
+	"=T\xfe\x97\xd9]\xb5\x0c\x09eT\xd5\x0d\x1d\x11\x08" +
+	"b\xfdI4U7\x9c+\xeb2\x96.\xdd\xb1\xde\x95" +
+	"\xaa\x95\xa8\xc8\x95B\x94|\xd4\x0b\xe0\xbc\x95h?0" +
+	"\xac\xbd\x03\x08k\x15\xb0\xf6\x08\xa2\xfd\xc4\xb0\xff\xb7\x01" +
+	"aA!ju_\x12C\\\xf5$\xa6p\xad}l" +
+	"\xeb\xba6\xfb\xedQ\xacW\xf7rQ+\xc8\x03\xce0" +
+	"\xad\xa6\xc7\xdb\x96\xed\xf1\x90\xae\xde\xaf\xac\xf6\xf2\xacV" +
+	"\xb8T\xfb\xed\xb4\xa6\x12\xa5\xf5\x04\xcdLU\x0e\x00@" +
+	"V[0\x00\x91\xd5\x9f\xd3z@\xb9\xa4\x1a\xad\xdf\x18" +
+	"\xf7\xe5a\xc50p\xad7d=Cd\x97\xedNy" +
+	"oU\xa8\xcd\x04\xcdb\xf5\x04\x84\xf8\x19;7w\xca" +
+	"\x9d\xd1\xb3\\\xc6\xa8\x95R\xf2\xa0{\x9b\xc3\x9dfO" +
+	"\xcd\x07i\xbd5f\xf6R\x8b\xf6\xde\xc8&\xbb\x80\xb0" +
+	"W\xf9\x98\xd9;3\xda\xcb\x16{\x91\x8f\xd9S\x02\x12" +
+	"g\x85C{Sc\xfb\xf8\xb9\xb2\x80\xd4\xd90\xd1\xde" +
+	"\xb4\x98\xca\xcf\xf5\x0b\xe8q\xd6l\xb4\x97e&\xf1\xb1" +
+	"\xee\x15\xd0\xebl\xbfh\xafpl{\x1a\x08k\x17\x12" +
+	"\x95[.\x89!\xee}\x12\x13\x95\xb6Kb\x88\x8b\x9a" +
+	"\xac:\x95D\xd3v\x17\x04\xebw\x0a\xf1\xef\x00\x00\x00" +
+	"\xff\xffV\xe1Q\xf6"
 
 func RegisterSchema(reg *schemas.Registry) {
 	reg.Register(&schemas.Schema{
 		String: schema_9cf9878fd3dd8473,
 		Nodes: []uint64{
 			0x85cf10ba0781d1d9,
+			0x889bad5ee80bd4ae,
 			0x8986414763ed9fe4,
+			0x8b0e78e7cb3c1c68,
 			0x8c6625092276093d,
+			0x90b6622e0669b417,
 			0x90be9e0983809cf5,
 			0x9d09768207bbb14b,
 			0xa202984178fc6068,
@@ -1675,6 +2194,7 @@ func RegisterSchema(reg *schemas.Registry) {
 			0xd067b888abba0bca,
 			0xd422be623bb0f731,
 			0xdf7b33d89ff629bd,
+			0xe7da36d32d5316b8,
 			0xec1df2a9965771fc,
 			0xfddc20d968f417dd,
 		},
