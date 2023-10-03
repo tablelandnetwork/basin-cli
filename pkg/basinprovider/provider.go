@@ -3,6 +3,7 @@ package basinprovider
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"errors"
 	"fmt"
 	"io"
@@ -234,6 +235,112 @@ func (bp *BasinProvider) List(ctx context.Context, owner common.Address) ([]stri
 	return pubs, nil
 }
 
+// Deals lists deals from a given publication.
+func (bp *BasinProvider) Deals(
+	ctx context.Context, ns string, rel string, limit uint32, offset uint64,
+) ([]app.DealInfo, error) {
+	f, release := bp.p.Deals(ctx, func(call Publications_deals_Params) error {
+		if err := call.SetNs(ns); err != nil {
+			return fmt.Errorf("setting ns")
+		}
+
+		if err := call.SetRel(rel); err != nil {
+			return fmt.Errorf("setting rel")
+		}
+
+		call.SetLimit(limit)
+		call.SetOffset(offset)
+
+		return nil
+	})
+	defer release()
+
+	results, err := f.Struct()
+	if err != nil {
+		return []app.DealInfo{}, fmt.Errorf("waiting list results: %s", err)
+	}
+
+	list, err := results.Deals()
+	if err != nil {
+		return []app.DealInfo{}, fmt.Errorf("result deals: %s", err)
+	}
+
+	deals := make([]app.DealInfo, list.Len())
+	for i := 0; i < list.Len(); i++ {
+		deal := list.At(i)
+		cid, err := deal.Cid()
+		if err != nil {
+			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
+		}
+
+		selectorPath, err := deal.SelectorPath()
+		if err != nil {
+			return []app.DealInfo{}, fmt.Errorf("failed to get selector path: %s", err)
+		}
+
+		id := deal.Id()
+		deals[i] = app.DealInfo{
+			ID:           id,
+			CID:          cid,
+			SelectorPath: selectorPath,
+		}
+	}
+
+	return deals, nil
+}
+
+// LatestDeals lists latest deals from a given publication.
+func (bp *BasinProvider) LatestDeals(
+	ctx context.Context, ns string, rel string, n uint32,
+) ([]app.DealInfo, error) {
+	f, release := bp.p.LatestDeals(ctx, func(call Publications_latestDeals_Params) error {
+		if err := call.SetNs(ns); err != nil {
+			return fmt.Errorf("setting ns")
+		}
+
+		if err := call.SetRel(rel); err != nil {
+			return fmt.Errorf("setting rel")
+		}
+
+		call.SetN(n)
+		return nil
+	})
+	defer release()
+
+	results, err := f.Struct()
+	if err != nil {
+		return []app.DealInfo{}, fmt.Errorf("waiting list results: %s", err)
+	}
+
+	list, err := results.Deals()
+	if err != nil {
+		return []app.DealInfo{}, fmt.Errorf("result deals: %s", err)
+	}
+
+	deals := make([]app.DealInfo, list.Len())
+	for i := 0; i < list.Len(); i++ {
+		deal := list.At(i)
+		cid, err := deal.Cid()
+		if err != nil {
+			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
+		}
+
+		selectorPath, err := deal.SelectorPath()
+		if err != nil {
+			return []app.DealInfo{}, fmt.Errorf("failed to get selector path: %s", err)
+		}
+
+		id := deal.Id()
+		deals[i] = app.DealInfo{
+			ID:           id,
+			CID:          cid,
+			SelectorPath: selectorPath,
+		}
+	}
+
+	return deals, nil
+}
+
 // Reconnect with the Basin Provider.
 func (bp *BasinProvider) Reconnect() error {
 	bp.cancel()
@@ -269,7 +376,7 @@ type BasinServerMock struct {
 	owner        map[string]string
 	txs          map[basincapnp.Tx]bool
 
-	uploads map[string]*callbackMock
+	uploads map[string]map[int]*callbackMock
 }
 
 // NewBasinServerMock creates new *BasinServerMock.
@@ -278,7 +385,7 @@ func NewBasinServerMock() *BasinServerMock {
 		publications: make(map[string]struct{}),
 		owner:        make(map[string]string),
 		txs:          make(map[basincapnp.Tx]bool),
-		uploads:      make(map[string]*callbackMock),
+		uploads:      make(map[string]map[int]*callbackMock),
 	}
 }
 
@@ -385,7 +492,85 @@ func (s *BasinServerMock) Upload(_ context.Context, call Publications_upload) er
 		return err
 	}
 
-	s.uploads[fmt.Sprintf("%s.%s", ns, rel)] = callback
+	pub := fmt.Sprintf("%s.%s", ns, rel)
+	_, ok := s.uploads[pub]
+	if !ok {
+		s.uploads[pub] = make(map[int]*callbackMock)
+	}
+	s.uploads[pub][len(s.uploads[pub])] = callback
+
+	return nil
+}
+
+// Deals lists deals from a given publication.
+func (s *BasinServerMock) Deals(_ context.Context, call Publications_deals) error {
+	ns, _ := call.Args().Ns()
+	rel, _ := call.Args().Rel()
+	limit := call.Args().Limit()
+	offset := call.Args().Offset()
+
+	results, _ := call.AllocResults()
+	dealInfoList, _ := results.NewDeals(min(int32(limit), int32(len(s.uploads))))
+	var i uint32
+	for pub, deals := range s.uploads {
+		parts := strings.Split(pub, ".")
+		dealNs, dealRel := parts[0], parts[1]
+		if dealNs != ns || dealRel != rel {
+			continue
+		}
+
+		for id, callback := range deals {
+			if uint64(id) < offset {
+				continue
+			}
+
+			if i >= limit {
+				continue
+			}
+
+			dealInfo := dealInfoList.At(int(i))
+			dealInfo.SetId(uint64(id))
+			fakeCID := sha1.Sum(callback.bytes)
+			_ = dealInfo.SetCid(string(fakeCID[:]))
+			_ = dealInfo.SetSelectorPath("does not matter")
+		}
+
+		return nil
+	}
+
+	return nil
+}
+
+// LatestDeals lists latest deals from a given publication.
+func (s *BasinServerMock) LatestDeals(_ context.Context, call Publications_latestDeals) error {
+	ns, _ := call.Args().Ns()
+	rel, _ := call.Args().Rel()
+	n := call.Args().N()
+
+	results, _ := call.AllocResults()
+	var i uint32
+	for pub, deals := range s.uploads {
+		parts := strings.Split(pub, ".")
+		dealNs, dealRel := parts[0], parts[1]
+		if dealNs != ns || dealRel != rel {
+			continue
+		}
+
+		dealInfoList, _ := results.NewDeals(int32(len(s.uploads[pub])))
+		for id, callback := range deals {
+			if i >= n {
+				continue
+			}
+
+			dealInfo := dealInfoList.At(int(i))
+			dealInfo.SetId(uint64(id))
+			fakeCID := sha1.Sum(callback.bytes)
+			_ = dealInfo.SetCid(string(fakeCID[:]))
+			_ = dealInfo.SetSelectorPath("does not matter")
+		}
+
+		return nil
+	}
 	return nil
 }
 

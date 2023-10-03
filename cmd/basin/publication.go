@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/olekukonko/tablewriter"
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	"github.com/tablelandnetwork/basin-cli/pkg/basinprovider"
@@ -40,6 +41,7 @@ func newPublicationCommand() *cli.Command {
 			newPublicationStartCommand(),
 			newPublicationUploadCommand(),
 			newPublicationListCommand(),
+			newPublicationDealsCommand(),
 		},
 	}
 }
@@ -324,6 +326,92 @@ func newPublicationListCommand() *cli.Command {
 			for _, pub := range publications {
 				fmt.Printf("%s\n", pub)
 			}
+
+			return nil
+		},
+	}
+}
+
+func newPublicationDealsCommand() *cli.Command {
+	var publication, provider string
+	var limit, latest int
+	var offset int64
+
+	return &cli.Command{
+		Name:  "deals",
+		Usage: "list deals of a given publications",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "publication",
+				Usage:       "Publication name",
+				Destination: &publication,
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "provider",
+				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Destination: &provider,
+				Value:       DefaultProviderHost,
+			},
+			&cli.IntFlag{
+				Name:        "limit",
+				Usage:       "The number of deals to fetch",
+				Destination: &limit,
+				Value:       10,
+			},
+			&cli.IntFlag{
+				Name:        "latest",
+				Usage:       "The latest N deals to fetch",
+				Destination: &latest,
+				Value:       10,
+			},
+			&cli.Int64Flag{
+				Name:        "offset",
+				Usage:       "The epoch to start from",
+				Destination: &offset,
+				Value:       0,
+			},
+		},
+		Action: func(cCtx *cli.Context) error {
+			ns, rel, err := parsePublicationName(publication)
+			if err != nil {
+				return err
+			}
+
+			bp, err := basinprovider.New(cCtx.Context, provider)
+			if err != nil {
+				return fmt.Errorf("new basin provider: %s", err)
+			}
+			defer bp.Close()
+
+			var deals []app.DealInfo
+			if latest > 0 {
+				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest))
+				if err != nil {
+					return fmt.Errorf("failed to fetch deals: %s", err)
+				}
+			} else {
+				if offset < 0 {
+					return errors.New("offset has to be greater than 0")
+				}
+
+				if limit < 0 {
+					return errors.New("limit has to be greater than 0")
+				}
+
+				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset))
+				if err != nil {
+					return fmt.Errorf("failed to fetch deals: %s", err)
+				}
+			}
+
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"ID", "Selector Path", "CID"})
+
+			for _, deal := range deals {
+				table.Append([]string{fmt.Sprint(deal.ID), deal.SelectorPath, deal.CID})
+			}
+			table.Render()
 
 			return nil
 		},
