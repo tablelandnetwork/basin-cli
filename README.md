@@ -17,6 +17,7 @@
   - [Start replicating a publication](#start-replicating-a-publication)
   - [Upload a Parquet file](#upload-a-parquet-file)
   - [Listing Publications](#listing-publications)
+  - [Listing Deals](#listing-deals)
 - [Development](#development)
   - [Running](#running)
   - [Run tests](#run-tests)
@@ -119,6 +120,14 @@ You can list the publications from an address by running:
 
 ```bash
 basin publication list --address [ETH_ADDRESS]
+```
+
+## Listing Deals
+
+You can list deals of a given publication by running:
+
+```bash
+basin publication deals --publication [PUBLICATION] --latest 5
 ```
 
 # Development
