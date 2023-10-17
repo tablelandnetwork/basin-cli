@@ -1,2 +1,7 @@
 /basin
 /cover.out
+*.out
+*.addr
+.vscode/*
+*.db
+*.parquet
