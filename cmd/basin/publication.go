@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"capnproto.org/go/capnp/v3"
@@ -47,7 +48,7 @@ func newPublicationCommand() *cli.Command {
 }
 
 func newPublicationCreateCommand() *cli.Command {
-	var owner, dburi, provider string
+	var owner, dburi, provider, winSize string
 	var secure bool
 
 	return &cli.Command{
@@ -76,6 +77,12 @@ func newPublicationCreateCommand() *cli.Command {
 				Usage:       "Uses TLS connection",
 				Destination: &secure,
 				Value:       true,
+			},
+			&cli.StringFlag{
+				Name:        "window-size",
+				Usage:       "The size of the window for the WAL records",
+				Destination: &winSize,
+				Value:       fmt.Sprintf("%d", DefaultWindowSize),
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -116,6 +123,11 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("load config: %s", err)
 			}
 
+			winSizeInt, err := strconv.ParseInt(winSize, 10, 64)
+			if err != nil {
+				return fmt.Errorf("cannot parse window size: %s", err)
+			}
+
 			cfg.Publications[pub] = publication{
 				Host:         pgConfig.Host,
 				Port:         int(pgConfig.Port),
@@ -123,10 +135,21 @@ func newPublicationCreateCommand() *cli.Command {
 				Password:     pgConfig.Password,
 				Database:     pgConfig.Database,
 				ProviderHost: provider,
+				WindowSize:   int(winSizeInt),
 			}
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
 				return fmt.Errorf("encode: %s", err)
+			}
+
+			// This directory will contain the db files for the pub
+			if err := os.Mkdir(path.Join(dir, pub), 0o755); err != nil {
+				if os.IsExist(err) {
+					fmt.Println("db directory already exists")
+				} else {
+					fmt.Println("Error:", err)
+					return err
+				}
 			}
 
 			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, secure)
@@ -211,14 +234,111 @@ func newPublicationStartCommand() *cli.Command {
 			}
 			defer bp.Close()
 
+			/// -----------------
+			pgxConn, err := pgx.Connect(cCtx.Context, connString)
+			if err != nil {
+				return fmt.Errorf("connect: %s", err)
+			}
+			defer func() {
+				_ = pgxConn.Close(cCtx.Context)
+			}()
+
+			rows, err := pgxConn.Query(
+				cCtx.Context,
+				`
+				WITH primary_key_info AS
+					(SELECT tc.constraint_schema,
+							tc.table_name,
+							ccu.column_name
+					FROM information_schema.table_constraints tc
+					JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
+					WHERE constraint_type = 'PRIMARY KEY' )
+				SELECT
+					c.column_name,
+					c.data_type,
+					c.is_nullable = 'YES' AS is_nullable,
+					pki.column_name IS NOT NULL AS is_primary
+				FROM information_schema.columns AS c
+				LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
+					AND pki.table_name = c.table_name
+					AND pki.column_name = c.column_name
+				WHERE c.table_name = $1; 
+				`, rel,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to fetch schema")
+			}
+			defer rows.Close()
+
+			var colName, typ string
+			var isNull, isPrimary bool
+			var columns []Column
+			for rows.Next() {
+				if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
+					return fmt.Errorf("scan: %s", err)
+				}
+
+				columns = append(columns, Column{
+					Name:               colName,
+					Type:               typ,
+					IsNullable:         isNull,
+					IsPartOfPrimaryKey: isPrimary,
+				})
+			}
+
+			createTblQuery, err := schemaToTableCreate(rel, columns)
+			if err != nil {
+				return fmt.Errorf("cannot create table in duckdb: %s", err)
+			}
+
+			dbDir := path.Join(dir, publication)
 			basinStreamer := app.NewBasinStreamer(ns, r, bp, privateKey)
-			if err := basinStreamer.Run(cCtx.Context); err != nil {
+			if err := basinStreamer.Run(cCtx.Context, createTblQuery, dbDir); err != nil {
 				return fmt.Errorf("run: %s", err)
 			}
 
 			return nil
 		},
 	}
+}
+
+type Column struct {
+	Name               string
+	Type               string
+	IsNullable         bool
+	IsPartOfPrimaryKey bool
+}
+
+func schemaToTableCreate(tableName string, schema []Column) (string, error) {
+	var cols, pks string
+
+	for i, column := range schema {
+		col := fmt.Sprintf("%s %s", column.Name, column.Type)
+		if !column.IsNullable {
+			col = fmt.Sprintf("%s NOT NULL", col)
+		}
+		if i == 0 {
+			cols = col
+			if column.IsPartOfPrimaryKey {
+				pks = column.Name
+			}
+		} else {
+			cols = fmt.Sprintf("%s,%s", cols, col)
+			if column.IsPartOfPrimaryKey {
+				pks = fmt.Sprintf("%s,%s", pks, column.Name)
+			}
+		}
+	}
+
+	if pks != "" {
+		cols = fmt.Sprintf("%s,PRIMARY KEY (%s)", cols, pks)
+	}
+
+	if cols == "" {
+		return "", errors.New("schema must have at least one column")
+	}
+
+	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", tableName, cols), nil
 }
 
 func newPublicationUploadCommand() *cli.Command {

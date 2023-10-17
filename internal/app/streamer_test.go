@@ -35,12 +35,13 @@ func TestBasinStreamer(t *testing.T) {
 		sig []byte
 	})
 
+	// TODO: add mock db for testing
 	streamer := NewBasinStreamer("n", &replicatorMock{feed: feed}, &basinProviderMock{
 		feedback: feedback,
 		owner:    make(map[string]string),
 	}, privateKey)
 	go func() {
-		err = streamer.Run(context.Background())
+		err = streamer.Run(context.Background(), "", "")
 		require.NoError(t, err)
 	}()
 
@@ -131,5 +132,11 @@ func (bp *basinProviderMock) LatestDeals(context.Context, string, string, uint32
 }
 
 func (bp *basinProviderMock) Reconnect() error {
+	return nil
+}
+
+func (bp *basinProviderMock) Upload(
+	ctx context.Context, ns string, rel string, size uint64, f io.Reader, signer *Signer, progress io.Writer,
+) error {
 	return nil
 }
