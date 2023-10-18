@@ -48,6 +48,7 @@ func newPublicationCommand() *cli.Command {
 
 func newPublicationCreateCommand() *cli.Command {
 	var owner, dburi, provider string
+	var secure bool
 
 	return &cli.Command{
 		Name:  "create",
@@ -69,6 +70,12 @@ func newPublicationCreateCommand() *cli.Command {
 				Usage:       "The provider's address and port (e.g. localhost:8080)",
 				Destination: &provider,
 				Value:       DefaultProviderHost,
+			},
+			&cli.BoolFlag{
+				Name:        "secure",
+				Usage:       "Uses TLS connection",
+				Destination: &secure,
+				Value:       true,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -122,7 +129,7 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner)
+			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, secure)
 			if err != nil {
 				return fmt.Errorf("failed to create publication: %s", err)
 			}
@@ -140,6 +147,7 @@ func newPublicationCreateCommand() *cli.Command {
 
 func newPublicationStartCommand() *cli.Command {
 	var privateKey string
+	var secure bool
 
 	return &cli.Command{
 		Name:  "start",
@@ -150,6 +158,12 @@ func newPublicationStartCommand() *cli.Command {
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
+			},
+			&cli.BoolFlag{
+				Name:        "secure",
+				Usage:       "Uses TLS connection",
+				Destination: &secure,
+				Value:       true,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -191,7 +205,7 @@ func newPublicationStartCommand() *cli.Command {
 				return err
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publication].ProviderHost)
+			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publication].ProviderHost, secure)
 			if err != nil {
 				return err
 			}
@@ -209,6 +223,7 @@ func newPublicationStartCommand() *cli.Command {
 
 func newPublicationUploadCommand() *cli.Command {
 	var privateKey, publicationName string
+	var secure bool
 
 	return &cli.Command{
 		Name:  "upload",
@@ -225,6 +240,12 @@ func newPublicationUploadCommand() *cli.Command {
 				Usage:       "Publication name",
 				Destination: &publicationName,
 				Required:    true,
+			},
+			&cli.BoolFlag{
+				Name:        "secure",
+				Usage:       "Uses TLS connection",
+				Destination: &secure,
+				Value:       true,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -251,7 +272,7 @@ func newPublicationUploadCommand() *cli.Command {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publicationName].ProviderHost)
+			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publicationName].ProviderHost, secure)
 			if err != nil {
 				return err
 			}
@@ -289,6 +310,7 @@ func newPublicationUploadCommand() *cli.Command {
 
 func newPublicationListCommand() *cli.Command {
 	var owner, provider string
+	var secure bool
 
 	return &cli.Command{
 		Name:  "list",
@@ -306,13 +328,19 @@ func newPublicationListCommand() *cli.Command {
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
+			&cli.BoolFlag{
+				Name:        "secure",
+				Usage:       "Uses TLS connection",
+				Destination: &secure,
+				Value:       true,
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			if !common.IsHexAddress(owner) {
 				return fmt.Errorf("%s is not a valid Ethereum wallet address", owner)
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, provider)
+			bp, err := basinprovider.New(cCtx.Context, provider, secure)
 			if err != nil {
 				return fmt.Errorf("new basin provider: %s", err)
 			}
@@ -336,6 +364,7 @@ func newPublicationDealsCommand() *cli.Command {
 	var publication, provider string
 	var limit, latest int
 	var offset int64
+	var secure bool
 
 	return &cli.Command{
 		Name:  "deals",
@@ -371,6 +400,12 @@ func newPublicationDealsCommand() *cli.Command {
 				Destination: &offset,
 				Value:       0,
 			},
+			&cli.BoolFlag{
+				Name:        "secure",
+				Usage:       "Uses TLS connection",
+				Destination: &secure,
+				Value:       true,
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			ns, rel, err := parsePublicationName(publication)
@@ -378,7 +413,7 @@ func newPublicationDealsCommand() *cli.Command {
 				return err
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, provider)
+			bp, err := basinprovider.New(cCtx.Context, provider, secure)
 			if err != nil {
 				return fmt.Errorf("new basin provider: %s", err)
 			}
@@ -429,9 +464,9 @@ func parsePublicationName(name string) (ns string, rel string, err error) {
 }
 
 func createPublication(
-	ctx context.Context, dburi string, ns string, rel string, provider string, owner string,
+	ctx context.Context, dburi string, ns string, rel string, provider string, owner string, secure bool,
 ) (exists bool, err error) {
-	bp, err := basinprovider.New(ctx, provider)
+	bp, err := basinprovider.New(ctx, provider, secure)
 	if err != nil {
 		return false, err
 	}

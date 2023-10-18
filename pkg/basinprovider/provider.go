@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,7 @@ const uploadChunk = 1 << 20 // 2 ^ 20 bytes = 1MiB
 type BasinProvider struct {
 	p        Publications
 	provider string
+	secure   bool
 	ctx      context.Context
 	cancel   context.CancelFunc
 }
@@ -39,8 +41,8 @@ type BasinProvider struct {
 var _ app.BasinProvider = (*BasinProvider)(nil)
 
 // New creates a new BasinProvider.
-func New(ctx context.Context, provider string) (*BasinProvider, error) {
-	client, cancel, err := connectWithBackoff(ctx, provider)
+func New(ctx context.Context, provider string, secure bool) (*BasinProvider, error) {
+	client, cancel, err := connectWithBackoff(ctx, provider, secure)
 	if err != nil {
 		return nil, err
 	}
@@ -48,15 +50,25 @@ func New(ctx context.Context, provider string) (*BasinProvider, error) {
 	return &BasinProvider{
 		p:        client,
 		provider: provider,
+		secure:   secure,
 		ctx:      ctx,
 		cancel:   cancel,
 	}, nil
 }
 
-func connect(ctx context.Context, provider string) (Publications, func(), error) {
-	conn, err := net.Dial("tcp", provider)
-	if err != nil {
-		return Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
+func connect(ctx context.Context, provider string, secure bool) (Publications, func(), error) {
+	var conn io.ReadWriteCloser
+	var err error
+	if secure {
+		conn, err = tls.Dial("tcp", provider, nil)
+		if err != nil {
+			return Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
+		}
+	} else {
+		conn, err = net.Dial("tcp", provider)
+		if err != nil {
+			return Publications{}, func() {}, fmt.Errorf("failed to connect to provider: %s", err)
+		}
 	}
 
 	rpcConn := rpc.NewConn(rpc.NewStreamTransport(conn), nil)
@@ -69,11 +81,13 @@ func connect(ctx context.Context, provider string) (Publications, func(), error)
 	return Publications(rpcConn.Bootstrap(ctx)), cancel, nil
 }
 
-func connectWithBackoff(ctx context.Context, provider string) (client Publications, cancel func(), err error) {
+func connectWithBackoff(
+	ctx context.Context, provider string, secure bool,
+) (client Publications, cancel func(), err error) {
 	exbo := backoff.NewExponentialBackOff()
 
 	for i := 0; i < maxPushAttempts; i++ {
-		client, cancel, err = connect(ctx, provider)
+		client, cancel, err = connect(ctx, provider, secure)
 		if err != nil {
 			wait := exbo.NextBackOff()
 			slog.Info("connect failed", "attempt", i+1, "sleep", wait)
@@ -344,7 +358,7 @@ func (bp *BasinProvider) LatestDeals(
 // Reconnect with the Basin Provider.
 func (bp *BasinProvider) Reconnect() error {
 	bp.cancel()
-	client, cancel, err := connectWithBackoff(bp.ctx, bp.provider)
+	client, cancel, err := connectWithBackoff(bp.ctx, bp.provider, bp.secure)
 	if err != nil {
 		return err
 	}
