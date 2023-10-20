@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -35,13 +37,22 @@ func TestBasinStreamer(t *testing.T) {
 		sig []byte
 	})
 
+	testDBDir := t.TempDir()
+	testTable := "t"
+	dbm, err := NewDBManager(context.Background(), testDBDir, testTable, []Column{
+		{Name: "id", Typ: "integer", IsNull: false, IsPrimary: true},
+		{Name: "name", Typ: "text", IsNull: false, IsPrimary: false},
+	}, 1*time.Second)
+	dbm.uploadMngr = &MockUploadManager{}
+
 	// TODO: add mock db for testing
 	streamer := NewBasinStreamer("n", &replicatorMock{feed: feed}, &basinProviderMock{
 		feedback: feedback,
 		owner:    make(map[string]string),
-	}, privateKey)
+	}, dbm, privateKey)
 	go func() {
-		err = streamer.Run(context.Background(), "", "")
+		err = streamer.Run(context.Background())
+		fmt.Println("streamer.Run err: ", err)
 		require.NoError(t, err)
 	}()
 
@@ -70,9 +81,28 @@ func TestBasinStreamer(t *testing.T) {
 		feed <- &tx
 		response := <-feedback
 
+		dbm.uploadMngr.Stop()
+		dbm.Close()
+
 		// TODO: check signature, require.Equal(t, []byte{}, response.sig)
 		require.NoError(t, basincapnp.CompareTx(&tx, response.tx))
 	}
+
+}
+
+type MockUploadManager struct{}
+
+func (m *MockUploadManager) Upload() error {
+	fmt.Println("uploading...")
+	return nil
+}
+
+func (m *MockUploadManager) Start() {
+	fmt.Println("starting...")
+}
+
+func (m *MockUploadManager) Stop() {
+	fmt.Println("stopping...")
 }
 
 type replicatorMock struct {
