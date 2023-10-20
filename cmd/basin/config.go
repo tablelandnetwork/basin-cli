@@ -10,7 +10,7 @@ import (
 )
 
 // DefaultProviderHost is the address of Basin Provider.
-const DefaultProviderHost = "34.73.36.206:3000"
+const DefaultProviderHost = "basin.tableland.xyz:3000"
 
 type config struct {
 	Publications map[string]publication `yaml:"publications"`
