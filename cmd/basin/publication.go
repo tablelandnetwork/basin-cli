@@ -243,52 +243,19 @@ func newPublicationStartCommand() *cli.Command {
 				_ = pgxConn.Close(cCtx.Context)
 			}()
 
-			rows, err := pgxConn.Query(
-				cCtx.Context,
-				`
-				WITH primary_key_info AS
-					(SELECT tc.constraint_schema,
-							tc.table_name,
-							ccu.column_name
-					FROM information_schema.table_constraints tc
-					JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
-					WHERE constraint_type = 'PRIMARY KEY' )
-				SELECT
-					c.column_name,
-					c.data_type,
-					c.is_nullable = 'YES' AS is_nullable,
-					pki.column_name IS NOT NULL AS is_primary
-				FROM information_schema.columns AS c
-				LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
-					AND pki.table_name = c.table_name
-					AND pki.column_name = c.column_name
-				WHERE c.table_name = $1; 
-				`, rel,
-			)
+			tx, err := pgxConn.Begin(cCtx.Context)
 			if err != nil {
-				return fmt.Errorf("failed to fetch schema")
+				return fmt.Errorf("failed to begin transaction")
 			}
-			defer rows.Close()
-
-			var colName, typ string
-			var isNull, isPrimary bool
-			var columns []Column
-			for rows.Next() {
-				if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
-					return fmt.Errorf("scan: %s", err)
+			defer func() {
+				if err != nil {
+					_ = tx.Rollback(cCtx.Context)
 				}
+			}()
 
-				columns = append(columns, Column{
-					Name:               colName,
-					Type:               typ,
-					IsNullable:         isNull,
-					IsPartOfPrimaryKey: isPrimary,
-				})
-			}
-
-			createTblQuery, err := schemaToTableCreate(rel, columns)
+			cols, err := insepectSourceTable(cCtx.Context, tx, rel)
 			if err != nil {
-				return fmt.Errorf("cannot create table in duckdb: %s", err)
+				return fmt.Errorf("failed to inspect source table: %s", err)
 			}
 
 			dbDir := path.Join(dir, publication)
@@ -300,45 +267,6 @@ func newPublicationStartCommand() *cli.Command {
 			return nil
 		},
 	}
-}
-
-type Column struct {
-	Name               string
-	Type               string
-	IsNullable         bool
-	IsPartOfPrimaryKey bool
-}
-
-func schemaToTableCreate(tableName string, schema []Column) (string, error) {
-	var cols, pks string
-
-	for i, column := range schema {
-		col := fmt.Sprintf("%s %s", column.Name, column.Type)
-		if !column.IsNullable {
-			col = fmt.Sprintf("%s NOT NULL", col)
-		}
-		if i == 0 {
-			cols = col
-			if column.IsPartOfPrimaryKey {
-				pks = column.Name
-			}
-		} else {
-			cols = fmt.Sprintf("%s,%s", cols, col)
-			if column.IsPartOfPrimaryKey {
-				pks = fmt.Sprintf("%s,%s", pks, column.Name)
-			}
-		}
-	}
-
-	if pks != "" {
-		cols = fmt.Sprintf("%s,PRIMARY KEY (%s)", cols, pks)
-	}
-
-	if cols == "" {
-		return "", errors.New("schema must have at least one column")
-	}
-
-	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", tableName, cols), nil
 }
 
 func newPublicationUploadCommand() *cli.Command {
@@ -586,6 +514,51 @@ func parsePublicationName(name string) (ns string, rel string, err error) {
 	return
 }
 
+func insepectSourceTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, error) {
+	rows, err := tx.Query(ctx,
+		`
+		WITH primary_key_info AS
+			(SELECT tc.constraint_schema,
+					tc.table_name,
+					ccu.column_name
+			FROM information_schema.table_constraints tc
+			JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
+			WHERE constraint_type = 'PRIMARY KEY' )
+		SELECT
+			c.column_name,
+			c.data_type,
+			c.is_nullable = 'YES' AS is_nullable,
+			pki.column_name IS NOT NULL AS is_primary
+		FROM information_schema.columns AS c
+		LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
+			AND pki.table_name = c.table_name
+			AND pki.column_name = c.column_name
+		WHERE c.table_name = $1; 
+		`, rel,
+	)
+	if err != nil {
+		return []app.Column{}, fmt.Errorf("failed to fetch schema")
+	}
+	defer rows.Close()
+
+	var colName, typ string
+	var isNull, isPrimary bool
+	var columns []app.Column
+	for rows.Next() {
+		if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
+			return []app.Column{}, fmt.Errorf("scan: %s", err)
+		}
+
+		columns = append(columns, app.Column{
+			Name:      colName,
+			Typ:       typ,
+			IsNull:    isNull,
+			IsPrimary: isPrimary,
+		})
+	}
+	return columns, nil
+}
+
 func createPublication(
 	ctx context.Context, dburi string, ns string, rel string, provider string, owner string, secure bool,
 ) (exists bool, err error) {
@@ -616,59 +589,13 @@ func createPublication(
 	if err != nil {
 		return false, fmt.Errorf("failed to begin transaction")
 	}
-
 	defer func() {
 		if err != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()
 
-	rows, err := tx.Query(ctx,
-		`
-		WITH primary_key_info AS
-			(SELECT tc.constraint_schema,
-					tc.table_name,
-					ccu.column_name
-			FROM information_schema.table_constraints tc
-			JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
-			WHERE constraint_type = 'PRIMARY KEY' )
-		SELECT
-			c.column_name,
-			c.data_type,
-			c.is_nullable = 'YES' AS is_nullable,
-			pki.column_name IS NOT NULL AS is_primary
-		FROM information_schema.columns AS c
-		LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
-			AND pki.table_name = c.table_name
-			AND pki.column_name = c.column_name
-		WHERE c.table_name = $1; 
-		`, rel,
-	)
-	if err != nil {
-		return false, fmt.Errorf("failed to fetch schema")
-	}
-	defer rows.Close()
-
-	type column struct {
-		name, typ         string
-		isNull, isPrimary bool
-	}
-
-	var colName, typ string
-	var isNull, isPrimary bool
-	var columns []column
-	for rows.Next() {
-		if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
-			return false, fmt.Errorf("scan: %s", err)
-		}
-
-		columns = append(columns, column{
-			name:      colName,
-			typ:       typ,
-			isNull:    isNull,
-			isPrimary: isPrimary,
-		})
-	}
+	columns, err := insepectSourceTable(ctx, tx, rel)
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
@@ -688,10 +615,10 @@ func createPublication(
 	for i, col := range columns {
 		column := columnsList.At(i)
 
-		_ = column.SetName(col.name)
-		_ = column.SetType(col.typ)
-		column.SetIsNullable(col.isNull)
-		column.SetIsPartOfPrimaryKey(col.isPrimary)
+		_ = column.SetName(col.Name)
+		_ = column.SetType(col.Typ)
+		column.SetIsNullable(col.IsNull)
+		column.SetIsPartOfPrimaryKey(col.IsPrimary)
 	}
 	_ = capnpSchema.SetColumns(columnsList)
 

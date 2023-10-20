@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pglogrepl"
+
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"golang.org/x/exp/slog"
 
@@ -30,14 +31,16 @@ type BasinStreamer struct {
 	replicator Replicator
 	privateKey *ecdsa.PrivateKey
 	provider   BasinProviderUploader
+	dbMngr     *DBManager // (todo): change it to interface for testing?
 }
 
 // NewBasinStreamer creates new streamer.
-func NewBasinStreamer(ns string, r Replicator, bp BasinProviderUploader, pk *ecdsa.PrivateKey) *BasinStreamer {
+func NewBasinStreamer(ns string, r Replicator, bp BasinProviderUploader, dbm *DBManager, pk *ecdsa.PrivateKey) *BasinStreamer {
 	return &BasinStreamer{
 		namespace:  ns,
 		replicator: r,
 		provider:   bp,
+		dbMngr:     dbm,
 		privateKey: pk,
 	}
 }
@@ -64,22 +67,20 @@ func (b *BasinStreamer) queryGen(tx *pgrepl.Tx) string {
 }
 
 // Run runs the BasinStreamer logic.
-func (b *BasinStreamer) Run(ctx context.Context, tableSchema, dbDir string) error {
+func (b *BasinStreamer) Run(ctx context.Context) error {
 	txs, table, err := b.replicator.StartReplication(ctx)
 	if err != nil {
 		return fmt.Errorf("start replication: %s", err)
 	}
 	fmt.Println("table: ", table)
 
-	// Creates a new db manager when replication starts
-	dbMngr, err := NewDBManager(dbDir, tableSchema)
-	if err != nil {
-		return fmt.Errorf("cannot create db manager: %s", err)
-	}
-
-	if err := dbMngr.setup(); err != nil {
+	// Setup local DB for replaying txs
+	if err := b.dbMngr.Setup(); err != nil {
 		return fmt.Errorf("cannot setup db: %s", err)
 	}
+	// defer b.dbMngr.Close()
+	// start "exports" uploader in the background
+	b.dbMngr.uploadMngr.Start()
 
 	go func() {
 		ticker := time.NewTicker(55 * time.Second)
@@ -119,26 +120,22 @@ func (b *BasinStreamer) Run(ctx context.Context, tableSchema, dbDir string) erro
 	}()
 
 	for tx := range txs {
-		delta := time.Since(dbMngr.createdAT)
-		if delta.Seconds() > 60 { // todo: change window size
+		// todo: change window size to read from config
+		if time.Since(b.dbMngr.createdAT).Seconds() > 60 {
 			// swap the db in the db manager
-			dbMngr.swap()
+			b.dbMngr.Swap()
 		}
 
 		slog.Info("new transaction received")
-		query := b.queryGen(tx)
-		res, err := dbMngr.db.Exec(query)
-		if err != nil {
-			return fmt.Errorf("cannot replay WAL record %s", err)
-		}
 
-		fmt.Println("Replayed the WAL log", res, query)
+		if err := b.dbMngr.Replay(tx); err != nil {
+			return fmt.Errorf("replay: %s", err)
+		}
 
 		if err := b.replicator.Commit(ctx, tx.CommitLSN); err != nil {
 			return fmt.Errorf("commit: %s", err)
 		}
 		slog.Info("transaction acked")
-
 	}
 
 	return nil
