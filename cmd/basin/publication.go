@@ -218,7 +218,6 @@ func newPublicationStartCommand() *cli.Command {
 			}
 			defer bp.Close()
 
-			/// -----------------
 			pgxConn, err := pgx.Connect(cCtx.Context, connString)
 			if err != nil {
 				return fmt.Errorf("connect: %s", err)
@@ -243,15 +242,29 @@ func newPublicationStartCommand() *cli.Command {
 			}
 
 			// Creates a new db manager when replication starts
-			// uploadInterval := cfg.Publications[publication].UploadInterval
-			dbm, err := app.NewDBManager(
-				cCtx.Context, path.Join(dir, publication), rel, cols, 5*time.Second)
-			if err != nil {
-				return fmt.Errorf("cannot create db manager: %s", err)
+			dbDir := path.Join(dir, publication)
+
+			// (todo): read from config
+			// (todo): read from config
+			uploadInterval := 5 * time.Second
+			replaceThreshold := 2 * time.Second
+
+			dbm := app.NewDBManager(dbDir, rel, cols, replaceThreshold)
+			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
+			upm := app.NewUploadManager(
+				cCtx.Context, dbDir, rel, uploader, uploadInterval,
+			)
+			// Before starting the UploadManager, upload the current.db
+			// if it exists in dbDir.
+			if err := upm.Upload(`^current.db$`); err != nil {
+				return fmt.Errorf("upload: %s", err)
 			}
-			defer dbm.Close()
-			
-			basinStreamer := app.NewBasinStreamer(ns, r, bp, dbm, privateKey)
+
+			// start uploader to run the background.
+			upm.Start()
+			defer upm.Stop()
+
+			basinStreamer := app.NewBasinStreamer(ns, r, dbm)
 			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				return fmt.Errorf("run: %s", err)
 			}
