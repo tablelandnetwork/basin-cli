@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -234,7 +235,6 @@ func newPublicationStartCommand() *cli.Command {
 			}
 			defer bp.Close()
 
-			/// -----------------
 			pgxConn, err := pgx.Connect(cCtx.Context, connString)
 			if err != nil {
 				return fmt.Errorf("connect: %s", err)
@@ -258,9 +258,31 @@ func newPublicationStartCommand() *cli.Command {
 				return fmt.Errorf("failed to inspect source table: %s", err)
 			}
 
+			// Creates a new db manager when replication starts
 			dbDir := path.Join(dir, publication)
-			basinStreamer := app.NewBasinStreamer(ns, r, bp, privateKey)
-			if err := basinStreamer.Run(cCtx.Context, createTblQuery, dbDir); err != nil {
+
+			// (todo): read from config
+			// (todo): read from config
+			uploadInterval := 5 * time.Second
+			replaceThreshold := 2 * time.Second
+
+			dbm := app.NewDBManager(dbDir, rel, cols, replaceThreshold)
+			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
+			upm := app.NewUploadManager(
+				cCtx.Context, dbDir, rel, uploader, uploadInterval,
+			)
+			// Before starting the UploadManager, upload the current.db
+			// if it exists in dbDir.
+			if err := upm.Upload(`^current.db$`); err != nil {
+				return fmt.Errorf("upload: %s", err)
+			}
+
+			// start uploader to run the background.
+			upm.Start()
+			defer upm.Stop()
+
+			basinStreamer := app.NewBasinStreamer(ns, r, dbm)
+			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				return fmt.Errorf("run: %s", err)
 			}
 

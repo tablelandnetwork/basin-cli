@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
+	"golang.org/x/exp/slog"
 )
 
 type Column struct {
@@ -19,47 +19,32 @@ type Column struct {
 	IsNull, IsPrimary bool
 }
 
-type Uploader interface {
-	Upload() error
-	Start()
-	Stop()
-}
-
 type DBManager struct {
-	db         *sql.DB
-	dbDir      string
-	table      string
-	createdAT  time.Time
-	cols       []Column
-	uploadMngr Uploader
+	db               *sql.DB
+	dbDir            string
+	table            string
+	createdAT        time.Time
+	cols             []Column
+	replaceThreshold time.Duration
 }
 
 func NewDBManager(
-	ctx context.Context,
 	dbDir string,
 	table string,
 	cols []Column,
-	uploadInterval time.Duration,
-) (*DBManager, error) {
-	dbPath := path.Join(dbDir, fmt.Sprintf("%d.db", time.Now().Unix()))
-	db, err := sql.Open("duckdb", dbPath)
-	if err != nil {
-		return nil, err
-	}
-
-	umngr := NewUploadManager(ctx, dbDir, table, uploadInterval)
+	threshold time.Duration,
+) *DBManager {
 	return &DBManager{
-		db:         db,
-		dbDir:      dbDir,
-		table:      table,
-		createdAT:  time.Now(),
-		cols:       cols,
-		uploadMngr: umngr,
-	}, nil
+		dbDir:            dbDir,
+		table:            table,
+		createdAT:        time.Now(),
+		cols:             cols,
+		replaceThreshold: threshold,
+	}
 }
 
-func (dbm *DBManager) Close() {
-	dbm.db.Close()
+func (dbm *DBManager) Close() error {
+	return dbm.db.Close()
 }
 
 // queryFromWAL creates a query for a WAL TX records.
@@ -86,42 +71,54 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 	return strings.Join(queries, "\n")
 }
 
-func (dbm *DBManager) Swap() error {
+func (dbm *DBManager) replace(ctx context.Context) error {
 	now := time.Now()
-	dbPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.Unix()))
-	db, err := sql.Open("duckdb", dbPath)
-	if err != nil {
+	dbPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
+
+	// 1. close current db
+	slog.Info("closing current db")
+	if err := dbm.db.Close(); err != nil {
 		return err
 	}
 
-	fmt.Println("swapping db to ", dbPath)
-	dbm.db.Close()
+	// 2. rename current.db to <timestamp>.db
+	slog.Info("renaming current db", "to", dbPath)
+	if err := os.Rename(path.Join(dbm.dbDir, "current.db"), dbPath); err != nil {
+		return err
+	}
+
+	// 3. create a new current.db
+	db, err := dbm.NewDB()
+	if err != nil {
+		return fmt.Errorf("swap: %v", err)
+	}
+
+	// 4. setup the new current db
 	dbm.db = db
 	dbm.createdAT = now
-
-	// setup the new db
-	if err := dbm.Setup(); err != nil {
-		return err
-	}
-
-	return nil
+	return dbm.Setup(ctx)
 }
 
-func (dbm *DBManager) Setup() error {
-	// initialize parquet extension
-	_, err := dbm.db.Exec("INSTALL parquet; LOAD parquet;")
+// NewDB creates a new duckdb database at the current.db path.
+func (dbm *DBManager) NewDB() (*sql.DB, error) {
+	db, err := sql.Open("duckdb", path.Join(dbm.dbDir, "current.db"))
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("cannot open db: %s", err)
 	}
 
-	createQuery, err := dbm.generateCreateQuery()
+	return db, nil
+}
+
+func (dbm *DBManager) Setup(ctx context.Context) error {
+	createQuery, err := dbm.genCreateQuery()
 	if err != nil {
 		return fmt.Errorf("cannot create table in duckdb: %s", err)
 	}
 
 	// create table if it does not exist
-	fmt.Println("create query: ", createQuery)
-	_, err = dbm.db.Exec(createQuery)
+	slog.Info("applying create", "query", createQuery)
+	query := fmt.Sprintf("INSTALL parquet; LOAD parquet; %s", createQuery)
+	_, err = dbm.db.ExecContext(ctx, query)
 	if err != nil {
 		return err
 	}
@@ -129,19 +126,35 @@ func (dbm *DBManager) Setup() error {
 	return nil
 }
 
-func (dbm *DBManager) Replay(tx *pgrepl.Tx) error {
+func (dbm *DBManager) replaceThresholdExceeded() bool {
+	delta := time.Since(dbm.createdAT).Seconds()
+	threshold := dbm.replaceThreshold.Seconds()
+	return delta > threshold
+}
+
+// Replay replays a WAL record to the current.db after materializing it.
+// If the replace threshold is exceeded, it replaces the current.db with
+// a new one.
+func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
+	if dbm.replaceThresholdExceeded() {
+		slog.Info("replacing current db before replaying further txs")
+		if err := dbm.replace(ctx); err != nil {
+			return fmt.Errorf("cannot replace db: %v", err)
+		}
+	}
+
 	query := dbm.queryFromWAL(tx) // (todo): error handling
-	fmt.Println("replay query: ", query)
-	res, err := dbm.db.Exec(query)
+	slog.Info("replaying", "query", query)
+
+	_, err := dbm.db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("cannot replay WAL record %s", err)
 	}
 
-	fmt.Println("Replayed the WAL log", res, query)
 	return nil
 }
 
-func (dbm *DBManager) generateCreateQuery() (string, error) {
+func (dbm *DBManager) genCreateQuery() (string, error) {
 	var cols, pks string
 	for i, column := range dbm.cols {
 		col := fmt.Sprintf("%s %s", column.Name, column.Typ)
@@ -173,121 +186,4 @@ func (dbm *DBManager) generateCreateQuery() (string, error) {
 		"CREATE TABLE IF NOT EXISTS %s (%s)",
 		dbm.table, cols)
 	return stmt, nil
-}
-
-func NewUploadManager(ctx context.Context, dbDir, table string, interval time.Duration) *UploadManager {
-	ctx, cancel := context.WithCancel(ctx)
-	return &UploadManager{
-		dbDir:    dbDir,
-		table:    table,
-		interval: interval,
-		ctx:      ctx,
-		cancel:   cancel,
-	}
-}
-
-type UploadManager struct {
-	dbDir    string
-	table    string
-	ctx      context.Context
-	cancel   context.CancelFunc
-	interval time.Duration
-}
-
-func (u *UploadManager) Start() {
-	go func(ctx context.Context) {
-		ticker := time.NewTicker(u.interval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				fmt.Println("Uploader is stopping")
-				return
-			case <-ticker.C:
-				fmt.Println("Time to scan, export, upload and cleanup")
-				if err := u.Upload(); err != nil {
-					fmt.Println("upload error: ", err)
-					continue
-				}
-			}
-		}
-	}(u.ctx)
-}
-
-func (u *UploadManager) Stop() {
-	u.cancel()
-}
-
-func (u *UploadManager) Upload() error {
-	re := regexp.MustCompile(`^\d+\.db$`)
-	files, err := os.ReadDir(u.dbDir)
-	if err != nil {
-		return fmt.Errorf("cannot read dir: %s", err)
-	}
-
-	for _, f := range files {
-		if re.MatchString(f.Name()) {
-			dbPath := path.Join(u.dbDir, f.Name())
-			fmt.Printf("db dump found, backing up %s\n", f.Name())
-			exportFilePath := path.Join(u.dbDir, fmt.Sprintf("%s.parquet", f.Name()))
-			exportQuery := fmt.Sprintf(
-				"COPY (SELECT * FROM %s) TO '%s' (FORMAT PARQUET)", u.table, exportFilePath)
-
-			db, err := sql.Open("duckdb", dbPath)
-			if err != nil {
-				return err
-			}
-
-			_, err = db.Exec("INSTALL parquet; LOAD parquet;")
-			if err != nil {
-				return err
-			}
-
-			_, err = db.Exec(exportQuery)
-			if err != nil {
-				return fmt.Errorf("cannot exprort to parquet file: %s", err)
-			}
-
-			// Read exported parquet file and send to provider
-			f, err := os.Open(exportFilePath)
-			if err != nil {
-				return fmt.Errorf("open file: %s", err)
-			}
-			defer func() {
-				_ = f.Close()
-			}()
-
-			// --- UPLOAD TO PROVIDER ---
-			/*
-				fi, err := f.Stat()
-				if err != nil {
-					return fmt.Errorf("fstat: %s", err)
-				}
-
-				progress := progressbar.DefaultBytes(
-						fi.Size(),
-						"Uploading file...",
-				)
-				if err := b.provider.Upload(
-						ctx, b.namespace, table, uint64(fi.Size()),
-						f, NewSigner(b.privateKey), progress,
-				); err != nil {
-						return fmt.Errorf("upload: %s", err)
-				}
-			*/
-			// --- END UPLOAD TO PROVIDER ---
-
-			fmt.Printf("deleting db dump %s\n", f.Name())
-			if err := os.Remove(dbPath); err != nil {
-				return fmt.Errorf("cannot delete file: %s", err)
-			}
-
-			fmt.Printf("deleting db WAL file %s\n", f.Name())
-			if err := os.Remove(fmt.Sprintf("%s.wal", dbPath)); err != nil {
-				fmt.Println("cannot delete file: ", err)
-			}
-		}
-	}
-	return nil
 }
