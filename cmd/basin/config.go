@@ -12,9 +12,9 @@ import (
 // DefaultProviderHost is the address of Basin Provider.
 const DefaultProviderHost = "basin.tableland.xyz:3000"
 
-// WindowSize is the size of the window for the WAL records.
-// After the window is filled, the records are pushed to the Basin Provider.
-const DefaultWindowSize = 10
+// DefaultWindowSize is the number of seconds for which WAL updates
+// are buffered before being sent to the provider.
+const DefaultWindowSize = 3600
 
 type config struct {
 	Publications map[string]publication `yaml:"publications"`

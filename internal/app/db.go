@@ -16,38 +16,36 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+// Column represents a column in a table being replicated.
 type Column struct {
 	Name, Typ         string
 	IsNull, IsPrimary bool
 }
 
+// DBManager manages a duckdb database.
 type DBManager struct {
-	db               *sql.DB
-	dbDir            string
-	table            string
-	createdAT        time.Time
-	cols             []Column
-	replaceThreshold time.Duration
-	uploader         *BasinUploader
+	db        *sql.DB
+	dbDir     string
+	table     string
+	createdAT time.Time
+	cols      []Column
+	winSize   time.Duration
+	uploader  *BasinUploader
 }
 
-func NewDBManager(
-	dbDir string,
-	table string,
-	cols []Column,
-	threshold time.Duration,
-	uploader *BasinUploader,
-) *DBManager {
+// NewDBManager creates a new DBManager.
+func NewDBManager(dbDir, table string, cols []Column, winSize time.Duration, uploader *BasinUploader) *DBManager {
 	return &DBManager{
-		dbDir:            dbDir,
-		table:            table,
-		createdAT:        time.Now(),
-		cols:             cols,
-		replaceThreshold: threshold,
-		uploader:         uploader,
+		dbDir:     dbDir,
+		table:     table,
+		createdAT: time.Now(),
+		cols:      cols,
+		winSize:   winSize,
+		uploader:  uploader,
 	}
 }
 
+// Close closes the current db.
 func (dbm *DBManager) Close() error {
 	return dbm.db.Close()
 }
@@ -118,6 +116,8 @@ func (dbm *DBManager) NewDB() (*sql.DB, error) {
 	return db, nil
 }
 
+// Setup creates a local table in the current.db and installs
+// the parquet extension.
 func (dbm *DBManager) Setup(ctx context.Context) error {
 	createQuery, err := dbm.genCreateQuery()
 	if err != nil {
@@ -137,7 +137,7 @@ func (dbm *DBManager) Setup(ctx context.Context) error {
 
 func (dbm *DBManager) replaceThresholdExceeded() bool {
 	delta := time.Since(dbm.createdAT).Seconds()
-	threshold := dbm.replaceThreshold.Seconds()
+	threshold := dbm.winSize.Seconds()
 	return delta > threshold
 }
 
@@ -206,7 +206,11 @@ func (dbm *DBManager) export(f fs.DirEntry) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			fmt.Println("cannot close db", "err", err)
+		}
+	}()
 
 	expQuery := fmt.Sprintf(
 		`INSTALL parquet; LOAD parquet;
@@ -221,41 +225,32 @@ func (dbm *DBManager) export(f fs.DirEntry) (string, error) {
 	return expPath, nil
 }
 
-func (dbm *DBManager) deleteDBFile(f fs.DirEntry) error {
+func (dbm *DBManager) cleanup(f fs.DirEntry) error {
 	dbPath := path.Join(dbm.dbDir, f.Name())
 	slog.Info("deleting db dump", "at", dbPath)
-	return os.Remove(dbPath)
-}
+	if err := os.Remove(dbPath); err != nil {
+		return fmt.Errorf("cannot delete db dump: %s", err)
+	}
 
-func (dbm *DBManager) deleteWALFile(f fs.DirEntry) error {
+	// delete WAL file if it exists
 	walPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.wal", f.Name()))
 	slog.Info("deleting db WAL file", "at", walPath)
-	return os.Remove(walPath)
-}
+	if err := os.Remove(walPath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("cannot delete db WAL file: %s", err)
+		}
+	}
 
-func (dbm *DBManager) deleteParquetFile(f fs.DirEntry) error {
 	parquetPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.parquet", f.Name()))
 	slog.Info("deleting db parquet export", "at", parquetPath)
-	return os.Remove(parquetPath)
-}
-
-func (dbm *DBManager) cleanup(f fs.DirEntry) error {
-	if err := dbm.deleteDBFile(f); err != nil {
-		return err
-	}
-
-	if err := dbm.deleteWALFile(f); err != nil {
-		return err
-	}
-
-	if err := dbm.deleteParquetFile(f); err != nil {
-		return err
+	if err := os.Remove(parquetPath); err != nil {
+		return fmt.Errorf("cannot delete db parquet export: %s", err)
 	}
 
 	return nil
 }
 
-// Upload uploads all db dumps that match the filterReg.
+// Upload uploads all db dumps that match the filter regex pattern.
 // It returns an error if any of the dumps cannot be uploaded.
 // FilterReg is a regular expression that matches file names
 // to be uploaded.
@@ -268,7 +263,6 @@ func (dbm *DBManager) Upload(ctx context.Context, pattern string) error {
 	if err != nil {
 		return fmt.Errorf("cannot read dir: %s", err)
 	}
-	ctx, cancel := context.WithDeadline()
 
 	for _, f := range files {
 		fname := f.Name()

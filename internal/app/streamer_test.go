@@ -39,6 +39,7 @@ const ex1 = `{
 		}
 	]
 }`
+
 const ex2 = ` {
 	"commit_lsn":957398297,
 	"records":[
@@ -61,9 +62,9 @@ const ex2 = ` {
 `
 
 // recvWAL reads one line from the reader and unmarshals it into a transaction.
-func recvWAL(t *testing.T, json_in string, feed chan *pgrepl.Tx) {
+func recvWAL(t *testing.T, jsonIn string, feed chan *pgrepl.Tx) {
 	var tx pgrepl.Tx
-	require.NoError(t, json.Unmarshal([]byte(json_in), &tx))
+	require.NoError(t, json.Unmarshal([]byte(jsonIn), &tx))
 	feed <- &tx
 }
 
@@ -119,7 +120,7 @@ var cols = []Column{
 }
 
 // Test when replacement threshold is crossed before
-// second Tx is received: <T1, R, T2, C>
+// second Tx is received: <T1, R, T2, C>.
 func TestBasinStreamerOne(t *testing.T) {
 	// used for testing
 	privateKey, err := crypto.HexToECDSA(pk)
@@ -153,6 +154,8 @@ func TestBasinStreamerOne(t *testing.T) {
 
 	recvWAL(t, ex2, feed)
 
+	time.Sleep(2 * time.Second)
+
 	// Assert that the first tx was replayed by importing the
 	// exported parquet file
 	file := <-providerMock.uploaderInputs
@@ -165,7 +168,8 @@ func TestBasinStreamerOne(t *testing.T) {
 	// Manually trigger upload of current.db to simulate
 	// starting the replication process again.
 	go func() {
-		dbm.Upload(context.Background(), `^current.db$`)
+		require.NoError(
+			t, dbm.Upload(context.Background(), `^current.db$`))
 	}()
 
 	// Assert that the second tx was replayed and uploaded by importing the
@@ -179,7 +183,7 @@ func TestBasinStreamerOne(t *testing.T) {
 }
 
 // Test when replacement threshold is crossed after
-// second Tx is received: <T1, T2, R, C>
+// second Tx is received: <T1, T2, R, C>.
 func TestBasinStreamerTwo(t *testing.T) {
 	privateKey, err := crypto.HexToECDSA(pk)
 	require.NoError(t, err)
@@ -187,14 +191,14 @@ func TestBasinStreamerTwo(t *testing.T) {
 	// This chan will receive the wal records from the replicator
 	feed := make(chan *pgrepl.Tx)
 	testDBDir := t.TempDir()
-	replaceThreshold := 3 * time.Second
+	winSize := 3 * time.Second
 	providerMock := &basinProviderMock{
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
 	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
 	dbm := NewDBManager(
-		testDBDir, testTable, cols, replaceThreshold, uploader)
+		testDBDir, testTable, cols, winSize, uploader)
 	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
 		// start listening to WAL records in a separate goroutine
@@ -209,7 +213,7 @@ func TestBasinStreamerTwo(t *testing.T) {
 	recvWAL(t, ex2, feed)
 
 	// wait for replaceThreshold to pass
-	time.Sleep(replaceThreshold + 1)
+	time.Sleep(winSize + 1)
 
 	// nothing should be uploaded because the second tx was received before
 	// the replaceThreshold was reached. the current.db should be uploaded
@@ -221,7 +225,8 @@ func TestBasinStreamerTwo(t *testing.T) {
 		// manually trigger upload to simulate
 		// starting the replication process again
 		go func() {
-			dbm.Upload(context.Background(), `^current.db$`)
+			require.NoError(
+				t, dbm.Upload(context.Background(), `^current.db$`))
 		}()
 	}
 
@@ -295,7 +300,7 @@ func (bp *basinProviderMock) Reconnect() error {
 }
 
 func (bp *basinProviderMock) Upload(
-	ctx context.Context, ns string, rel string, size uint64, f io.Reader, signer *Signer, progress io.Writer,
+	_ context.Context, _ string, _ string, _ uint64, f io.Reader, _ *Signer, _ io.Writer,
 ) error {
 	file := f.(*os.File)
 	file.Fd()

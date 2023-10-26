@@ -81,7 +81,7 @@ func newPublicationCreateCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "window-size",
-				Usage:       "The size of the window for the WAL records",
+				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
 				Destination: &winSize,
 				Value:       fmt.Sprintf("%d", DefaultWindowSize),
 			},
@@ -260,15 +260,12 @@ func newPublicationStartCommand() *cli.Command {
 
 			// Creates a new db manager when replication starts
 			dbDir := path.Join(dir, publication)
+			winSize := time.Duration(cfg.Publications[publication].WindowSize)
+			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
+			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
 
-			// (todo): read from config
-			replaceThreshold := 2 * time.Second
-
-			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)			
-			dbm := app.NewDBManager(dbDir, rel, cols, replaceThreshold, uploader)
-			
 			// Before starting replication, upload the current.db
-			// if it exists in dbDir.			
+			// if it exists in dbDir.
 			if err := dbm.Upload(cCtx.Context, `^current.db$`); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
