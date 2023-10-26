@@ -118,7 +118,8 @@ var cols = []Column{
 	{Name: "name", Typ: "text", IsNull: false, IsPrimary: false},
 }
 
-// <T1, R, T2, U, C>
+// Test when replacement threshold is crossed before
+// second Tx is received: <T1, R, T2, C>
 func TestBasinStreamerOne(t *testing.T) {
 	// used for testing
 	privateKey, err := crypto.HexToECDSA(pk)
@@ -127,20 +128,15 @@ func TestBasinStreamerOne(t *testing.T) {
 	// This chan will receive the wal records from the replicator
 	feed := make(chan *pgrepl.Tx)
 	testDBDir := t.TempDir()
-	uploadInterval := 6 * time.Second
 	replaceThreshold := 3 * time.Second
-	dbm := NewDBManager(
-		testDBDir, testTable, cols, replaceThreshold)
 	providerMock := &basinProviderMock{
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
 	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
-	upm := NewUploadManager(
-		context.Background(), testDBDir, testTable, uploader, uploadInterval,
-	)
-	// starts upload manager in a separate goroutine
-	upm.Start()
+	dbm := NewDBManager(
+		testDBDir, testTable, cols, replaceThreshold, uploader)
+
 	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
 		// start listening to WAL records in a separate goroutine
@@ -153,11 +149,9 @@ func TestBasinStreamerOne(t *testing.T) {
 
 	// 2. sleep for replaceThreshold time and receive next message
 	//    to trigger db replacement
-	time.Sleep(replaceThreshold)
-	recvWAL(t, ex2, feed)
+	time.Sleep(replaceThreshold + 1)
 
-	// wait for the first upload to kick in
-	time.Sleep(uploadInterval - replaceThreshold)
+	recvWAL(t, ex2, feed)
 
 	// Assert that the first tx was replayed by importing the
 	// exported parquet file
@@ -168,10 +162,10 @@ func TestBasinStreamerOne(t *testing.T) {
 	require.Equal(t, 200232, result[0].id)
 	require.Equal(t, "100", result[0].name)
 
-	// Manually trigger uplaod of current.db like it would happen
-	// when the replication process starts again.
+	// Manually trigger upload of current.db to simulate
+	// starting the replication process again.
 	go func() {
-		upm.Upload(`^current.db$`)
+		dbm.Upload(context.Background(), `^current.db$`)
 	}()
 
 	// Assert that the second tx was replayed and uploaded by importing the
@@ -184,7 +178,8 @@ func TestBasinStreamerOne(t *testing.T) {
 	require.Equal(t, "200", result[0].name)
 }
 
-// <T1, T2, R, U, C>
+// Test when replacement threshold is crossed after
+// second Tx is received: <T1, T2, R, C>
 func TestBasinStreamerTwo(t *testing.T) {
 	privateKey, err := crypto.HexToECDSA(pk)
 	require.NoError(t, err)
@@ -192,20 +187,14 @@ func TestBasinStreamerTwo(t *testing.T) {
 	// This chan will receive the wal records from the replicator
 	feed := make(chan *pgrepl.Tx)
 	testDBDir := t.TempDir()
-	uploadInterval := 4 * time.Second
 	replaceThreshold := 3 * time.Second
-	dbm := NewDBManager(
-		testDBDir, testTable, cols, replaceThreshold)
 	providerMock := &basinProviderMock{
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
 	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
-	upm := NewUploadManager(
-		context.Background(), testDBDir, testTable, uploader, uploadInterval,
-	)
-	// starts upload manager in a separate goroutine
-	upm.Start()
+	dbm := NewDBManager(
+		testDBDir, testTable, cols, replaceThreshold, uploader)
 	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
 		// start listening to WAL records in a separate goroutine
@@ -219,8 +208,8 @@ func TestBasinStreamerTwo(t *testing.T) {
 	// 2. receive second tx
 	recvWAL(t, ex2, feed)
 
-	// wait for the first upload to kick in
-	time.Sleep(uploadInterval)
+	// wait for replaceThreshold to pass
+	time.Sleep(replaceThreshold + 1)
 
 	// nothing should be uploaded because the second tx was received before
 	// the replaceThreshold was reached. the current.db should be uploaded
@@ -229,10 +218,10 @@ func TestBasinStreamerTwo(t *testing.T) {
 	case <-providerMock.uploaderInputs:
 		t.FailNow() // should not be reached
 	default:
-		// manually trigger upload of current.db like
-		// it happens when the replication process starts again.
+		// manually trigger upload to simulate
+		// starting the replication process again
 		go func() {
-			upm.Upload(`^current.db$`)
+			dbm.Upload(context.Background(), `^current.db$`)
 		}()
 	}
 
@@ -246,75 +235,6 @@ func TestBasinStreamerTwo(t *testing.T) {
 	require.Equal(t, "100", result[0].name)
 	require.Equal(t, 200233, result[1].id)
 	require.Equal(t, "200", result[1].name)
-}
-
-// <T1, R, T2, C, U> (opposite of 1st case)
-func TestBasinStreamerThree(t *testing.T) {
-	privateKey, err := crypto.HexToECDSA(pk)
-	require.NoError(t, err)
-
-	// This chan will receive the wal records from the replicator
-	feed := make(chan *pgrepl.Tx)
-	testDBDir := t.TempDir()
-	uploadInterval := 8 * time.Second
-	replaceThreshold := 3 * time.Second
-	dbm := NewDBManager(
-		testDBDir, testTable, cols, replaceThreshold)
-	providerMock := &basinProviderMock{
-		owner:          make(map[string]string),
-		uploaderInputs: make(chan *os.File),
-	}
-	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
-	upm := NewUploadManager(
-		context.Background(), testDBDir, testTable, uploader, uploadInterval,
-	)
-	// starts upload manager in a separate goroutine
-	upm.Start()
-	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
-	go func() {
-		// start listening to WAL records in a separate goroutine
-		err = streamer.Run(context.Background())
-		require.NoError(t, err)
-	}()
-
-	// 1. receive first tx
-	recvWAL(t, ex1, feed)
-
-	// wait for the first upload to kick in
-	time.Sleep(replaceThreshold + 1)
-
-	// 2. receive second tx
-	recvWAL(t, ex2, feed)
-
-	// shutdown uploader while the second tx is being replayed
-	go func() {
-		upm.Stop()
-		NewUploadManager(
-			context.Background(), testDBDir, testTable, uploader, uploadInterval,
-		).Start()
-	}()
-
-	file := <-providerMock.uploaderInputs
-	rows := importDuckDB(t, file)
-	result := queryResult(t, rows)
-	require.Equal(t, 1, len(result))
-	require.Equal(t, 200232, result[0].id)
-	require.Equal(t, "100", result[0].name)
-
-	// When replication start again, the existing current.db will be uploaded
-	go func() {
-		upm = NewUploadManager(
-			context.Background(), testDBDir, testTable, uploader, uploadInterval,
-		)
-		require.NoError(t, upm.Upload(`^current.db$`))
-	}()
-	file = <-providerMock.uploaderInputs
-	rows = importDuckDB(t, file)
-	result = queryResult(t, rows)
-	require.Equal(t, 1, len(result))
-	require.Equal(t, 200233, result[0].id)
-	require.Equal(t, "200", result[0].name)
-
 }
 
 type replicatorMock struct {

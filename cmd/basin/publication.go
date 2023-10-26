@@ -262,24 +262,16 @@ func newPublicationStartCommand() *cli.Command {
 			dbDir := path.Join(dir, publication)
 
 			// (todo): read from config
-			// (todo): read from config
-			uploadInterval := 5 * time.Second
 			replaceThreshold := 2 * time.Second
 
-			dbm := app.NewDBManager(dbDir, rel, cols, replaceThreshold)
-			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
-			upm := app.NewUploadManager(
-				cCtx.Context, dbDir, rel, uploader, uploadInterval,
-			)
-			// Before starting the UploadManager, upload the current.db
-			// if it exists in dbDir.
-			if err := upm.Upload(`^current.db$`); err != nil {
+			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)			
+			dbm := app.NewDBManager(dbDir, rel, cols, replaceThreshold, uploader)
+			
+			// Before starting replication, upload the current.db
+			// if it exists in dbDir.			
+			if err := dbm.Upload(cCtx.Context, `^current.db$`); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
-
-			// start uploader to run the background.
-			upm.Start()
-			defer upm.Stop()
 
 			basinStreamer := app.NewBasinStreamer(ns, r, dbm)
 			if err := basinStreamer.Run(cCtx.Context); err != nil {

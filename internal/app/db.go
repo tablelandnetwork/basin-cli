@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -26,6 +28,7 @@ type DBManager struct {
 	createdAT        time.Time
 	cols             []Column
 	replaceThreshold time.Duration
+	uploader         *BasinUploader
 }
 
 func NewDBManager(
@@ -33,6 +36,7 @@ func NewDBManager(
 	table string,
 	cols []Column,
 	threshold time.Duration,
+	uploader *BasinUploader,
 ) *DBManager {
 	return &DBManager{
 		dbDir:            dbDir,
@@ -40,6 +44,7 @@ func NewDBManager(
 		createdAT:        time.Now(),
 		cols:             cols,
 		replaceThreshold: threshold,
+		uploader:         uploader,
 	}
 }
 
@@ -72,9 +77,6 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 }
 
 func (dbm *DBManager) replace(ctx context.Context) error {
-	now := time.Now()
-	dbPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
-
 	// 1. close current db
 	slog.Info("closing current db")
 	if err := dbm.db.Close(); err != nil {
@@ -82,9 +84,16 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 	}
 
 	// 2. rename current.db to <timestamp>.db
+	now := time.Now()
+	dbPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
 	slog.Info("renaming current db", "to", dbPath)
 	if err := os.Rename(path.Join(dbm.dbDir, "current.db"), dbPath); err != nil {
 		return err
+	}
+
+	// 3. upload <timestamp>.db files
+	if err := dbm.Upload(ctx, `^\d+\.db$`); err != nil {
+		fmt.Println("upload error, skipping", "err", err)
 	}
 
 	// 3. create a new current.db
@@ -186,4 +195,96 @@ func (dbm *DBManager) genCreateQuery() (string, error) {
 		"CREATE TABLE IF NOT EXISTS %s (%s)",
 		dbm.table, cols)
 	return stmt, nil
+}
+
+func (dbm *DBManager) export(f fs.DirEntry) (string, error) {
+	expPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.parquet", f.Name()))
+
+	slog.Info("backing up db dump", "at", f.Name(), "to", expPath)
+	dbPath := path.Join(dbm.dbDir, f.Name())
+	db, err := sql.Open("duckdb", dbPath)
+	if err != nil {
+		return "", err
+	}
+	defer db.Close()
+
+	expQuery := fmt.Sprintf(
+		`INSTALL parquet; LOAD parquet;
+		COPY (SELECT * FROM %s) TO '%s' (FORMAT PARQUET)`,
+		dbm.table, expPath)
+
+	_, err = db.ExecContext(context.Background(), expQuery)
+	if err != nil {
+		return "", fmt.Errorf("cannot export to parquet file: %s", err)
+	}
+
+	return expPath, nil
+}
+
+func (dbm *DBManager) deleteDBFile(f fs.DirEntry) error {
+	dbPath := path.Join(dbm.dbDir, f.Name())
+	slog.Info("deleting db dump", "at", dbPath)
+	return os.Remove(dbPath)
+}
+
+func (dbm *DBManager) deleteWALFile(f fs.DirEntry) error {
+	walPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.wal", f.Name()))
+	slog.Info("deleting db WAL file", "at", walPath)
+	return os.Remove(walPath)
+}
+
+func (dbm *DBManager) deleteParquetFile(f fs.DirEntry) error {
+	parquetPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.parquet", f.Name()))
+	slog.Info("deleting db parquet export", "at", parquetPath)
+	return os.Remove(parquetPath)
+}
+
+func (dbm *DBManager) cleanup(f fs.DirEntry) error {
+	if err := dbm.deleteDBFile(f); err != nil {
+		return err
+	}
+
+	if err := dbm.deleteWALFile(f); err != nil {
+		return err
+	}
+
+	if err := dbm.deleteParquetFile(f); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Upload uploads all db dumps that match the filterReg.
+// It returns an error if any of the dumps cannot be uploaded.
+// FilterReg is a regular expression that matches file names
+// to be uploaded.
+func (dbm *DBManager) Upload(ctx context.Context, pattern string) error {
+	// this regex will not match current.db
+	re := regexp.MustCompile(pattern)
+	slog.Info("finding db dumps to upload", "pattern", pattern)
+
+	files, err := os.ReadDir(dbm.dbDir)
+	if err != nil {
+		return fmt.Errorf("cannot read dir: %s", err)
+	}
+	ctx, cancel := context.WithDeadline()
+
+	for _, f := range files {
+		fname := f.Name()
+		if re.MatchString(fname) {
+			exportPath, err := dbm.export(f)
+			if err != nil {
+				return fmt.Errorf("export: %s", err)
+			}
+			if err := dbm.uploader.Upload(ctx, exportPath, nil); err != nil {
+				return fmt.Errorf("upload: %s", err)
+			}
+			if err := dbm.cleanup(f); err != nil {
+				return fmt.Errorf("cleanup: %s", err)
+			}
+		}
+	}
+
+	return nil
 }

@@ -80,11 +80,10 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	}()
 
 	// Start replication
-	txs, table, err := b.replicator.StartReplication(ctx)
+	txs, _, err := b.replicator.StartReplication(ctx)
 	if err != nil {
 		return fmt.Errorf("start replication: %s", err)
 	}
-	fmt.Println("table: ", table)
 
 	// Setup local DB for replaying txs
 	if err := b.dbMngr.Setup(); err != nil {
@@ -133,11 +132,9 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 
 	for tx := range txs {
 		slog.Info("new transaction received")
-
 		if err := b.dbMngr.Replay(ctx, tx); err != nil {
 			return fmt.Errorf("replay: %s", err)
 		}
-
 		if err := b.replicator.Commit(ctx, tx.CommitLSN); err != nil {
 			return fmt.Errorf("commit: %s", err)
 		}
