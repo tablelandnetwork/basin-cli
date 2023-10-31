@@ -20,7 +20,7 @@ import (
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
-const ex1 = `{
+const WAL1 = `{
 	"commit_lsn":957398296,
 	"records":[
 		{
@@ -40,7 +40,7 @@ const ex1 = `{
 	]
 }`
 
-const ex2 = ` {
+const WAL2 = ` {
 	"commit_lsn":957398297,
 	"records":[
 		{
@@ -146,13 +146,13 @@ func TestBasinStreamerOne(t *testing.T) {
 	}()
 
 	// 1. receive first tx
-	recvWAL(t, ex1, feed)
+	recvWAL(t, WAL1, feed)
 
 	// 2. sleep for replaceThreshold time and receive next message
 	//    to trigger db replacement
 	time.Sleep(replaceThreshold + 1)
 
-	recvWAL(t, ex2, feed)
+	recvWAL(t, WAL2, feed)
 
 	// Assert that the first tx was replayed by importing the
 	// exported parquet file
@@ -204,10 +204,10 @@ func TestBasinStreamerTwo(t *testing.T) {
 	}()
 
 	// 1. receive first tx
-	recvWAL(t, ex1, feed)
+	recvWAL(t, WAL1, feed)
 
 	// 2. receive second tx
-	recvWAL(t, ex2, feed)
+	recvWAL(t, WAL2, feed)
 
 	// wait for replaceThreshold to pass
 	time.Sleep(winSize + 1)
