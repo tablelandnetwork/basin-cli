@@ -154,8 +154,6 @@ func TestBasinStreamerOne(t *testing.T) {
 
 	recvWAL(t, ex2, feed)
 
-	time.Sleep(2 * time.Second)
-
 	// Assert that the first tx was replayed by importing the
 	// exported parquet file
 	file := <-providerMock.uploaderInputs
@@ -165,11 +163,10 @@ func TestBasinStreamerOne(t *testing.T) {
 	require.Equal(t, 200232, result[0].id)
 	require.Equal(t, "100", result[0].name)
 
-	// Manually trigger upload of current.db to simulate
-	// starting the replication process again.
+	// simulate starting the replication process again
+	// by uploading all the parquet files in the db dir
 	go func() {
-		require.NoError(
-			t, dbm.Upload(context.Background(), `^current.db$`))
+		require.NoError(t, dbm.UploadAll(context.Background()))
 	}()
 
 	// Assert that the second tx was replayed and uploaded by importing the
@@ -226,7 +223,7 @@ func TestBasinStreamerTwo(t *testing.T) {
 		// starting the replication process again
 		go func() {
 			require.NoError(
-				t, dbm.Upload(context.Background(), `^current.db$`))
+				t, dbm.UploadAll(context.Background()))
 		}()
 	}
 

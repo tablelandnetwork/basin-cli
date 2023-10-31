@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"regexp"
@@ -76,32 +75,30 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 }
 
 func (dbm *DBManager) replace(ctx context.Context) error {
-	// 1. close current db
-	slog.Info("closing current db")
-	if err := dbm.db.Close(); err != nil {
-		return err
-	}
-
-	// 2. rename current.db to <timestamp>.db
+	// Export
 	now := time.Now()
-	dbPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
-	slog.Info("renaming current db", "to", dbPath)
-	if err := os.Rename(path.Join(dbm.dbDir, "current.db"), dbPath); err != nil {
+	exportPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
+	if err := dbm.Export(ctx, exportPath); err != nil {
 		return err
 	}
 
-	// 3. upload <timestamp>.db files
-	if err := dbm.Upload(ctx, `^\d+\.db$`); err != nil {
+	slog.Info("closing current db")
+	if err := dbm.Close(); err != nil {
+		return err
+	}
+
+	// Upload
+	if err := dbm.UploadAt(ctx, exportPath); err != nil {
 		fmt.Println("upload error, skipping", "err", err)
 	}
 
-	// 3. create a new current.db
+	// Create a new current.db
 	db, err := dbm.NewDB()
 	if err != nil {
-		return fmt.Errorf("swap: %v", err)
+		return fmt.Errorf("new db: %v", err)
 	}
 
-	// 4. setup the new current db
+	// Setup the new current db
 	dbm.db = db
 	dbm.createdAT = now
 	return dbm.Setup(ctx)
@@ -109,7 +106,9 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 
 // NewDB creates a new duckdb database at the current.db path.
 func (dbm *DBManager) NewDB() (*sql.DB, error) {
-	db, err := sql.Open("duckdb", path.Join(dbm.dbDir, "current.db"))
+	now := time.Now()
+	dbPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
+	db, err := sql.Open("duckdb", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open db: %s", err)
 	}
@@ -120,14 +119,13 @@ func (dbm *DBManager) NewDB() (*sql.DB, error) {
 // Setup creates a local table in the current.db and installs
 // the parquet extension.
 func (dbm *DBManager) Setup(ctx context.Context) error {
-	createQuery, err := dbm.genCreateQuery()
+	query, err := dbm.genCreateQuery()
 	if err != nil {
 		return fmt.Errorf("cannot create table in duckdb: %s", err)
 	}
 
 	// create table if it does not exist
-	slog.Info("applying create", "query", createQuery)
-	query := fmt.Sprintf("INSTALL parquet; LOAD parquet; %s", createQuery)
+	slog.Info("applying create", "query", query)
 	_, err = dbm.db.ExecContext(ctx, query)
 	if err != nil {
 		return err
@@ -201,93 +199,111 @@ func (dbm *DBManager) genCreateQuery() (string, error) {
 	return stmt, nil
 }
 
-func (dbm *DBManager) export(f fs.DirEntry) (string, error) {
-	expPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.parquet", f.Name()))
-
-	slog.Info("backing up db dump", "at", f.Name(), "to", expPath)
-	dbPath := path.Join(dbm.dbDir, f.Name())
-	db, err := sql.Open("duckdb", dbPath)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			fmt.Println("cannot close db", "err", err)
+// Export exports the current db to a parquet file at the given path.
+func (dbm *DBManager) Export(ctx context.Context, fname string) error {
+	slog.Info("backing up db dump", "at", fname)
+	// export before starting replication
+	var err error
+	db := dbm.db
+	if db == nil {
+		db, err = sql.Open("duckdb", fname)
+		if err != nil {
+			return err
 		}
-	}()
-
-	expQuery := fmt.Sprintf(
-		`INSTALL parquet; LOAD parquet;
-		COPY (SELECT * FROM %s) TO '%s' (FORMAT PARQUET)`,
-		dbm.table, expPath)
-
-	_, err = db.ExecContext(context.Background(), expQuery)
+		defer func() {
+			if err := db.Close(); err != nil {
+				fmt.Println("cannot close db", "err", err)
+			}
+		}()
+	}
+	_, err = db.ExecContext(ctx,
+		fmt.Sprintf(
+			`INSTALL parquet;
+			 LOAD parquet;
+			 COPY (SELECT * FROM %s) TO '%s' (FORMAT PARQUET)`,
+			dbm.table, fname+".parquet"))
 	if err != nil {
-		return "", fmt.Errorf("cannot export to parquet file: %s", err)
-	}
-
-	return expPath, nil
-}
-
-func (dbm *DBManager) cleanup(f fs.DirEntry) error {
-	dbPath := path.Join(dbm.dbDir, f.Name())
-	slog.Info("deleting db dump", "at", dbPath)
-	if err := os.Remove(dbPath); err != nil {
-		return fmt.Errorf("cannot delete db dump: %s", err)
-	}
-
-	// delete WAL file if it exists
-	walPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.wal", f.Name()))
-	slog.Info("deleting db WAL file", "at", walPath)
-	if err := os.Remove(walPath); err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("cannot delete db WAL file: %s", err)
-		}
-	}
-
-	parquetPath := path.Join(dbm.dbDir, fmt.Sprintf("%s.parquet", f.Name()))
-	slog.Info("deleting db parquet export", "at", parquetPath)
-	if err := os.Remove(parquetPath); err != nil {
-		return fmt.Errorf("cannot delete db parquet export: %s", err)
+		return fmt.Errorf("cannot export to parquet file: %s", err)
 	}
 
 	return nil
 }
 
-// Upload uploads all db dumps that match the filter regex pattern.
-// It returns an error if any of the dumps cannot be uploaded.
-// FilterReg is a regular expression that matches file names
-// to be uploaded.
-func (dbm *DBManager) Upload(ctx context.Context, pattern string) error {
-	// this regex will not match current.db
-	re := regexp.MustCompile(pattern)
-	slog.Info("finding db dumps to upload", "pattern", pattern)
-
-	files, err := os.ReadDir(dbm.dbDir)
-	if err != nil {
-		return fmt.Errorf("cannot read dir: %s", err)
+func (dbm *DBManager) cleanup(fname string) error {
+	dbPath := path.Join(dbm.dbDir, fname)
+	slog.Info("deleting db dump", "at", dbPath)
+	if err := os.Remove(dbPath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("cannot delete file: %s", err)
+		}
 	}
 
-	for _, f := range files {
-		fname := f.Name()
+	slog.Info("deleting db wal", "at", dbPath+".wal")
+	if err := os.Remove(dbPath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("cannot delete file: %s", err)
+		}
+	}
+
+	slog.Info("deleting db export", "at", dbPath+".parquet")
+	if err := os.Remove(dbPath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("cannot delete file: %s", err)
+		}
+	}
+
+	return nil
+}
+
+// UploadAt uploads a db dump at the given path.
+// It returns an error if a dumps cannot be uploaded.
+// It cleans up the db dumps and export files after uploading.
+func (dbm *DBManager) UploadAt(ctx context.Context, dbPath string) error {
+	exportPath := dbPath + ".parquet"
+	f, err := os.Open(exportPath)
+	if err != nil {
+		return fmt.Errorf("cannot open file: %s", err)
+	}
+
+	fi, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("cannot stat file: %s", err)
+	}
+
+	progress := progressbar.DefaultBytes(
+		fi.Size(),
+		"Uploading file...",
+	)
+
+	if err := dbm.uploader.Upload(ctx, exportPath, progress); err != nil {
+		return fmt.Errorf("upload: %s", err)
+	}
+
+	if err := dbm.cleanup(dbPath); err != nil {
+		return fmt.Errorf("cleanup: %s", err)
+	}
+
+	return nil
+}
+
+// UploadAll uploads all db dumps in the db dir.
+func (dbm *DBManager) UploadAll(ctx context.Context) error {
+	files, err := os.ReadDir(dbm.dbDir)
+	if err != nil {
+		return fmt.Errorf("read dir: %s", err)
+	}
+
+	// find all db dumps: <timestamp>.db
+	re := regexp.MustCompile(`^\d+\.db$`)
+	for _, file := range files {
+		fname := file.Name()
 		if re.MatchString(fname) {
-			exportPath, err := dbm.export(f)
-			if err != nil {
+			dbPath := path.Join(dbm.dbDir, fname)
+			if err = dbm.Export(ctx, dbPath); err != nil {
 				return fmt.Errorf("export: %s", err)
 			}
-			fi, err := f.Info()
-			if err != nil {
-				return fmt.Errorf("file info: %s", err)
-			}
-			progress := progressbar.DefaultBytes(
-				fi.Size(),
-				"Uploading file...",
-			)
-			if err := dbm.uploader.Upload(ctx, exportPath, progress); err != nil {
+			if err := dbm.UploadAt(ctx, dbPath); err != nil {
 				return fmt.Errorf("upload: %s", err)
-			}
-			if err := dbm.cleanup(f); err != nil {
-				return fmt.Errorf("cleanup: %s", err)
 			}
 		}
 	}

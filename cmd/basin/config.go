@@ -27,7 +27,7 @@ type publication struct {
 	Port         int    `yaml:"port"`
 	Database     string `yaml:"database"`
 	ProviderHost string `yaml:"provider_host"`
-	WindowSize   int    `yaml:"window_size"`
+	WindowSize   int64  `yaml:"window_size"`
 }
 
 func newConfig() *config {

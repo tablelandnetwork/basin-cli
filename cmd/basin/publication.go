@@ -136,7 +136,7 @@ func newPublicationCreateCommand() *cli.Command {
 				Password:     pgConfig.Password,
 				Database:     pgConfig.Database,
 				ProviderHost: provider,
-				WindowSize:   int(winSizeInt),
+				WindowSize:   winSizeInt,
 			}
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
@@ -259,10 +259,9 @@ func newPublicationStartCommand() *cli.Command {
 			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
 			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
 
-			// Before starting replication, upload the current.db
-			// if it exists in dbDir.
-			if err := dbm.Upload(cCtx.Context, `^current.db$`); err != nil {
-				return fmt.Errorf("upload: %s", err)
+			// Before starting replication, upload the remaining data
+			if err := dbm.UploadAll(cCtx.Context); err != nil {
+				return fmt.Errorf("upload all: %s", err)
 			}
 
 			basinStreamer := app.NewBasinStreamer(ns, r, dbm)
