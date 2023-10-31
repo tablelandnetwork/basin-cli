@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/jackc/pglogrepl"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
@@ -34,27 +33,6 @@ func NewBasinStreamer(ns string, r Replicator, dbm *DBManager) *BasinStreamer {
 		replicator: r,
 		dbMngr:     dbm,
 	}
-}
-
-// queryGen creates a query for a WAL TX records.
-func (b *BasinStreamer) queryGen(tx *pgrepl.Tx) string {
-	var query string
-	for _, r := range tx.Records {
-		columnNames := []string{}
-		vals := []string{}
-		for _, c := range r.Columns {
-			columnNames = append(columnNames, c.Name)
-			vals = append(vals, string(c.Value))
-		}
-
-		cols := strings.Join(columnNames, ", ")
-		valsStr := strings.Join(vals, ", ")
-		query = fmt.Sprintf(
-			"insert into %s (%s) values (%s) \n",
-			r.Table, cols, valsStr,
-		)
-	}
-	return query
 }
 
 // Run runs the BasinStreamer logic.

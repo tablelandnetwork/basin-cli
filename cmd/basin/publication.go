@@ -260,7 +260,7 @@ func newPublicationStartCommand() *cli.Command {
 
 			// Creates a new db manager when replication starts
 			dbDir := path.Join(dir, publication)
-			winSize := time.Duration(cfg.Publications[publication].WindowSize)
+			winSize := time.Duration(cfg.Publications[publication].WindowSize) * time.Second
 			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
 			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
 

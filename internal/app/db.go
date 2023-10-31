@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"golang.org/x/exp/slog"
 )
@@ -136,6 +137,9 @@ func (dbm *DBManager) Setup(ctx context.Context) error {
 }
 
 func (dbm *DBManager) replaceThresholdExceeded() bool {
+	if dbm.createdAT.IsZero() {
+		return false
+	}
 	delta := time.Since(dbm.createdAT).Seconds()
 	threshold := dbm.winSize.Seconds()
 	return delta > threshold
@@ -271,7 +275,15 @@ func (dbm *DBManager) Upload(ctx context.Context, pattern string) error {
 			if err != nil {
 				return fmt.Errorf("export: %s", err)
 			}
-			if err := dbm.uploader.Upload(ctx, exportPath, nil); err != nil {
+			fi, err := f.Info()
+			if err != nil {
+				return fmt.Errorf("file info: %s", err)
+			}
+			progress := progressbar.DefaultBytes(
+				fi.Size(),
+				"Uploading file...",
+			)
+			if err := dbm.uploader.Upload(ctx, exportPath, progress); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
 			if err := dbm.cleanup(f); err != nil {
