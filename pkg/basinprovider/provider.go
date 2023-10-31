@@ -287,16 +287,16 @@ func (bp *BasinProvider) Deals(
 			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
 		}
 
-		selectorPath, err := deal.SelectorPath()
+		created, err := deal.Created()
 		if err != nil {
-			return []app.DealInfo{}, fmt.Errorf("failed to get selector path: %s", err)
+			return []app.DealInfo{}, fmt.Errorf("failed to get created: %s", err)
 		}
 
-		id := deal.Id()
 		deals[i] = app.DealInfo{
-			ID:           id,
-			CID:          cid,
-			SelectorPath: selectorPath,
+			CID:         cid,
+			Created:     created,
+			IsPermanent: deal.IsPermament(),
+			Size:        deal.Size(),
 		}
 	}
 
@@ -339,16 +339,16 @@ func (bp *BasinProvider) LatestDeals(
 			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
 		}
 
-		selectorPath, err := deal.SelectorPath()
+		created, err := deal.Created()
 		if err != nil {
-			return []app.DealInfo{}, fmt.Errorf("failed to get selector path: %s", err)
+			return []app.DealInfo{}, fmt.Errorf("failed to get created: %s", err)
 		}
 
-		id := deal.Id()
 		deals[i] = app.DealInfo{
-			ID:           id,
-			CID:          cid,
-			SelectorPath: selectorPath,
+			CID:         cid,
+			Created:     created,
+			IsPermanent: deal.IsPermament(),
+			Size:        deal.Size(),
 		}
 	}
 
@@ -543,10 +543,11 @@ func (s *BasinServerMock) Deals(_ context.Context, call Publications_deals) erro
 			}
 
 			dealInfo := dealInfoList.At(int(i))
-			dealInfo.SetId(uint64(id))
 			fakeCID := sha1.Sum(callback.bytes)
 			_ = dealInfo.SetCid(string(fakeCID[:]))
-			_ = dealInfo.SetSelectorPath("does not matter")
+			_ = dealInfo.SetCreated("does not matter")
+			dealInfo.SetIsPermament(false)
+			dealInfo.SetSize(30)
 		}
 
 		return nil
@@ -571,16 +572,17 @@ func (s *BasinServerMock) LatestDeals(_ context.Context, call Publications_lates
 		}
 
 		dealInfoList, _ := results.NewDeals(int32(len(s.uploads[pub])))
-		for id, callback := range deals {
+		for _, callback := range deals {
 			if i >= n {
 				continue
 			}
 
 			dealInfo := dealInfoList.At(int(i))
-			dealInfo.SetId(uint64(id))
 			fakeCID := sha1.Sum(callback.bytes)
 			_ = dealInfo.SetCid(string(fakeCID[:]))
-			_ = dealInfo.SetSelectorPath("does not matter")
+			_ = dealInfo.SetCreated("does not matter")
+			dealInfo.SetIsPermament(false)
+			dealInfo.SetSize(30)
 		}
 
 		return nil

@@ -40,7 +40,8 @@ struct Schema {
 }
 
 struct DealInfo {
-    id @0 :UInt64;
-    selectorPath @1 :Text;
-    cid @2 :Text;
+    cid @0 :Text;
+    size @1 :UInt32;
+    created @2 :Text; 
+    isPermament @3 :Bool;
 }
