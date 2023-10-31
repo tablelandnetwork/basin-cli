@@ -143,16 +143,6 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			// This directory will contain the db files for the pub
-			if err := os.Mkdir(path.Join(dir, pub), 0o755); err != nil {
-				if os.IsExist(err) {
-					fmt.Println("db directory already exists")
-				} else {
-					fmt.Println("Error:", err)
-					return err
-				}
-			}
-
 			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, secure)
 			if err != nil {
 				return fmt.Errorf("failed to create publication: %s", err)
@@ -161,6 +151,11 @@ func newPublicationCreateCommand() *cli.Command {
 			if exists {
 				fmt.Printf("Publication %s.%s already exists.\n\n", ns, rel)
 				return nil
+			}
+
+			// This directory will contain the local db files for the pub
+			if err := mkDBDir(dir, pub); err != nil {
+				return fmt.Errorf("mk db dir: %s", err)
 			}
 
 			fmt.Printf("\033[32mPublication %s.%s created.\033[0m\n\n", ns, rel)
@@ -253,7 +248,7 @@ func newPublicationStartCommand() *cli.Command {
 				}
 			}()
 
-			cols, err := insepectSourceTable(cCtx.Context, tx, rel)
+			cols, err := inspectTable(cCtx.Context, tx, rel)
 			if err != nil {
 				return fmt.Errorf("failed to inspect source table: %s", err)
 			}
@@ -525,7 +520,7 @@ func parsePublicationName(name string) (ns string, rel string, err error) {
 	return
 }
 
-func insepectSourceTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, error) {
+func inspectTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, error) {
 	rows, err := tx.Query(ctx,
 		`
 		WITH primary_key_info AS
@@ -570,6 +565,17 @@ func insepectSourceTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Colu
 	return columns, nil
 }
 
+func mkDBDir(dir, pub string) error {
+	if err := os.Mkdir(path.Join(dir, pub), 0o755); err != nil {
+		if os.IsExist(err) {
+			fmt.Println("db directory already exists")
+		} else {
+			return err
+		}
+	}
+	return nil
+}
+
 func createPublication(
 	ctx context.Context, dburi string, ns string, rel string, provider string, owner string, secure bool,
 ) (exists bool, err error) {
@@ -606,7 +612,10 @@ func createPublication(
 		}
 	}()
 
-	columns, err := insepectSourceTable(ctx, tx, rel)
+	columns, err := inspectTable(ctx, tx, rel)
+	if err != nil {
+		return false, fmt.Errorf("failed to inspect table: %s", err)
+	}
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
 	if err != nil {
