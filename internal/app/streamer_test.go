@@ -272,17 +272,6 @@ func (bp *basinProviderMock) Create(
 	return false, nil
 }
 
-func (bp *basinProviderMock) Push(
-	_ context.Context, _ string, _ string, tx basincapnp.Tx, signature []byte,
-) error {
-	bp.feedback <- struct {
-		tx  basincapnp.Tx
-		sig []byte
-	}{tx, signature}
-
-	return nil
-}
-
 func (bp *basinProviderMock) List(_ context.Context, _ common.Address) ([]string, error) {
 	return []string{}, nil
 }

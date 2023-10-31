@@ -3,14 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
-	"regexp"
 	"strings"
-	"time"
 
 	"github.com/jackc/pglogrepl"
-
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"golang.org/x/exp/slog"
 
@@ -84,51 +79,6 @@ func (b *BasinStreamer) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("start replication: %s", err)
 	}
-
-	// Setup local DB for replaying txs
-	if err := b.dbMngr.Setup(); err != nil {
-		return fmt.Errorf("cannot setup db: %s", err)
-	}
-	// defer b.dbMngr.Close()
-	// start "exports" uploader in the background
-	b.dbMngr.uploadMngr.Start()
-
-	go func() {
-		ticker := time.NewTicker(55 * time.Second)
-		defer ticker.Stop()
-
-		pattern := `^\d+\.db$`
-		re := regexp.MustCompile(pattern)
-
-		for range ticker.C {
-			fmt.Println("Time to scan, export, upload and cleanup")
-			files, err := os.ReadDir(dbDir)
-			if err != nil {
-				fmt.Println("cannot read dir: ", err)
-				continue
-			}
-
-			for _, f := range files {
-				if re.MatchString(f.Name()) {
-					fmt.Printf("db dump found, backing up %s\n", f.Name())
-					fmt.Printf("deleting db dump %s\n", f.Name())
-					if err := os.Remove(path.Join(dbDir, f.Name())); err != nil {
-						fmt.Println("cannot delete file: ", err)
-					}
-					/* (todo) implement uplaod
-					err = b.upload(ctx, oldDB, ddbTable, lastExportedTS) // should be last export ts
-					if err != nil {
-						return fmt.Errorf("cannot upload: %s", err)
-					}
-					*/
-					fmt.Printf("deleting db WAL file %s\n", f.Name())
-					if err := os.Remove(fmt.Sprintf("%s.wal", path.Join(dbDir, f.Name()))); err != nil {
-						fmt.Println("cannot delete file: ", err)
-					}
-				}
-			}
-		}
-	}()
 
 	for tx := range txs {
 		slog.Info("new transaction received")
