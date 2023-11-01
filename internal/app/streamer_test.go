@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,26 +79,53 @@ func TestBasinStreamerOne(t *testing.T) {
 
 	// Assert that ONLY the first tx was replayed
 	// by importing the exported parquet file
-	file := <-providerMock.uploaderInputs
-	rows := importLocalDB(t, file)
-	result := queryResult(t, rows)
-	require.Equal(t, 1, len(result))
-	require.Equal(t, 200232, result[0].id)
-	require.Equal(t, "100", result[0].name)
+	for file := range providerMock.uploaderInputs {
+		rows := importLocalDB(t, file)
+		result := queryResult(t, rows)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, 200232, result[0].id)
+		require.Equal(t, "100", result[0].name)
+
+		// check that db files and exports were deleted
+		exportPath := strings.ReplaceAll(file.Name(), ".copy", "")
+		require.NoFileExists(t, exportPath)
+
+		dbPath := strings.ReplaceAll(file.Name(), ".parquet.copy", "")
+		require.NoFileExists(t, dbPath)
+		require.NoFileExists(t, dbPath+".wal")
+	}
 
 	// simulate starting the replication process again.
 	// it will upload all the parquet files in the db dir
+	ch2 := make(chan *os.File)
 	go func() {
+		// reset the db and uploader channel
+		dbm.db = nil
+		dbm.dbFname = ""
+		dbm.createdAT = time.Time{}
+		uploader.provider = &basinProviderMock{
+			owner:          make(map[string]string),
+			uploaderInputs: ch2,
+		}
 		require.NoError(t, dbm.UploadAll(context.Background()))
 	}()
 
 	// Assert that the second tx was replayed and uploaded.
-	file = <-providerMock.uploaderInputs
-	rows = importLocalDB(t, file)
-	result = queryResult(t, rows)
-	require.Equal(t, 1, len(result))
-	require.Equal(t, 200233, result[0].id)
-	require.Equal(t, "200", result[0].name)
+	for file := range ch2 {
+		rows := importLocalDB(t, file)
+		result := queryResult(t, rows)
+		require.Equal(t, 1, len(result))
+		require.Equal(t, 200233, result[0].id)
+		require.Equal(t, "200", result[0].name)
+
+		// check that db files and exports were deleted
+		exportPath := strings.ReplaceAll(file.Name(), ".copy", "")
+		require.NoFileExists(t, exportPath)
+
+		dbPath := strings.ReplaceAll(file.Name(), ".parquet.copy", "")
+		require.NoFileExists(t, dbPath)
+		require.NoFileExists(t, dbPath+".wal")
+	}
 }
 
 // Test when window threshold is crossed after
@@ -153,7 +181,7 @@ func TestBasinStreamerTwo(t *testing.T) {
 	case <-providerMock.uploaderInputs:
 		t.FailNow() // should not be reached
 	default:
-		// manually trigger upload to simulate
+		// manually trigger uploadAll to simulate
 		// starting the replication process again
 		go func() {
 			require.NoError(
@@ -171,6 +199,14 @@ func TestBasinStreamerTwo(t *testing.T) {
 	require.Equal(t, "100", result[0].name)
 	require.Equal(t, 200233, result[1].id)
 	require.Equal(t, "200", result[1].name)
+
+	// check that db files and exports were deleted
+	exportPath := strings.ReplaceAll(file.Name(), ".copy", "")
+	require.NoFileExists(t, exportPath)
+
+	dbPath := strings.ReplaceAll(file.Name(), ".parquet.copy", "")
+	require.NoFileExists(t, dbPath)
+	require.NoFileExists(t, dbPath+".wal")
 }
 
 type replicatorMock struct {
@@ -242,5 +278,6 @@ func (bp *basinProviderMock) Upload(
 	}
 
 	bp.uploaderInputs <- newFile
+	close(bp.uploaderInputs)
 	return nil
 }
