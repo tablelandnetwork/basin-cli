@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"io"
 	"os"
@@ -53,15 +54,27 @@ func TestBasinStreamerOne(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
+	f, err := os.Open("testdata/wal.input")
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, f.Close())
+	}()
+	reader := bufio.NewReader(f)
+
+	wal1, _, err := reader.ReadLine()
+	require.NoError(t, err)
+
 	// receive first tx
-	recvWAL(t, WAL1, feed)
+	recvWAL(t, wal1, feed)
 
 	// sleep for winSize time and receive next message
 	// to trigger db replacement
 	time.Sleep(winSize + 1)
 
 	// receive second tx
-	recvWAL(t, WAL2, feed)
+	wal2, _, err := reader.ReadLine()
+	require.NoError(t, err)
+	recvWAL(t, wal2, feed)
 
 	// Assert that ONLY the first tx was replayed
 	// by importing the exported parquet file
@@ -111,11 +124,24 @@ func TestBasinStreamerTwo(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
+	f, err := os.Open("testdata/wal.input")
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, f.Close())
+	}()
+	reader := bufio.NewReader(f)
+
+	wal1, _, err := reader.ReadLine()
+	require.NoError(t, err)
+
 	// 1. receive first tx
-	recvWAL(t, WAL1, feed)
+	recvWAL(t, wal1, feed)
+
+	wal2, _, err := reader.ReadLine()
+	require.NoError(t, err)
 
 	// 2. receive second tx
-	recvWAL(t, WAL2, feed)
+	recvWAL(t, wal2, feed)
 
 	// wait for window to pass
 	time.Sleep(winSize + 1)

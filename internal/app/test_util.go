@@ -12,51 +12,10 @@ import (
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
-const WAL1 = `{
-	"commit_lsn":957398296,
-	"records":[
-		{
-			"action":"I",
-			"xid":1058,
-			"lsn":"0/3910B898",
-			"nextlsn":"",
-			"timestamp":"2023-08-22 14:44:02.043586-03",
-			"schema":"public",
-			"table":"t",
-			"columns":[
-				{"name":"id","type":"integer","value":200232},
-				{"name":"name","type":"text","value":"100"}
-			],
-			"pk":[{"name":"id","type":"integer"}]
-		}
-	]
-}`
-
-const WAL2 = ` {
-	"commit_lsn":957398297,
-	"records":[
-		{
-			"action":"I",
-			"xid":1059,
-			"lsn":"0/3910B899",
-			"nextlsn":"",
-			"timestamp":"2023-08-22 14:45:02.043586-03",
-			"schema":"public",
-			"table":"t",
-			"columns":[
-				{"name":"id","type":"integer","value":200233},
-				{"name":"name","type":"text","value":"200"}
-			],
-			"pk":[{"name":"id","type":"integer"}]
-		}
-	]
-}
-`
-
 // recvWAL reads one line from the reader and unmarshals it into a transaction.
-func recvWAL(t *testing.T, jsonIn string, feed chan *pgrepl.Tx) {
+func recvWAL(t *testing.T, jsonIn []byte, feed chan *pgrepl.Tx) {
 	var tx pgrepl.Tx
-	require.NoError(t, json.Unmarshal([]byte(jsonIn), &tx))
+	require.NoError(t, json.Unmarshal(jsonIn, &tx))
 	feed <- &tx
 }
 

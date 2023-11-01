@@ -75,30 +75,31 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 }
 
 func (dbm *DBManager) replace(ctx context.Context) error {
-	// Export
+	// Export current db to a parquet file
 	now := time.Now()
 	exportPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
 	if err := dbm.Export(ctx, exportPath); err != nil {
 		return err
 	}
 
+	// Close current db
 	slog.Info("closing current db")
 	if err := dbm.Close(); err != nil {
 		return err
 	}
 
-	// Upload
+	// Upload the exported parquet file
 	if err := dbm.UploadAt(ctx, exportPath); err != nil {
 		fmt.Println("upload error, skipping", "err", err)
 	}
 
-	// Create a new current.db
+	// Create a new db
 	db, err := dbm.NewDB()
 	if err != nil {
 		return fmt.Errorf("new db: %v", err)
 	}
 
-	// Setup the new current db
+	// Setup the new db
 	dbm.db = db
 	dbm.createdAT = now
 	return dbm.Setup(ctx)
@@ -143,9 +144,10 @@ func (dbm *DBManager) replaceThresholdExceeded() bool {
 	return delta > threshold
 }
 
-// Replay replays a WAL record to the current.db after materializing it.
-// If the replace threshold is exceeded, it replaces the current.db with
-// a new one.
+// Replay replays a WAL record onto the current db.
+// If the window has passed, it replaces the current db with
+// a new one. The current db is exported and uploaded before
+// new db is ready to be used.
 func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 	if dbm.replaceThresholdExceeded() {
 		slog.Info("replacing current db before replaying further txs")
@@ -202,9 +204,11 @@ func (dbm *DBManager) genCreateQuery() (string, error) {
 // Export exports the current db to a parquet file at the given path.
 func (dbm *DBManager) Export(ctx context.Context, fname string) error {
 	slog.Info("backing up db dump", "at", fname)
-	// export before starting replication
 	var err error
 	db := dbm.db
+	// db is nil before replication starts.
+	// In that case, we open all existing db files
+	// and upload them.
 	if db == nil {
 		db, err = sql.Open("duckdb", fname)
 		if err != nil {

@@ -153,7 +153,6 @@ func newPublicationCreateCommand() *cli.Command {
 				return nil
 			}
 
-			// This directory will contain the local db files for the pub
 			if err := mkDBDir(dir, pub); err != nil {
 				return fmt.Errorf("mk db dir: %s", err)
 			}
