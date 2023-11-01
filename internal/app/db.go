@@ -105,7 +105,7 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 	return dbm.Setup(ctx)
 }
 
-// NewDB creates a new duckdb database at the current.db path.
+// NewDB creates a new duckdb database at the <ts>.db path.
 func (dbm *DBManager) NewDB() (*sql.DB, error) {
 	now := time.Now()
 	dbPath := path.Join(dbm.dbDir, fmt.Sprintf("%d.db", now.UnixNano()))
@@ -117,8 +117,7 @@ func (dbm *DBManager) NewDB() (*sql.DB, error) {
 	return db, nil
 }
 
-// Setup creates a local table in the current.db and installs
-// the parquet extension.
+// Setup creates a local table in the local db.
 func (dbm *DBManager) Setup(ctx context.Context) error {
 	query, err := dbm.genCreateQuery()
 	if err != nil {
