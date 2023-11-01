@@ -2,12 +2,8 @@ package app
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"fmt"
 	"io"
 	"os"
-	"path"
 	"testing"
 	"time"
 
@@ -20,94 +16,6 @@ import (
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
-const WAL1 = `{
-	"commit_lsn":957398296,
-	"records":[
-		{
-			"action":"I",
-			"xid":1058,
-			"lsn":"0/3910B898",
-			"nextlsn":"",
-			"timestamp":"2023-08-22 14:44:02.043586-03",
-			"schema":"public",
-			"table":"t",
-			"columns":[
-				{"name":"id","type":"integer","value":200232},
-				{"name":"name","type":"text","value":"100"}
-			],
-			"pk":[{"name":"id","type":"integer"}]
-		}
-	]
-}`
-
-const WAL2 = ` {
-	"commit_lsn":957398297,
-	"records":[
-		{
-			"action":"I",
-			"xid":1059,
-			"lsn":"0/3910B899",
-			"nextlsn":"",
-			"timestamp":"2023-08-22 14:45:02.043586-03",
-			"schema":"public",
-			"table":"t",
-			"columns":[
-				{"name":"id","type":"integer","value":200233},
-				{"name":"name","type":"text","value":"200"}
-			],
-			"pk":[{"name":"id","type":"integer"}]
-		}
-	]
-}
-`
-
-// recvWAL reads one line from the reader and unmarshals it into a transaction.
-func recvWAL(t *testing.T, jsonIn string, feed chan *pgrepl.Tx) {
-	var tx pgrepl.Tx
-	require.NoError(t, json.Unmarshal([]byte(jsonIn), &tx))
-	feed <- &tx
-}
-
-type testRow struct {
-	id   int
-	name string
-}
-
-func importDuckDB(t *testing.T, file *os.File) *sql.Rows {
-	db, err := sql.Open("duckdb", path.Join(t.TempDir(), "temp.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = db.Exec("INSTALL parquet; LOAD parquet;")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	parquetQuery := fmt.Sprintf(
-		"SELECT * FROM read_parquet('%s')", file.Name())
-	rows, err := db.Query(parquetQuery)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return rows
-}
-
-func queryResult(t *testing.T, rows *sql.Rows) (result []testRow) {
-	var id int
-	var name string
-	for rows.Next() {
-		require.NoError(t, rows.Scan(&id, &name))
-		row := testRow{
-			id:   id,
-			name: name,
-		}
-		result = append(result, row)
-	}
-
-	return result
-}
-
 const (
 	pk        = "f81ab2709b7cf1f2ebbbd50bd730b267879a495318f7aac16bbe7caa8a8f2d8d"
 	testTable = "t"
@@ -119,8 +27,8 @@ var cols = []Column{
 	{Name: "name", Typ: "text", IsNull: false, IsPrimary: false},
 }
 
-// Test when replacement threshold is crossed before
-// second Tx is received: <T1, R, T2, C>.
+// Test when window threshold is crossed before
+// second Tx is received: <T1, W, T2, C>.
 func TestBasinStreamerOne(t *testing.T) {
 	// used for testing
 	privateKey, err := crypto.HexToECDSA(pk)
@@ -129,14 +37,14 @@ func TestBasinStreamerOne(t *testing.T) {
 	// This chan will receive the wal records from the replicator
 	feed := make(chan *pgrepl.Tx)
 	testDBDir := t.TempDir()
-	replaceThreshold := 3 * time.Second
+	winSize := 3 * time.Second
 	providerMock := &basinProviderMock{
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
 	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
 	dbm := NewDBManager(
-		testDBDir, testTable, cols, replaceThreshold, uploader)
+		testDBDir, testTable, cols, winSize, uploader)
 
 	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
@@ -145,42 +53,42 @@ func TestBasinStreamerOne(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	// 1. receive first tx
+	// receive first tx
 	recvWAL(t, WAL1, feed)
 
-	// 2. sleep for replaceThreshold time and receive next message
-	//    to trigger db replacement
-	time.Sleep(replaceThreshold + 1)
+	// sleep for winSize time and receive next message
+	// to trigger db replacement
+	time.Sleep(winSize + 1)
 
+	// receive second tx
 	recvWAL(t, WAL2, feed)
 
-	// Assert that the first tx was replayed by importing the
-	// exported parquet file
+	// Assert that ONLY the first tx was replayed
+	// by importing the exported parquet file
 	file := <-providerMock.uploaderInputs
-	rows := importDuckDB(t, file)
+	rows := importLocalDB(t, file)
 	result := queryResult(t, rows)
 	require.Equal(t, 1, len(result))
 	require.Equal(t, 200232, result[0].id)
 	require.Equal(t, "100", result[0].name)
 
-	// simulate starting the replication process again
-	// by uploading all the parquet files in the db dir
+	// simulate starting the replication process again.
+	// it will upload all the parquet files in the db dir
 	go func() {
 		require.NoError(t, dbm.UploadAll(context.Background()))
 	}()
 
-	// Assert that the second tx was replayed and uploaded by importing the
-	// exported parquet file.
+	// Assert that the second tx was replayed and uploaded.
 	file = <-providerMock.uploaderInputs
-	rows = importDuckDB(t, file)
+	rows = importLocalDB(t, file)
 	result = queryResult(t, rows)
 	require.Equal(t, 1, len(result))
 	require.Equal(t, 200233, result[0].id)
 	require.Equal(t, "200", result[0].name)
 }
 
-// Test when replacement threshold is crossed after
-// second Tx is received: <T1, T2, R, C>.
+// Test when window threshold is crossed after
+// second Tx is received: <T1, T2, W, C>.
 func TestBasinStreamerTwo(t *testing.T) {
 	privateKey, err := crypto.HexToECDSA(pk)
 	require.NoError(t, err)
@@ -209,12 +117,12 @@ func TestBasinStreamerTwo(t *testing.T) {
 	// 2. receive second tx
 	recvWAL(t, WAL2, feed)
 
-	// wait for replaceThreshold to pass
+	// wait for window to pass
 	time.Sleep(winSize + 1)
 
 	// nothing should be uploaded because the second tx was received before
-	// the replaceThreshold was reached. the current.db should be uploaded
-	// when we shutdown the uploader
+	// the window closed. the exports should be uploaded
+	// when we replicator is started again
 	select {
 	case <-providerMock.uploaderInputs:
 		t.FailNow() // should not be reached
@@ -230,7 +138,7 @@ func TestBasinStreamerTwo(t *testing.T) {
 	// Assert that the both first and second tx
 	// were replayed by importing the exported parquet file
 	file := <-providerMock.uploaderInputs
-	rows := importDuckDB(t, file)
+	rows := importLocalDB(t, file)
 	result := queryResult(t, rows)
 	require.Equal(t, 2, len(result))
 	require.Equal(t, 200232, result[0].id)
