@@ -135,7 +135,7 @@ func (dbm *DBManager) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (dbm *DBManager) replaceThresholdExceeded() bool {
+func (dbm *DBManager) windowPassed() bool {
 	if dbm.createdAT.IsZero() {
 		return false
 	}
@@ -149,7 +149,7 @@ func (dbm *DBManager) replaceThresholdExceeded() bool {
 // a new one. The current db is exported and uploaded before
 // new db is ready to be used.
 func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
-	if dbm.replaceThresholdExceeded() {
+	if dbm.windowPassed() {
 		slog.Info("replacing current db before replaying further txs")
 		if err := dbm.replace(ctx); err != nil {
 			return fmt.Errorf("cannot replace db: %v", err)
