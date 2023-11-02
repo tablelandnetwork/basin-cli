@@ -82,9 +82,13 @@ func TestBasinStreamerOne(t *testing.T) {
 	for file := range providerMock.uploaderInputs {
 		rows := importLocalDB(t, file)
 		result := queryResult(t, rows)
-		require.Equal(t, 1, len(result))
+		require.Equal(t, 2, len(result))
+		// assert record 1
 		require.Equal(t, 200232, result[0].id)
 		require.Equal(t, "100", result[0].name)
+		// assert record 2
+		require.Equal(t, 200242, result[1].id)
+		require.Equal(t, "400", result[1].name)
 
 		// check that db files and exports were deleted
 		exportPath := strings.ReplaceAll(file.Name(), ".copy", "")
@@ -194,11 +198,16 @@ func TestBasinStreamerTwo(t *testing.T) {
 	file := <-providerMock.uploaderInputs
 	rows := importLocalDB(t, file)
 	result := queryResult(t, rows)
-	require.Equal(t, 2, len(result))
+	require.Equal(t, 3, len(result))
+	// assert WAL 1, record 1
 	require.Equal(t, 200232, result[0].id)
 	require.Equal(t, "100", result[0].name)
-	require.Equal(t, 200233, result[1].id)
-	require.Equal(t, "200", result[1].name)
+	// assert WAL 1, record 2
+	require.Equal(t, 200242, result[1].id)
+	require.Equal(t, "400", result[1].name)
+	// assert WAL 2, record 1
+	require.Equal(t, 200233, result[2].id)
+	require.Equal(t, "200", result[2].name)
 
 	// check that db files and exports were deleted
 	exportPath := strings.ReplaceAll(file.Name(), ".copy", "")

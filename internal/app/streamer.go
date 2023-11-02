@@ -38,16 +38,10 @@ func NewBasinStreamer(ns string, r Replicator, dbm *DBManager) *BasinStreamer {
 // Run runs the BasinStreamer logic.
 func (b *BasinStreamer) Run(ctx context.Context) error {
 	// Open a local DB for replaying txs
-	db, err := b.dbMngr.NewDB()
-	if err != nil {
+	if err := b.dbMngr.NewDB(ctx); err != nil {
 		return err
 	}
-	b.dbMngr.db = db
 
-	// Create sink table in local DB
-	if err := b.dbMngr.Setup(ctx); err != nil {
-		return fmt.Errorf("cannot setup db: %s", err)
-	}
 	defer func() {
 		_ = b.dbMngr.Close()
 	}()

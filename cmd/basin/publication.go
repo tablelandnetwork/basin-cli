@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -49,8 +48,9 @@ func newPublicationCommand() *cli.Command {
 }
 
 func newPublicationCreateCommand() *cli.Command {
-	var owner, dburi, provider, winSize string
+	var owner, dburi, provider string
 	var secure bool
+	var winSize int64
 
 	return &cli.Command{
 		Name:  "create",
@@ -79,11 +79,11 @@ func newPublicationCreateCommand() *cli.Command {
 				Destination: &secure,
 				Value:       true,
 			},
-			&cli.StringFlag{
+			&cli.Int64Flag{
 				Name:        "window-size",
 				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
 				Destination: &winSize,
-				Value:       fmt.Sprintf("%d", DefaultWindowSize),
+				Value:       DefaultWindowSize,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -124,11 +124,6 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			winSizeInt, err := strconv.ParseInt(winSize, 10, 64)
-			if err != nil {
-				return fmt.Errorf("cannot parse window size: %s", err)
-			}
-
 			cfg.Publications[pub] = publication{
 				Host:         pgConfig.Host,
 				Port:         int(pgConfig.Port),
@@ -136,7 +131,7 @@ func newPublicationCreateCommand() *cli.Command {
 				Password:     pgConfig.Password,
 				Database:     pgConfig.Database,
 				ProviderHost: provider,
-				WindowSize:   winSizeInt,
+				WindowSize:   winSize,
 			}
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
@@ -153,7 +148,7 @@ func newPublicationCreateCommand() *cli.Command {
 				return nil
 			}
 
-			if err := mkDBDir(dir, pub); err != nil {
+			if err := os.MkdirAll(path.Join(dir, pub), 0o755); err != nil {
 				return fmt.Errorf("mk db dir: %s", err)
 			}
 
@@ -561,17 +556,6 @@ func inspectTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, err
 		})
 	}
 	return columns, nil
-}
-
-func mkDBDir(dir, pub string) error {
-	if err := os.Mkdir(path.Join(dir, pub), 0o755); err != nil {
-		if os.IsExist(err) {
-			fmt.Println("db directory already exists")
-		} else {
-			return err
-		}
-	}
-	return nil
 }
 
 func createPublication(

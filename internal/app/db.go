@@ -53,26 +53,31 @@ func (dbm *DBManager) Close() error {
 // queryFromWAL creates a query for a WAL TX records.
 // (todo): error handling and remapping of types.
 func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
-	var queries []string
-	for _, r := range tx.Records {
-		columnNames := []string{}
-		vals := []string{}
-		for _, c := range r.Columns {
-			columnNames = append(columnNames, c.Name)
-			vals = append(vals, strings.ReplaceAll(string(c.Value), "\"", ""))
-		}
+	var columnValsStr string
 
-		cols := strings.Join(columnNames, ", ")
-		valsStr := strings.Join(vals, ", ")
-		query := fmt.Sprintf(
-			"insert into %s (%s) values (%s) \n",
-			r.Table, cols, valsStr,
-		)
-		queries = append(queries, query)
+	// get column names
+	cols := []string{}
+	for _, c := range tx.Records[0].Columns {
+		cols = append(cols, c.Name)
 	}
 
-	// batch all insert queries into one
-	return strings.Join(queries, "\n")
+	recordVals := []string{}
+	for _, r := range tx.Records {
+		columnVals := []string{}
+		for _, c := range r.Columns {
+			columnVals = append(columnVals, strings.ReplaceAll(string(c.Value), "\"", ""))
+		}
+		columnValsStr = strings.Join(columnVals, ", ")
+		recordVals = append(
+			recordVals, fmt.Sprintf("(%s)", columnValsStr))
+	}
+
+	return fmt.Sprintf(
+		"insert into %s (%s) values %s",
+		dbm.table,
+		strings.Join(cols, ", "),
+		strings.Join(recordVals, ", "),
+	)
 }
 
 func (dbm *DBManager) replace(ctx context.Context) error {
@@ -81,8 +86,6 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 	if err := dbm.Export(ctx, exportAt); err != nil {
 		return err
 	}
-
-	oldDBFname := dbm.dbFname
 
 	// Close current db
 	slog.Info("closing current db")
@@ -96,40 +99,42 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 	}
 
 	// Cleanup the previous db and wal files
-	oldDBPath := path.Join(dbm.dbDir, oldDBFname)
+	oldDBPath := path.Join(dbm.dbDir, dbm.dbFname)
 	if err := dbm.cleanup(oldDBPath); err != nil {
 		return fmt.Errorf("cleanup: %s", err)
 	}
 
 	// Create a new db
-	db, err := dbm.NewDB()
-	if err != nil {
+	if err := dbm.NewDB(ctx); err != nil {
 		return fmt.Errorf("new db: %v", err)
 	}
 
-	// Setup the new db
-	dbm.db = db
-	return dbm.Setup(ctx)
+	return nil
 }
 
 // NewDB creates a new duckdb database at the <ts>.db path.
-func (dbm *DBManager) NewDB() (*sql.DB, error) {
+func (dbm *DBManager) NewDB(ctx context.Context) error {
 	now := time.Now()
 	dbm.dbFname = fmt.Sprintf("%d.db", now.UnixNano())
 	dbm.createdAT = now
 	dbPath := path.Join(dbm.dbDir, dbm.dbFname)
 	db, err := sql.Open("duckdb", dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("cannot open db: %s", err)
+		return fmt.Errorf("cannot open db: %s", err)
 	}
 
 	slog.Info("created new db", "at", dbPath)
+	dbm.db = db
 
-	return db, nil
+	if err := dbm.setup(ctx); err != nil {
+		return fmt.Errorf("cannot setup db: %s", err)
+	}
+
+	return nil
 }
 
-// Setup creates a local table in the local db.
-func (dbm *DBManager) Setup(ctx context.Context) error {
+// setup creates a local table in the local db.
+func (dbm *DBManager) setup(ctx context.Context) error {
 	query, err := dbm.genCreateQuery()
 	if err != nil {
 		return err
