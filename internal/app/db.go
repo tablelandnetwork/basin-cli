@@ -37,12 +37,11 @@ type DBManager struct {
 // NewDBManager creates a new DBManager.
 func NewDBManager(dbDir, table string, cols []Column, winSize time.Duration, uploader *BasinUploader) *DBManager {
 	return &DBManager{
-		dbDir:     dbDir,
-		table:     table,
-		createdAT: time.Now(),
-		cols:      cols,
-		winSize:   winSize,
-		uploader:  uploader,
+		dbDir:    dbDir,
+		table:    table,
+		cols:     cols,
+		winSize:  winSize,
+		uploader: uploader,
 	}
 }
 
@@ -109,7 +108,6 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 
 	// Setup the new db
 	dbm.db = db
-	dbm.createdAT = time.Now()
 	return dbm.Setup(ctx)
 }
 
@@ -117,6 +115,7 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 func (dbm *DBManager) NewDB() (*sql.DB, error) {
 	now := time.Now()
 	dbm.dbFname = fmt.Sprintf("%d.db", now.UnixNano())
+	dbm.createdAT = now
 	dbPath := path.Join(dbm.dbDir, dbm.dbFname)
 	db, err := sql.Open("duckdb", dbPath)
 	if err != nil {
