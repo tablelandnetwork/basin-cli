@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
-	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"google.golang.org/grpc/test/bufconn"
 )
 
@@ -35,24 +34,6 @@ func TestBasinProvider_CreateAndList(t *testing.T) {
 	pubs, err := bp.List(context.Background(), common.HexToAddress(""))
 	require.NoError(t, err)
 	require.Equal(t, []string{"n.t", "n.t2"}, pubs)
-}
-
-func TestBasinProvider_Push(t *testing.T) {
-	// in this test we create a fake tx,
-	// send to the server, the server deserialize it and send the value back
-
-	bp, _ := newClientAndServer()
-	tx := newTx(t, &pgrepl.Tx{
-		CommitLSN: 333,
-		Records: []pgrepl.Record{
-			{
-				Action: "I",
-			},
-		},
-	})
-
-	err := bp.Push(context.Background(), "n", "t", tx, []byte{})
-	require.NoError(t, err)
 }
 
 // Tests if the mocked server received the uploaded content.
@@ -113,13 +94,6 @@ func TestBasinProvider_Upload(t *testing.T) {
 		hash := sha1.Sum(filedata3)
 		require.Equal(t, hex.EncodeToString(hash[:]), "1a5db926797b9ae16ad56ec2c143e51a5172a862")
 	}
-}
-
-func newTx(t *testing.T, tx *pgrepl.Tx) basincapnp.Tx {
-	capnpTx, err := basincapnp.FromPgReplTx(tx)
-	require.NoError(t, err)
-
-	return capnpTx
 }
 
 // creates a client and a mocked server.
