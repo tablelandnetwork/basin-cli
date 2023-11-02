@@ -51,6 +51,7 @@ func (dbm *DBManager) Close() error {
 }
 
 // queryFromWAL creates a query for a WAL TX records.
+// (todo): error handling and remapping of types.
 func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 	var queries []string
 	for _, r := range tx.Records {
@@ -131,7 +132,7 @@ func (dbm *DBManager) NewDB() (*sql.DB, error) {
 func (dbm *DBManager) Setup(ctx context.Context) error {
 	query, err := dbm.genCreateQuery()
 	if err != nil {
-		return fmt.Errorf("cannot create table in duckdb: %s", err)
+		return err
 	}
 
 	// create table if it does not exist
@@ -165,7 +166,7 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 		}
 	}
 
-	query := dbm.queryFromWAL(tx) // (todo): error handling
+	query := dbm.queryFromWAL(tx)
 	slog.Info("replaying", "query", query)
 
 	_, err := dbm.db.ExecContext(ctx, query)
