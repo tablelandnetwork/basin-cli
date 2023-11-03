@@ -19,6 +19,10 @@ func NewRistrettoMultisetHash() *RistrettoMultisetHash {
 	}
 }
 
+func (h *RistrettoMultisetHash) String() string {
+	return h.accumulator.String()
+}
+
 func (h *RistrettoMultisetHash) Insert(p *ristretto.Point) {
 	h.accumulator.Add(h.accumulator, p)
 }

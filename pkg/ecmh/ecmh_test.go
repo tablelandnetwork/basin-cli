@@ -5,50 +5,77 @@ import (
 	"testing"
 
 	"github.com/bwesterb/go-ristretto"
+	"github.com/stretchr/testify/require"
 )
 
-func TestECMH(t *testing.T) {
-	currentHash := NewRistrettoMultisetHash()
-	items := []string{
-		"apple",
-		"banana",
-		"cherry",
-		"date",
-		"elderberry",
-		"fig",
-		"grape",
-		"honeydew",
-		"imbe",
-		"jackfruit",
-		"kiwi",
-		"lemon",
-		"mango",
-		"nectarine",
-		"orange",
-		"papaya",
-		"quince",
-		"raspberry",
-		"strawberry",
-		"tangerine",
-		"ugli",
-		"vanilla",
-		"watermelon",
-		"xylophone",
-		"yuzu",
-		"zucchini",
+func TestECMHInsertRemove(t *testing.T) {
+	testCases := []struct {
+		items []string
+	}{
+		{
+			items: []string{"apple", "banana", "cherry"},
+		},
+		{
+			items: []string{"apple", "banana", "cherry", "apple"},
+		}, // multisets
 	}
+	for _, tc := range testCases {
+		currentHash := NewRistrettoMultisetHash()
+		for _, item := range tc.items {
+			newItem := ristretto.Point{}
+			currentHash.Insert(newItem.DeriveDalek([]byte(item)))
+		}
+		cr1 := currentHash.String()
+		fmt.Println("cr1", cr1)
 
-	for _, item := range items {
+		// check if item is in the set?
 		newItem := ristretto.Point{}
-		currentHash.Insert(newItem.DeriveDalek([]byte(item)))
+		currentHash.Remove(newItem.DeriveDalek([]byte(tc.items[0])))
+		cr2 := currentHash.String()
+		fmt.Println("cr2", cr2)
+
+		currentHash.Insert(newItem.DeriveDalek([]byte(tc.items[0])))
+		cr3 := currentHash.String()
+		fmt.Println("cr3", cr3)
+		require.Equal(t, cr1, cr3)
 	}
+}
 
-	fmt.Println("finale currentHash", currentHash.accumulator)
+func TestECMHUnionDiff(t *testing.T) {
+	testCases := []struct {
+		items1 []string
+		items2 []string
+	}{
+		{
+			items1: []string{"apple", "banana", "cherry"},
+			items2: []string{"apple", "banana", "cherry"},
+		},
+		{
+			items1: []string{"apple", "banana", "cherry"},
+			items2: []string{"apple", "banana", "cherry", "apple"},
+		}, // multisets
+	}
+	for _, tc := range testCases {
+		currentHash1 := NewRistrettoMultisetHash()
+		for _, item := range tc.items1 {
+			newItem := ristretto.Point{}
+			currentHash1.Insert(newItem.DeriveDalek([]byte(item)))
+		}
 
-	// check if item is in the set?
-	newItem := ristretto.Point{}
-	currentHash.Remove(newItem.DeriveDalek([]byte("apple")))
-	fmt.Println("currentHash without apple", currentHash.accumulator)
-	currentHash.Insert(newItem.DeriveDalek([]byte("apple")))
-	fmt.Println("currentHash with apple", currentHash.accumulator)
+		currentHash2 := NewRistrettoMultisetHash()
+		for _, item := range tc.items2 {
+			newItem := ristretto.Point{}
+			currentHash2.Insert(newItem.DeriveDalek([]byte(item)))
+		}
+
+		currentHash1.Union(currentHash2)
+		cr1 := currentHash1.String()
+
+		currentHash1.Difference(currentHash2)
+
+		currentHash1.Union(currentHash2)
+		cr3 := currentHash1.String()
+		fmt.Println("cr3", cr3)
+		require.Equal(t, cr1, cr3)
+	}
 }
