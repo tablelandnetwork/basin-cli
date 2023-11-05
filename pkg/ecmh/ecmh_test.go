@@ -111,7 +111,7 @@ func createDBWindow(t *testing.T, dbDir string) string {
 	return exportPath
 }
 
-func TestECMHDuckDBInsert(t *testing.T) {
+func TestECMHMatch(t *testing.T) {
 	dbDir := t.TempDir()
 
 	// Create two export files from random data
@@ -146,4 +146,48 @@ func TestECMHDuckDBInsert(t *testing.T) {
 
 	// Assert the two hashset are equal
 	require.Equal(t, hashSet1.String(), hashSet2.String())
+}
+
+func TestECMHMissMatch(t *testing.T) {
+	dbDir := t.TempDir()
+
+	// Create two export files from random data
+	// and insert into a hash set
+	hashSet1 := NewMultisetHash()
+
+	exportPath1 := createDBWindow(t, dbDir)
+	data1, err := os.ReadFile(exportPath1)
+	require.NoError(t, err)
+	newItem := ristretto.Point{}
+	hashSet1.Insert(newItem.DeriveDalek(data1))
+
+	exportPath2 := createDBWindow(t, dbDir)
+	data2, err := os.ReadFile(exportPath2)
+	require.NoError(t, err)
+	newItem = ristretto.Point{}
+	hashSet1.Insert(newItem.DeriveDalek(data2))
+
+	exportPath3 := createDBWindow(t, dbDir)
+	data3, err := os.ReadFile(exportPath3)
+	require.NoError(t, err)
+	newItem = ristretto.Point{}
+	hashSet1.Insert(newItem.DeriveDalek(data3))
+
+	// Read the previously created export files
+	// in reverse order and insert into a new hash set
+	hashSet2 := NewMultisetHash()
+
+	data4, err := os.ReadFile(exportPath2)
+	require.NoError(t, err)
+	newItem = ristretto.Point{}
+	hashSet2.Insert(newItem.DeriveDalek(data4))
+
+	data5, err := os.ReadFile(exportPath1)
+	require.NoError(t, err)
+	newItem = ristretto.Point{}
+	hashSet2.Insert(newItem.DeriveDalek(data5))
+
+	// Assert the two hashset are not equal because
+	// we ddidn't insert the third export file data
+	require.NotEqual(t, hashSet1.String(), hashSet2.String())
 }
