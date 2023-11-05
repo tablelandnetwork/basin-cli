@@ -1,51 +1,59 @@
 package ecmh
 
-import (
-	"github.com/bwesterb/go-ristretto"
-)
+import "github.com/bwesterb/go-ristretto"
 
-type RistrettoMultisetHash struct {
+// MultisetHash is a multiset hash based on ECMH
+// implementated using ristretto points.
+type MultisetHash struct {
 	accumulator *ristretto.Point
 }
 
-func NewRistrettoMultisetHash() *RistrettoMultisetHash {
+// NewMultisetHash creates a new multiset hash.
+func NewMultisetHash() *MultisetHash {
 	p := ristretto.Point{}
 	// shoud we use SetZero() here? base is the generator
 	// point
 	p.SetBase()
 
-	return &RistrettoMultisetHash{
+	return &MultisetHash{
 		accumulator: &p,
 	}
 }
 
-func (h *RistrettoMultisetHash) String() string {
+// String returns the string representation of the multiset hash.
+func (h *MultisetHash) String() string {
 	return h.accumulator.String()
 }
 
-func (h *RistrettoMultisetHash) Insert(p *ristretto.Point) {
+// Insert inserts a new item (point) into the multiset hash.
+func (h *MultisetHash) Insert(p *ristretto.Point) {
 	h.accumulator.Add(h.accumulator, p)
 }
 
-func (h *RistrettoMultisetHash) InsertAll(ps []*ristretto.Point) {
+// InsertAll inserts all items (points) into the multiset hash.
+func (h *MultisetHash) InsertAll(ps []*ristretto.Point) {
 	for _, item := range ps {
 		h.Insert(item)
 	}
 }
 
-func (h *RistrettoMultisetHash) Union(other *RistrettoMultisetHash) {
+// Union unions two multisets.
+func (h *MultisetHash) Union(other *MultisetHash) {
 	h.accumulator.Add(h.accumulator, other.accumulator)
 }
 
-func (h *RistrettoMultisetHash) Difference(other *RistrettoMultisetHash) {
+// Difference computes the diff between two multisets.
+func (h *MultisetHash) Difference(other *MultisetHash) {
 	h.accumulator.Sub(h.accumulator, other.accumulator)
 }
 
-func (h *RistrettoMultisetHash) Remove(p *ristretto.Point) {
+// Remove removes an item (point) from the multiset hash.
+func (h *MultisetHash) Remove(p *ristretto.Point) {
 	h.accumulator.Sub(h.accumulator, p)
 }
 
-func (h *RistrettoMultisetHash) RemoveAll(ps []*ristretto.Point) {
+// RemoveAll removes all items (points) from the multiset hash.
+func (h *MultisetHash) RemoveAll(ps []*ristretto.Point) {
 	for _, item := range ps {
 		h.Remove(item)
 	}
