@@ -43,5 +43,5 @@ struct DealInfo {
     cid @0 :Text;
     size @1 :UInt32;
     created @2 :Text; 
-    isPermament @3 :Bool;
+    archived @3 :Bool;
 }

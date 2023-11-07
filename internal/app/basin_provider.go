@@ -10,10 +10,10 @@ import (
 
 // DealInfo represents information about a deal.
 type DealInfo struct {
-	CID         string
-	Created     string
-	Size        uint32
-	IsPermanent bool
+	CID        string
+	Created    string
+	Size       uint32
+	IsArchived bool
 }
 
 // BasinProvider ...

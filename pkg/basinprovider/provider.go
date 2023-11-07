@@ -293,10 +293,10 @@ func (bp *BasinProvider) Deals(
 		}
 
 		deals[i] = app.DealInfo{
-			CID:         cid,
-			Created:     created,
-			IsPermanent: deal.IsPermament(),
-			Size:        deal.Size(),
+			CID:        cid,
+			Created:    created,
+			IsArchived: deal.Archived(),
+			Size:       deal.Size(),
 		}
 	}
 
@@ -345,10 +345,10 @@ func (bp *BasinProvider) LatestDeals(
 		}
 
 		deals[i] = app.DealInfo{
-			CID:         cid,
-			Created:     created,
-			IsPermanent: deal.IsPermament(),
-			Size:        deal.Size(),
+			CID:        cid,
+			Created:    created,
+			IsArchived: deal.Archived(),
+			Size:       deal.Size(),
 		}
 	}
 
@@ -546,7 +546,7 @@ func (s *BasinServerMock) Deals(_ context.Context, call Publications_deals) erro
 			fakeCID := sha1.Sum(callback.bytes)
 			_ = dealInfo.SetCid(string(fakeCID[:]))
 			_ = dealInfo.SetCreated("does not matter")
-			dealInfo.SetIsPermament(false)
+			dealInfo.SetArchived(false)
 			dealInfo.SetSize(30)
 		}
 
@@ -581,7 +581,7 @@ func (s *BasinServerMock) LatestDeals(_ context.Context, call Publications_lates
 			fakeCID := sha1.Sum(callback.bytes)
 			_ = dealInfo.SetCid(string(fakeCID[:]))
 			_ = dealInfo.SetCreated("does not matter")
-			dealInfo.SetIsPermament(false)
+			dealInfo.SetArchived(false)
 			dealInfo.SetSize(30)
 		}
 

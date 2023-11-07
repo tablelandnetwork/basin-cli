@@ -440,14 +440,14 @@ func newPublicationDealsCommand() *cli.Command {
 			}
 
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"CID", "Size", "Created", "Is Permanent"})
+			table.SetHeader([]string{"CID", "Size", "Created", "Archived"})
 
 			for _, deal := range deals {
-				isPermanent := "N"
-				if deal.IsPermanent {
-					isPermanent = "Y"
+				isArchived := "N"
+				if deal.IsArchived {
+					isArchived = "Y"
 				}
-				table.Append([]string{deal.CID, fmt.Sprintf("%d", deal.Size), deal.Created, isPermanent})
+				table.Append([]string{deal.CID, fmt.Sprintf("%d", deal.Size), deal.Created, isArchived})
 			}
 			table.Render()
 
