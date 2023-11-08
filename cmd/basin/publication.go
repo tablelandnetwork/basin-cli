@@ -392,7 +392,6 @@ func newPublicationDealsCommand() *cli.Command {
 				Name:        "latest",
 				Usage:       "The latest N deals to fetch",
 				Destination: &latest,
-				Value:       10,
 			},
 			&cli.Int64Flag{
 				Name:        "offset",
@@ -441,10 +440,14 @@ func newPublicationDealsCommand() *cli.Command {
 			}
 
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"ID", "Selector Path", "CID"})
+			table.SetHeader([]string{"CID", "Size", "Created", "Archived"})
 
 			for _, deal := range deals {
-				table.Append([]string{fmt.Sprint(deal.ID), deal.SelectorPath, deal.CID})
+				isArchived := "N"
+				if deal.IsArchived {
+					isArchived = "Y"
+				}
+				table.Append([]string{deal.CID, fmt.Sprintf("%d", deal.Size), deal.Created, isArchived})
 			}
 			table.Render()
 
