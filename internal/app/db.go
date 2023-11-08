@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/marcboeker/go-duckdb"
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"golang.org/x/exp/slog"
@@ -182,10 +183,22 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 	return nil
 }
 
+var typeMap = map[string]string{
+	"json":    "varchar",
+	"jsonb":   "varchar",
+	"json[]":  "varchar[]",
+	"jsonb[]": "varchar[]",
+}
+
 func (dbm *DBManager) genCreateQuery() (string, error) {
 	var cols, pks string
 	for i, column := range dbm.cols {
-		col := fmt.Sprintf("%s %s", column.Name, column.Typ)
+		// convert PG type to duckdb type
+		typ, ok := typeMap[column.Typ]
+		if !ok {
+			typ = column.Typ
+		}
+		col := fmt.Sprintf("%s %s", column.Name, typ)
 		if !column.IsNull {
 			col = fmt.Sprintf("%s NOT NULL", col)
 		}
