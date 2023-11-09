@@ -158,7 +158,14 @@ func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx bas
 
 // Upload uploads a file to th server.
 func (bp *BasinProvider) Upload(
-	ctx context.Context, ns string, rel string, size uint64, r io.Reader, signer *app.Signer, progress io.Writer,
+	ctx context.Context,
+	ns string,
+	rel string,
+	size uint64,
+	r io.Reader,
+	signer *app.Signer,
+	progress io.Writer,
+	timestamp int64,
 ) error {
 	uploadFuture, uploadRelease := bp.p.Upload(ctx, func(p Publications_upload_Params) error {
 		if err := p.SetNs(ns); err != nil {
@@ -170,6 +177,7 @@ func (bp *BasinProvider) Upload(
 		}
 
 		p.SetSize(size)
+		p.SetTimestamp(uint64(timestamp))
 
 		return nil
 	})
@@ -251,7 +259,7 @@ func (bp *BasinProvider) List(ctx context.Context, owner common.Address) ([]stri
 
 // Deals lists deals from a given publication.
 func (bp *BasinProvider) Deals(
-	ctx context.Context, ns string, rel string, limit uint32, offset uint64,
+	ctx context.Context, ns string, rel string, limit uint32, offset uint64, ts app.Timestamp,
 ) ([]app.DealInfo, error) {
 	f, release := bp.p.Deals(ctx, func(call Publications_deals_Params) error {
 		if err := call.SetNs(ns); err != nil {
@@ -264,6 +272,7 @@ func (bp *BasinProvider) Deals(
 
 		call.SetLimit(limit)
 		call.SetOffset(offset)
+		call.SetTimestamp(ts.Seconds())
 
 		return nil
 	})
@@ -305,7 +314,7 @@ func (bp *BasinProvider) Deals(
 
 // LatestDeals lists latest deals from a given publication.
 func (bp *BasinProvider) LatestDeals(
-	ctx context.Context, ns string, rel string, n uint32,
+	ctx context.Context, ns string, rel string, n uint32, ts app.Timestamp,
 ) ([]app.DealInfo, error) {
 	f, release := bp.p.LatestDeals(ctx, func(call Publications_latestDeals_Params) error {
 		if err := call.SetNs(ns); err != nil {
@@ -317,6 +326,7 @@ func (bp *BasinProvider) LatestDeals(
 		}
 
 		call.SetN(n)
+		call.SetTimestamp(ts.Seconds())
 		return nil
 	})
 	defer release()

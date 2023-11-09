@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -224,6 +225,7 @@ func newPublicationStartCommand() *cli.Command {
 func newPublicationUploadCommand() *cli.Command {
 	var privateKey, publicationName string
 	var secure bool
+	var timestamp int64
 
 	return &cli.Command{
 		Name:  "upload",
@@ -246,6 +248,12 @@ func newPublicationUploadCommand() *cli.Command {
 				Usage:       "Uses TLS connection",
 				Destination: &secure,
 				Value:       true,
+			},
+			&cli.Int64Flag{
+				Name:        "timestamp",
+				Usage:       "The time the file was created",
+				Destination: &timestamp,
+				Value:       time.Now().UTC().Unix(),
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -298,7 +306,7 @@ func newPublicationUploadCommand() *cli.Command {
 				"Uploading file...",
 			)
 
-			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey)
+			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey, timestamp)
 			if err := basinStreamer.Upload(cCtx.Context, filepath, bar); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
@@ -361,7 +369,7 @@ func newPublicationListCommand() *cli.Command {
 }
 
 func newPublicationDealsCommand() *cli.Command {
-	var publication, provider string
+	var publication, provider, timestamp string
 	var limit, latest int
 	var offset int64
 	var secure bool
@@ -405,6 +413,12 @@ func newPublicationDealsCommand() *cli.Command {
 				Destination: &secure,
 				Value:       true,
 			},
+			&cli.StringFlag{
+				Name:        "timestamp",
+				Usage:       "List deals from a specific timestamp",
+				Destination: &timestamp,
+				Value:       "",
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			ns, rel, err := parsePublicationName(publication)
@@ -418,9 +432,14 @@ func newPublicationDealsCommand() *cli.Command {
 			}
 			defer bp.Close()
 
+			ts, err := app.ParseTimestamp(timestamp)
+			if err != nil {
+				return err
+			}
+
 			var deals []app.DealInfo
 			if latest > 0 {
-				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest))
+				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest), ts)
 				if err != nil {
 					return fmt.Errorf("failed to fetch deals: %s", err)
 				}
@@ -433,7 +452,7 @@ func newPublicationDealsCommand() *cli.Command {
 					return errors.New("limit has to be greater than 0")
 				}
 
-				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset))
+				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset), ts)
 				if err != nil {
 					return fmt.Errorf("failed to fetch deals: %s", err)
 				}

@@ -18,7 +18,7 @@ func TestBasinUploader(t *testing.T) {
 
 	mock := &basinProviderUploderMock{}
 
-	uploader := NewBasinUploader("test", "test", mock, privateKey)
+	uploader := NewBasinUploader("test", "test", mock, privateKey, 1)
 
 	buf := bytes.NewBuffer(make([]byte, 0, 10))
 	err = uploader.Upload(context.Background(), "testdata/test.parquet", buf)
@@ -33,7 +33,7 @@ type basinProviderUploderMock struct {
 }
 
 func (bp *basinProviderUploderMock) Upload(
-	_ context.Context, _ string, _ string, _ uint64, r io.Reader, _ *Signer, _ io.Writer,
+	_ context.Context, _ string, _ string, _ uint64, r io.Reader, _ *Signer, _ io.Writer, _ int64,
 ) error {
 	buf := make([]byte, 4*1024)
 	for {

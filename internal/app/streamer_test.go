@@ -122,11 +122,11 @@ func (bp *basinProviderMock) List(_ context.Context, _ common.Address) ([]string
 	return []string{}, nil
 }
 
-func (bp *basinProviderMock) Deals(context.Context, string, string, uint32, uint64) ([]DealInfo, error) {
+func (bp *basinProviderMock) Deals(context.Context, string, string, uint32, uint64, Timestamp) ([]DealInfo, error) {
 	return []DealInfo{}, nil
 }
 
-func (bp *basinProviderMock) LatestDeals(context.Context, string, string, uint32) ([]DealInfo, error) {
+func (bp *basinProviderMock) LatestDeals(context.Context, string, string, uint32, Timestamp) ([]DealInfo, error) {
 	return []DealInfo{}, nil
 }
 
