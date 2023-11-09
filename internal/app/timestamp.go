@@ -13,8 +13,8 @@ type Timestamp struct {
 }
 
 // Seconds returns the timestamp in seconds.
-func (t *Timestamp) Seconds() uint64 {
-	return uint64(t.t.Unix())
+func (t *Timestamp) Seconds() int64 {
+	return t.t.Unix()
 }
 
 // ParseTimestamp parses a string and returns a time.Time object as UTC.

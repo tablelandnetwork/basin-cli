@@ -98,7 +98,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 
 	// check latest 2 deals for test2.test2, should return filedata2
 	{
-		dealInfo, err := client.LatestDeals(context.Background(), "test2", "test2", 2, app.Timestamp{})
+		dealInfo, err := client.LatestDeals(context.Background(), "test2", "test2", 2, app.Timestamp{}, app.Timestamp{})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(dealInfo))
 		hash := sha1.Sum(filedata2)
@@ -107,7 +107,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 
 	// check deals for test.test, limit 1, offset 1, should return filedata3
 	{
-		dealInfo, err := client.Deals(context.Background(), "test", "test", 1, 1, app.Timestamp{})
+		dealInfo, err := client.Deals(context.Background(), "test", "test", 1, 1, app.Timestamp{}, app.Timestamp{})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(dealInfo))
 		hash := sha1.Sum(filedata3)

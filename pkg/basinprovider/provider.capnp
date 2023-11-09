@@ -16,6 +16,6 @@ interface Publications {
 	}
 
     list @3 (owner :Data) -> (publications :List(Text));
-	deals @4 (ns :Text, rel :Text, limit :UInt32, offset :UInt64, timestamp :UInt64) -> (deals :List(import "../capnp/definitions.capnp" .DealInfo));
-    latestDeals @5 (ns :Text, rel :Text, n :UInt32, timestamp :UInt64) -> (deals :List(import "../capnp/definitions.capnp" .DealInfo));
+	deals @4 (ns :Text, rel :Text, limit :UInt32, offset :UInt64, before :Int64, after :Int64) -> (deals :List(import "../capnp/definitions.capnp" .DealInfo));
+    latestDeals @5 (ns :Text, rel :Text, n :UInt32, before :Int64, after :Int64) -> (deals :List(import "../capnp/definitions.capnp" .DealInfo));
 }

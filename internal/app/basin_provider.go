@@ -11,7 +11,7 @@ import (
 // DealInfo represents information about a deal.
 type DealInfo struct {
 	CID        string
-	Created    string
+	Timestamp  int64
 	Size       uint32
 	IsArchived bool
 }
@@ -21,7 +21,7 @@ type BasinProvider interface {
 	Create(context.Context, string, string, basincapnp.Schema, common.Address) (bool, error)
 	Push(context.Context, string, string, basincapnp.Tx, []byte) error
 	List(context.Context, common.Address) ([]string, error)
-	Deals(context.Context, string, string, uint32, uint64, Timestamp) ([]DealInfo, error)
-	LatestDeals(context.Context, string, string, uint32, Timestamp) ([]DealInfo, error)
+	Deals(context.Context, string, string, uint32, uint64, Timestamp, Timestamp) ([]DealInfo, error)
+	LatestDeals(context.Context, string, string, uint32, Timestamp, Timestamp) ([]DealInfo, error)
 	Reconnect() error
 }

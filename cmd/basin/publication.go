@@ -369,7 +369,7 @@ func newPublicationListCommand() *cli.Command {
 }
 
 func newPublicationDealsCommand() *cli.Command {
-	var publication, provider, timestamp string
+	var publication, provider, before, after, at string
 	var limit, latest int
 	var offset int64
 	var secure bool
@@ -414,9 +414,21 @@ func newPublicationDealsCommand() *cli.Command {
 				Value:       true,
 			},
 			&cli.StringFlag{
-				Name:        "timestamp",
-				Usage:       "List deals from a specific timestamp",
-				Destination: &timestamp,
+				Name:        "before",
+				Usage:       "The time the file was created",
+				Destination: &before,
+				Value:       "",
+			},
+			&cli.StringFlag{
+				Name:        "after",
+				Usage:       "The time the file was created",
+				Destination: &after,
+				Value:       "",
+			},
+			&cli.StringFlag{
+				Name:        "at",
+				Usage:       "The time the file was created",
+				Destination: &at,
 				Value:       "",
 			},
 		},
@@ -432,14 +444,14 @@ func newPublicationDealsCommand() *cli.Command {
 			}
 			defer bp.Close()
 
-			ts, err := app.ParseTimestamp(timestamp)
+			b, a, err := validateBeforeAndAfter(before, after, at)
 			if err != nil {
 				return err
 			}
 
 			var deals []app.DealInfo
 			if latest > 0 {
-				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest), ts)
+				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest), b, a)
 				if err != nil {
 					return fmt.Errorf("failed to fetch deals: %s", err)
 				}
@@ -452,21 +464,23 @@ func newPublicationDealsCommand() *cli.Command {
 					return errors.New("limit has to be greater than 0")
 				}
 
-				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset), ts)
+				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset), b, a)
 				if err != nil {
 					return fmt.Errorf("failed to fetch deals: %s", err)
 				}
 			}
 
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"CID", "Size", "Created", "Archived"})
+			table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived"})
 
 			for _, deal := range deals {
 				isArchived := "N"
 				if deal.IsArchived {
 					isArchived = "Y"
 				}
-				table.Append([]string{deal.CID, fmt.Sprintf("%d", deal.Size), deal.Created, isArchived})
+				table.Append([]string{
+					deal.CID, fmt.Sprintf("%d", deal.Size), time.Unix(deal.Timestamp, 0).Format(time.RFC3339), isArchived,
+				})
 			}
 			table.Render()
 
@@ -612,4 +626,22 @@ func createPublication(
 	}
 
 	return false, nil
+}
+
+func validateBeforeAndAfter(before, after, at string) (app.Timestamp, app.Timestamp, error) {
+	if !strings.EqualFold(at, "") {
+		before, after = at, at
+	}
+
+	b, err := app.ParseTimestamp(before)
+	if err != nil {
+		return app.Timestamp{}, app.Timestamp{}, err
+	}
+
+	a, err := app.ParseTimestamp(after)
+	if err != nil {
+		return app.Timestamp{}, app.Timestamp{}, err
+	}
+
+	return b, a, nil
 }
