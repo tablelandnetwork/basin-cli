@@ -165,7 +165,7 @@ func (bp *BasinProvider) Upload(
 	r io.Reader,
 	signer *app.Signer,
 	progress io.Writer,
-	timestamp int64,
+	timestamp app.Timestamp,
 ) error {
 	uploadFuture, uploadRelease := bp.p.Upload(ctx, func(p Publications_upload_Params) error {
 		if err := p.SetNs(ns); err != nil {
@@ -177,7 +177,7 @@ func (bp *BasinProvider) Upload(
 		}
 
 		p.SetSize(size)
-		p.SetTimestamp(uint64(timestamp))
+		p.SetTimestamp(timestamp.Seconds())
 
 		return nil
 	})

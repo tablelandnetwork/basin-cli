@@ -225,7 +225,7 @@ func newPublicationStartCommand() *cli.Command {
 func newPublicationUploadCommand() *cli.Command {
 	var privateKey, publicationName string
 	var secure bool
-	var timestamp int64
+	var timestamp string
 
 	return &cli.Command{
 		Name:  "upload",
@@ -249,11 +249,11 @@ func newPublicationUploadCommand() *cli.Command {
 				Destination: &secure,
 				Value:       true,
 			},
-			&cli.Int64Flag{
+			&cli.StringFlag{
 				Name:        "timestamp",
 				Usage:       "The time the file was created",
 				Destination: &timestamp,
-				Value:       time.Now().UTC().Unix(),
+				Value:       fmt.Sprint(time.Now().UTC().Unix()),
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -306,7 +306,12 @@ func newPublicationUploadCommand() *cli.Command {
 				"Uploading file...",
 			)
 
-			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey, timestamp)
+			ts, err := app.ParseTimestamp(timestamp)
+			if err != nil {
+				return err
+			}
+
+			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey, ts)
 			if err := basinStreamer.Upload(cCtx.Context, filepath, bar); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}

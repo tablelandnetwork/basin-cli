@@ -14,7 +14,7 @@ import (
 
 // BasinProviderUploader ...
 type BasinProviderUploader interface {
-	Upload(context.Context, string, string, uint64, io.Reader, *Signer, io.Writer, int64) error
+	Upload(context.Context, string, string, uint64, io.Reader, *Signer, io.Writer, Timestamp) error
 }
 
 // BasinUploader contains logic of uploading Parquet files to Basin Provider.
@@ -23,12 +23,12 @@ type BasinUploader struct {
 	relation   string
 	privateKey *ecdsa.PrivateKey
 	provider   BasinProviderUploader
-	timestamp  int64
+	timestamp  Timestamp
 }
 
 // NewBasinUploader creates new uploader.
 func NewBasinUploader(
-	ns string, rel string, bp BasinProviderUploader, pk *ecdsa.PrivateKey, timestamp int64,
+	ns string, rel string, bp BasinProviderUploader, pk *ecdsa.PrivateKey, timestamp Timestamp,
 ) *BasinUploader {
 	return &BasinUploader{
 		namespace:  ns,
