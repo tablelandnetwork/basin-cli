@@ -415,19 +415,19 @@ func newPublicationDealsCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "before",
-				Usage:       "The time the file was created",
+				Usage:       "Filter deals created before this timestamp",
 				Destination: &before,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "after",
-				Usage:       "The time the file was created",
+				Usage:       "Filter deals created after this timestamp",
 				Destination: &after,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "at",
-				Usage:       "The time the file was created",
+				Usage:       "Filter deals created at this timestamp",
 				Destination: &at,
 				Value:       "",
 			},
