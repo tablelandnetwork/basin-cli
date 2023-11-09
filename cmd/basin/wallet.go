@@ -43,6 +43,27 @@ func newWalletCommand() *cli.Command {
 					return nil
 				},
 			},
+			{
+				Name:  "pubkey",
+				Usage: "print the public key for a private key",
+				Action: func(cCtx *cli.Context) error {
+					filename := cCtx.Args().Get(0)
+					if filename == "" {
+						return errors.New("filename is empty")
+					}
+
+					privateKey, err := crypto.LoadECDSA(filename)
+					if err != nil {
+						return fmt.Errorf("loading key: %s", err)
+					}
+
+					pubk, _ := privateKey.Public().(*ecdsa.PublicKey)
+					publicKey := common.HexToAddress(crypto.PubkeyToAddress(*pubk).Hex())
+
+					fmt.Println(publicKey)
+					return nil
+				},
+			},
 		},
 	}
 }
