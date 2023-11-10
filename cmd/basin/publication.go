@@ -251,9 +251,8 @@ func newPublicationUploadCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "timestamp",
-				Usage:       "The time the file was created",
+				Usage:       "The time the file was created (default: current epoch in UTC)",
 				Destination: &timestamp,
-				Value:       fmt.Sprint(time.Now().UTC().Unix()),
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -305,6 +304,10 @@ func newPublicationUploadCommand() *cli.Command {
 				fi.Size(),
 				"Uploading file...",
 			)
+
+			if timestamp == "" {
+				timestamp = fmt.Sprint(time.Now().UTC().Unix())
+			}
 
 			ts, err := app.ParseTimestamp(timestamp)
 			if err != nil {
