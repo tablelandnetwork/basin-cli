@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -49,6 +50,7 @@ func newPublicationCommand() *cli.Command {
 func newPublicationCreateCommand() *cli.Command {
 	var owner, dburi, provider string
 	var secure bool
+	var winSize int64
 
 	return &cli.Command{
 		Name:  "create",
@@ -76,6 +78,12 @@ func newPublicationCreateCommand() *cli.Command {
 				Usage:       "Uses TLS connection",
 				Destination: &secure,
 				Value:       true,
+			},
+			&cli.Int64Flag{
+				Name:        "window-size",
+				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
+				Destination: &winSize,
+				Value:       DefaultWindowSize,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -123,6 +131,7 @@ func newPublicationCreateCommand() *cli.Command {
 				Password:     pgConfig.Password,
 				Database:     pgConfig.Database,
 				ProviderHost: provider,
+				WindowSize:   winSize,
 			}
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
@@ -137,6 +146,10 @@ func newPublicationCreateCommand() *cli.Command {
 			if exists {
 				fmt.Printf("Publication %s.%s already exists.\n\n", ns, rel)
 				return nil
+			}
+
+			if err := os.MkdirAll(path.Join(dir, pub), 0o755); err != nil {
+				return fmt.Errorf("mk db dir: %s", err)
 			}
 
 			fmt.Printf("\033[32mPublication %s.%s created.\033[0m\n\n", ns, rel)
@@ -211,7 +224,41 @@ func newPublicationStartCommand() *cli.Command {
 			}
 			defer bp.Close()
 
-			basinStreamer := app.NewBasinStreamer(ns, r, bp, privateKey)
+			pgxConn, err := pgx.Connect(cCtx.Context, connString)
+			if err != nil {
+				return fmt.Errorf("connect: %s", err)
+			}
+			defer func() {
+				_ = pgxConn.Close(cCtx.Context)
+			}()
+
+			tx, err := pgxConn.Begin(cCtx.Context)
+			if err != nil {
+				return fmt.Errorf("failed to begin transaction")
+			}
+			defer func() {
+				if err != nil {
+					_ = tx.Rollback(cCtx.Context)
+				}
+			}()
+
+			cols, err := inspectTable(cCtx.Context, tx, rel)
+			if err != nil {
+				return fmt.Errorf("failed to inspect source table: %s", err)
+			}
+
+			// Creates a new db manager when replication starts
+			dbDir := path.Join(dir, publication)
+			winSize := time.Duration(cfg.Publications[publication].WindowSize) * time.Second
+			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
+			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
+
+			// Before starting replication, upload the remaining data
+			if err := dbm.UploadAll(cCtx.Context); err != nil {
+				return fmt.Errorf("upload all: %s", err)
+			}
+
+			basinStreamer := app.NewBasinStreamer(ns, r, dbm)
 			if err := basinStreamer.Run(cCtx.Context); err != nil {
 				return fmt.Errorf("run: %s", err)
 			}
@@ -466,6 +513,51 @@ func parsePublicationName(name string) (ns string, rel string, err error) {
 	return
 }
 
+func inspectTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, error) {
+	rows, err := tx.Query(ctx,
+		`
+		WITH primary_key_info AS
+			(SELECT tc.constraint_schema,
+					tc.table_name,
+					ccu.column_name
+			FROM information_schema.table_constraints tc
+			JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
+			WHERE constraint_type = 'PRIMARY KEY' )
+		SELECT
+			c.column_name,
+			c.data_type,
+			c.is_nullable = 'YES' AS is_nullable,
+			pki.column_name IS NOT NULL AS is_primary
+		FROM information_schema.columns AS c
+		LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
+			AND pki.table_name = c.table_name
+			AND pki.column_name = c.column_name
+		WHERE c.table_name = $1; 
+		`, rel,
+	)
+	if err != nil {
+		return []app.Column{}, fmt.Errorf("failed to fetch schema")
+	}
+	defer rows.Close()
+
+	var colName, typ string
+	var isNull, isPrimary bool
+	var columns []app.Column
+	for rows.Next() {
+		if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
+			return []app.Column{}, fmt.Errorf("scan: %s", err)
+		}
+
+		columns = append(columns, app.Column{
+			Name:      colName,
+			Typ:       typ,
+			IsNull:    isNull,
+			IsPrimary: isPrimary,
+		})
+	}
+	return columns, nil
+}
+
 func createPublication(
 	ctx context.Context, dburi string, ns string, rel string, provider string, owner string, secure bool,
 ) (exists bool, err error) {
@@ -496,58 +588,15 @@ func createPublication(
 	if err != nil {
 		return false, fmt.Errorf("failed to begin transaction")
 	}
-
 	defer func() {
 		if err != nil {
 			_ = tx.Rollback(ctx)
 		}
 	}()
 
-	rows, err := tx.Query(ctx,
-		`
-		WITH primary_key_info AS
-			(SELECT tc.constraint_schema,
-					tc.table_name,
-					ccu.column_name
-			FROM information_schema.table_constraints tc
-			JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
-			WHERE constraint_type = 'PRIMARY KEY' )
-		SELECT
-			c.column_name,
-			c.data_type,
-			c.is_nullable = 'YES' AS is_nullable,
-			pki.column_name IS NOT NULL AS is_primary
-		FROM information_schema.columns AS c
-		LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
-			AND pki.table_name = c.table_name
-			AND pki.column_name = c.column_name
-		WHERE c.table_name = $1; 
-		`, rel,
-	)
+	columns, err := inspectTable(ctx, tx, rel)
 	if err != nil {
-		return false, fmt.Errorf("failed to fetch schema")
-	}
-	defer rows.Close()
-
-	type column struct {
-		name, typ         string
-		isNull, isPrimary bool
-	}
-
-	var colName, typ string
-	var isNull, isPrimary bool
-	var columns []column
-	for rows.Next() {
-		if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
-			return false, fmt.Errorf("scan: %s", err)
-		}
-
-		columns = append(columns, column{
-			name:      colName,
-			typ:       typ,
-			isNull:    isNull,
-			isPrimary: isPrimary,
-		})
+		return false, fmt.Errorf("failed to inspect table: %s", err)
 	}
 
 	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
@@ -568,10 +617,10 @@ func createPublication(
 	for i, col := range columns {
 		column := columnsList.At(i)
 
-		_ = column.SetName(col.name)
-		_ = column.SetType(col.typ)
-		column.SetIsNullable(col.isNull)
-		column.SetIsPartOfPrimaryKey(col.isPrimary)
+		_ = column.SetName(col.Name)
+		_ = column.SetType(col.Typ)
+		column.SetIsNullable(col.IsNull)
+		column.SetIsPartOfPrimaryKey(col.IsPrimary)
 	}
 	_ = capnpSchema.SetColumns(columnsList)
 

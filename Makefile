@@ -10,7 +10,7 @@ build:
 
 # Test
 test: 
-	go test ./... -short -race
+	go test ./... -short -race -timeout 1m
 .PHONY: test
 
 generate:

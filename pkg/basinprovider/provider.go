@@ -129,33 +129,6 @@ func (bp *BasinProvider) Create(
 	return results.Exists(), nil
 }
 
-// Push pushes Postgres tx to the server.
-func (bp *BasinProvider) Push(ctx context.Context, ns string, rel string, tx basincapnp.Tx, sig []byte) error {
-	f, release := bp.p.Push(ctx, func(bp Publications_push_Params) error {
-		if err := bp.SetNs(ns); err != nil {
-			return fmt.Errorf("setting ns: %s", err)
-		}
-		if strings.Contains(rel, ".") {
-			parts := strings.Split(rel, ".") // remove the schema from table's name (e.g. public)
-			rel = parts[1]
-		}
-		if err := bp.SetRel(rel); err != nil {
-			return fmt.Errorf("setting rel: %s", err)
-		}
-		if err := bp.SetTx(tx); err != nil {
-			return fmt.Errorf("setting rel: %s", err)
-		}
-		if err := bp.SetSig(sig); err != nil {
-			return fmt.Errorf("setting sig: %s", err)
-		}
-		return nil
-	})
-	defer release()
-
-	_, err := f.Struct()
-	return err
-}
-
 // Upload uploads a file to th server.
 func (bp *BasinProvider) Upload(
 	ctx context.Context, ns string, rel string, size uint64, r io.Reader, signer *app.Signer, progress io.Writer,
