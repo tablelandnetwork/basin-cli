@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"capnproto.org/go/capnp/v3"
+	"github.com/drand/tlock"
+	"github.com/drand/tlock/networks/http"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pgx/v5"
@@ -47,7 +51,7 @@ func newPublicationCommand() *cli.Command {
 }
 
 func newPublicationCreateCommand() *cli.Command {
-	var owner, dburi, provider string
+	var owner, dburi, provider, tlockDuration, tlockHost, tlockChain string
 	var secure bool
 
 	return &cli.Command{
@@ -76,6 +80,24 @@ func newPublicationCreateCommand() *cli.Command {
 				Usage:       "Uses TLS connection",
 				Destination: &secure,
 				Value:       true,
+			},
+			&cli.StringFlag{
+				Name:        "tlockDuration",
+				Usage:       "The timelock encryption duration (default is no encryption)",
+				Destination: &tlockDuration,
+				Required:    false,
+			},
+			&cli.StringFlag{
+				Name:        "tlockHost",
+				Usage:       "The drand host for timelock encryption",
+				Destination: &tlockHost,
+				Value:       DefaultTlockHost,
+			},
+			&cli.StringFlag{
+				Name:        "tlockChain",
+				Usage:       "The drand chain for timelock encryption",
+				Destination: &tlockChain,
+				Value:       DefaultTlockChain,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -117,12 +139,15 @@ func newPublicationCreateCommand() *cli.Command {
 			}
 
 			cfg.Publications[pub] = publication{
-				Host:         pgConfig.Host,
-				Port:         int(pgConfig.Port),
-				User:         pgConfig.User,
-				Password:     pgConfig.Password,
-				Database:     pgConfig.Database,
-				ProviderHost: provider,
+				Host:          pgConfig.Host,
+				Port:          int(pgConfig.Port),
+				User:          pgConfig.User,
+				Password:      pgConfig.Password,
+				Database:      pgConfig.Database,
+				ProviderHost:  provider,
+				TlockDuration: tlockDuration,
+				TlockHost:     tlockHost,
+				TlockChain:    tlockChain,
 			}
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
@@ -222,12 +247,12 @@ func newPublicationStartCommand() *cli.Command {
 }
 
 func newPublicationUploadCommand() *cli.Command {
-	var privateKey, publicationName string
+	var privateKey, publicationName, tlockDuration, encryptPath string
 	var secure bool
 
 	return &cli.Command{
 		Name:  "upload",
-		Usage: "upload a Parquet file",
+		Usage: "upload a Parquet file with optional tlock encryption",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
@@ -246,6 +271,18 @@ func newPublicationUploadCommand() *cli.Command {
 				Usage:       "Uses TLS connection",
 				Destination: &secure,
 				Value:       true,
+			},
+			&cli.StringFlag{
+				Name:        "encryptd",
+				Usage:       "optional timelock encryption duration (e.g., '24hr'). If set, the file will be encrypted with tlock before upload",
+				Destination: &tlockDuration,
+				Required:    false,
+			},
+			&cli.StringFlag{
+				Name:        "encryptp",
+				Usage:       "file path to maintain a local copy of the encrypted file",
+				Destination: &encryptPath,
+				Required:    false,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -272,13 +309,77 @@ func newPublicationUploadCommand() *cli.Command {
 				return fmt.Errorf("load config: %s", err)
 			}
 
+			// Use global tlock duration if not supplied
+			if tlockDuration == "" && cfg.Publications[publicationName].TlockDuration != "" {
+				tlockDuration = cfg.Publications[publicationName].TlockDuration
+			}
+
+			if encryptPath != "" && tlockDuration == "" {
+				return fmt.Errorf("error: requesting stored copy without requesting encryption")
+			}
+
 			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publicationName].ProviderHost, secure)
 			if err != nil {
 				return err
 			}
 			defer bp.Close()
 
+			// Setup the encrpytion dependant on tlockDuration
+			var encryptor tlock.Tlock
+			var roundNumber uint64
+			if tlockDuration != "" {
+
+				tl, err := time.ParseDuration(tlockDuration)
+				if err != nil {
+					return fmt.Errorf("encryption duration error: %s", err)
+				}
+				// Construct a network that can talk to a drand network. Example using the mainnet fastnet network.
+				network, err := http.NewNetwork(cfg.Publications[publicationName].TlockHost, cfg.Publications[publicationName].TlockChain)
+				if err != nil {
+					return fmt.Errorf("drand network error: %s", err)
+				}
+
+				// Use the network to identify the round number that represents the duration.
+				roundNumber = network.RoundNumber(time.Now().Add(tl))
+				// Initialize the tlock encryptor with the provided duration
+				encryptor = tlock.New(network)
+			}
+
 			filepath := cCtx.Args().First()
+
+			// Check if we have encrypted content to upload
+			if tlockDuration != "" {
+				f, err := os.Open(filepath)
+				if err != nil {
+					return fmt.Errorf("open file: %s", err)
+				}
+
+				var encrypted *os.File
+				if encryptPath == "" {
+					// Write the encrypted content to a temporary file
+					encrypted, err = os.CreateTemp("", "encrypted-*")
+					if err != nil {
+						return fmt.Errorf("create temp file: %s", err)
+					}
+					defer encrypted.Close()
+					defer os.Remove(encrypted.Name()) // Clean up the file afterwards
+				} else {
+					// Write the encrypted content to a temporary file
+					encrypted, err = os.Create(encryptPath)
+					if err != nil {
+						return fmt.Errorf("create output file: %s", err)
+					}
+					defer encrypted.Close()
+				}
+
+				// Encrypt the file content using tlock
+				if err := encryptor.Encrypt(encrypted, io.ReadCloser(f), roundNumber); err != nil {
+					return fmt.Errorf("encrypt file: %s", err)
+				}
+
+				// Update the filepath to point to the temporary encrypted file
+				filepath = encrypted.Name()
+			}
 
 			f, err := os.Open(filepath)
 			if err != nil {
@@ -302,7 +403,6 @@ func newPublicationUploadCommand() *cli.Command {
 			if err := basinStreamer.Upload(cCtx.Context, filepath, bar); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
-
 			return nil
 		},
 	}
