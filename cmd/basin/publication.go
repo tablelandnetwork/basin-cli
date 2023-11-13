@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -385,7 +386,7 @@ func newPublicationListCommand() *cli.Command {
 }
 
 func newPublicationDealsCommand() *cli.Command {
-	var publication, provider, before, after, at string
+	var publication, provider, before, after, at, format string
 	var limit, latest int
 	var offset int64
 	var secure bool
@@ -447,6 +448,12 @@ func newPublicationDealsCommand() *cli.Command {
 				Destination: &at,
 				Value:       "",
 			},
+			&cli.StringFlag{
+				Name:        "format",
+				Usage:       "The output format (table or json)",
+				Destination: &format,
+				Value:       "table",
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			ns, rel, err := parsePublicationName(publication)
@@ -486,25 +493,33 @@ func newPublicationDealsCommand() *cli.Command {
 				}
 			}
 
-			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived"})
+			if format == "table" {
+				table := tablewriter.NewWriter(os.Stdout)
+				table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived"})
 
-			for _, deal := range deals {
-				isArchived := "N"
-				if deal.IsArchived {
-					isArchived = "Y"
+				for _, deal := range deals {
+					isArchived := "N"
+					if deal.IsArchived {
+						isArchived = "Y"
+					}
+					timestamp := "(null)"
+					if deal.Timestamp > 0 {
+						timestamp = time.Unix(deal.Timestamp, 0).Format(time.RFC3339)
+					}
+					table.Append([]string{
+						deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived,
+					})
 				}
-				timestamp := "(null)"
-				if deal.Timestamp > 0 {
-					timestamp = time.Unix(deal.Timestamp, 0).Format(time.RFC3339)
+				table.Render()
+			} else if format == "json" {
+				jsonData, err := json.Marshal(deals)
+				if err != nil {
+					return fmt.Errorf("error serializing deals to JSON")
 				}
-
-				table.Append([]string{
-					deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived,
-				})
+				fmt.Println(string(jsonData))
+			} else {
+				return fmt.Errorf("invalid format: %s", format)
 			}
-			table.Render()
-
 			return nil
 		},
 	}
