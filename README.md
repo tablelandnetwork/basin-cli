@@ -7,29 +7,25 @@
 
 # Table of Contents
 
-- [basin-cli](#basin-cli)
-- [Table of Contents](#table-of-contents)
-- [Background](#background)
-- [Usage](#usage)
-  - [Install](#install)
-  - [Postgres Setup](#postgres-setup)
-  - [Create a publication](#create-a-publication)
-  - [Start replicating a publication](#start-replicating-a-publication)
-  - [Upload a Parquet file](#upload-a-parquet-file)
-  - [Listing Publications](#listing-publications)
-  - [Listing Deals](#listing-deals)
-- [Development](#development)
-  - [Running](#running)
-  - [Run tests](#run-tests)
-  - [Generate Cap'N Proto code](#generate-capn-proto-code)
-- [Contributing](#contributing)
-- [License](#license)
+- [Install](#install)
+- [Postgres Setup](#postgres-setup)
+  - [Self-hosted](#self-hosted)
+  - [Amazon RDS](#amazon-rds)
+  - [Supabase](#supabase)
+- [Create a publication](#create-a-publication)
+- [Start replicating a publication](#start-replicating-a-publication)
+- [Upload a Parquet file](#upload-a-parquet-file)
+- [Listing Publications](#listing-publications)
+- [Listing Deals](#listing-deals)
+- [Running](#running)
+- [Run tests](#run-tests)
+- [Generate Cap'N Proto code](#generate-capn-proto-code)
 
 # Background
 
 Tableland Basin is a secure and verifiable open data platform. The Basin CLI is a tool that allows you to continuously replicate a table or view from your database to the network. Currently, only PostgreSQL is supported.
 
-🚧 Basin is currently not in a production-ready state. Any data that is pushed to the network may be subject to deletion. 🚧
+> 🚧 Basin is currently not in a production-ready state. Any data that is pushed to the network may be subject to deletion. 🚧
 
 # Usage
 
@@ -45,41 +41,56 @@ go install ./cmd/basin
 
 ### Self-hosted
 
-- Make sure you have access to a superuser or a role with `LOGIN` and `REPLICATION` options.
-For example, you can create a new role such as `CREATE ROLE basin WITH PASSWORD NULL LOGIN REPLICATION;`.
+- Make sure you have access to a superuser role. For example, you can create a new role such as `CREATE ROLE basin WITH PASSWORD NULL LOGIN SUPERUSER;`.
 - Check that your Postgres installation has the [wal2json](https://github.com/eulerto/wal2json) plugin installed.
 - Check if logical replication is enabled:
 
-    ```sql
-    SHOW wal_level;
-    ```
+  ```sql
+  SHOW wal_level;
+  ```
 
-    The `wal_level` setting must be set to logical: `ALTER SYSTEM SET wal_level = logical;`.
-- Restart the database in order for the new `wal_level` to take effect (be careful!)
+  The `wal_level` setting must be set to logical: `ALTER SYSTEM SET wal_level = logical;`.
+
+- Restart the database in order for the new `wal_level` to take effect (be careful!).
 
 ### Amazon RDS
 
 - Make sure you have a user with the `rds_superuser` role, and use `psql` to connect to your database.
+
+  ```console
+  psql -h [HOST] -U [USER] -d [DATABASE]
+  ```
+
 - Check if logical replication is enabled:
 
-    ```sql
-        SELECT name, setting
-        FROM pg_settings
-        WHERE name = 'rds.logical_replication';
-    ```
+  ```sql
+  SELECT name, setting
+  FROM pg_settings
+  WHERE name = 'rds.logical_replication';
+  ```
 
 - If it's on, go to [Create a publication](#create-a-publication)
 - If it's off, follow the next steps:
-    - [Create a custom RDS parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithDBInstanceParamGroups.html#USER_WorkingWithParamGroups.Creating)
-    - After creation, edit it and set the `rds.logical_replication` parameter to `1`
-    - [Associate the recently created parameter group with you DB instance](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithDBInstanceParamGroups.html#USER_WorkingWithParamGroups.Associating)
-        - You can choose **Apply immediately** to apply the changes immediately
-        - You'll probably need to reboot the instance for changes to take effect (be careful!)
+  - [Create a custom RDS parameter group](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithDBInstanceParamGroups.html#USER_WorkingWithParamGroups.Creating)
+  - After creation, edit it and set the `rds.logical_replication` parameter to `1`
+  - [Associate the recently created parameter group with you DB instance](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithDBInstanceParamGroups.html#USER_WorkingWithParamGroups.Associating)
+    - You can choose **Apply immediately** to apply the changes immediately
+    - You'll probably need to reboot the instance for changes to take effect (be careful!)
 - After reboot, check if logical replication is enabled
+
+### Supabase
+
+- Log into the [Supabase](https://supabase.io/) dashboard and go to your project, or create a new one.
+- Check if logical replication is enabled. This should be the default setting, so you shouldn't have to change anything. You can do this in the `SQL Editor` section on the left hand side of the Supabase dashboard by running `SHOW wal_level;` query, which should log `logical`.
+- You can find the database connection information on the left hand side under `Project Settings` > `Database`. You will need the `Host`, `Port`, `Database`, `Username`, and `Password` to connect to your database.
+  - When you create a publication, the `--dburi` should follow this format:
+    ```sh
+    postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
+    ```
 
 ## Create a publication
 
-_Publications_ define the data you are pushing to Basin.  
+_Publications_ define the data you are pushing to Basin.
 
 Basin uses public key authentication, so you will need an Ethereum style (ECDSA, secp256k1) wallet to create a new publication. You can use an existing wallet or set up a new one with `basin wallet create`. Your private key is only used locally for signing.
 
@@ -141,10 +152,10 @@ You can make use of the scripts inside `scripts` to facilitate running the CLI l
 PORT=8888 ./scripts/server.sh
 
 # Create a wallet
-./scripts/run.sh wallet create pk.out  
+./scripts/run.sh wallet create pk.out
 
 # Start replicating
-./scripts/run.sh publication start --private-key [PRIVATE_KEY] namespace.relation_name 
+./scripts/run.sh publication start --private-key [PRIVATE_KEY] namespace.relation_name
 ```
 
 ## Run tests
