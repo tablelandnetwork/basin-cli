@@ -13,6 +13,13 @@ import (
 	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/filecoin-project/lassie/pkg/lassie"
+	"github.com/filecoin-project/lassie/pkg/storage"
+	"github.com/filecoin-project/lassie/pkg/types"
+	"github.com/ipfs/go-cid"
+	"github.com/ipld/go-car/v2"
+	"github.com/ipld/go-car/v2/storage/deferred"
+	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/olekukonko/tablewriter"
@@ -43,6 +50,7 @@ func newPublicationCommand() *cli.Command {
 			newPublicationUploadCommand(),
 			newPublicationListCommand(),
 			newPublicationDealsCommand(),
+			newPublicationRetrieveCommand(),
 		},
 	}
 }
@@ -496,6 +504,56 @@ func newPublicationDealsCommand() *cli.Command {
 				})
 			}
 			table.Render()
+
+			return nil
+		},
+	}
+}
+
+func newPublicationRetrieveCommand() *cli.Command {
+	return &cli.Command{
+		Name:  "retrieve",
+		Usage: "Retrieve files by CID",
+		Action: func(cCtx *cli.Context) error {
+			arg := cCtx.Args().Get(0)
+			if arg == "" {
+				return errors.New("argument is empty")
+			}
+
+			rootCid, err := cid.Parse(arg)
+			if err != nil {
+				return errors.New("cid is invalid")
+			}
+
+			lassie, err := lassie.NewLassie(cCtx.Context)
+			if err != nil {
+				return fmt.Errorf("failed to create lassie instance: %s", err)
+			}
+
+			carOpts := []car.Option{
+				car.WriteAsCarV1(true),
+				car.StoreIdentityCIDs(false),
+				car.UseWholeCIDs(false),
+			}
+			carWriter := deferred.NewDeferredCarWriterForPath(fmt.Sprintf("./%s.car", arg), []cid.Cid{rootCid}, carOpts...)
+			defer func() {
+				_ = carWriter.Close()
+			}()
+			carStore := storage.NewCachingTempStore(
+				carWriter.BlockWriteOpener(), storage.NewDeferredStorageCar(os.TempDir(), rootCid),
+			)
+			defer func() {
+				_ = carStore.Close()
+			}()
+
+			request, err := types.NewRequestForPath(carStore, rootCid, "", trustlessutils.DagScopeAll, nil)
+			if err != nil {
+				return fmt.Errorf("failed to create request: %s", err)
+			}
+
+			if _, err := lassie.Fetch(cCtx.Context, request, []types.FetchOption{}...); err != nil {
+				return fmt.Errorf("failed to fetch: %s", err)
+			}
 
 			return nil
 		},
