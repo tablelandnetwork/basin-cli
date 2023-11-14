@@ -486,8 +486,13 @@ func newPublicationDealsCommand() *cli.Command {
 				if deal.IsArchived {
 					isArchived = "Y"
 				}
+				timestamp := "(null)"
+				if deal.Timestamp > 0 {
+					timestamp = time.Unix(deal.Timestamp, 0).Format(time.RFC3339)
+				}
+
 				table.Append([]string{
-					deal.CID, fmt.Sprintf("%d", deal.Size), time.Unix(deal.Timestamp, 0).Format(time.RFC3339), isArchived,
+					deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived,
 				})
 			}
 			table.Render()
