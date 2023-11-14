@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
@@ -224,6 +225,7 @@ func newPublicationStartCommand() *cli.Command {
 func newPublicationUploadCommand() *cli.Command {
 	var privateKey, publicationName string
 	var secure bool
+	var timestamp string
 
 	return &cli.Command{
 		Name:  "upload",
@@ -246,6 +248,11 @@ func newPublicationUploadCommand() *cli.Command {
 				Usage:       "Uses TLS connection",
 				Destination: &secure,
 				Value:       true,
+			},
+			&cli.StringFlag{
+				Name:        "timestamp",
+				Usage:       "The time the file was created (default: current epoch in UTC)",
+				Destination: &timestamp,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -298,7 +305,16 @@ func newPublicationUploadCommand() *cli.Command {
 				"Uploading file...",
 			)
 
-			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey)
+			if timestamp == "" {
+				timestamp = fmt.Sprint(time.Now().UTC().Unix())
+			}
+
+			ts, err := app.ParseTimestamp(timestamp)
+			if err != nil {
+				return err
+			}
+
+			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey, ts)
 			if err := basinStreamer.Upload(cCtx.Context, filepath, bar); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
@@ -361,7 +377,7 @@ func newPublicationListCommand() *cli.Command {
 }
 
 func newPublicationDealsCommand() *cli.Command {
-	var publication, provider string
+	var publication, provider, before, after, at string
 	var limit, latest int
 	var offset int64
 	var secure bool
@@ -405,6 +421,24 @@ func newPublicationDealsCommand() *cli.Command {
 				Destination: &secure,
 				Value:       true,
 			},
+			&cli.StringFlag{
+				Name:        "before",
+				Usage:       "Filter deals created before this timestamp",
+				Destination: &before,
+				Value:       "",
+			},
+			&cli.StringFlag{
+				Name:        "after",
+				Usage:       "Filter deals created after this timestamp",
+				Destination: &after,
+				Value:       "",
+			},
+			&cli.StringFlag{
+				Name:        "at",
+				Usage:       "Filter deals created at this timestamp",
+				Destination: &at,
+				Value:       "",
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			ns, rel, err := parsePublicationName(publication)
@@ -418,9 +452,14 @@ func newPublicationDealsCommand() *cli.Command {
 			}
 			defer bp.Close()
 
+			b, a, err := validateBeforeAndAfter(before, after, at)
+			if err != nil {
+				return err
+			}
+
 			var deals []app.DealInfo
 			if latest > 0 {
-				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest))
+				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest), b, a)
 				if err != nil {
 					return fmt.Errorf("failed to fetch deals: %s", err)
 				}
@@ -433,21 +472,28 @@ func newPublicationDealsCommand() *cli.Command {
 					return errors.New("limit has to be greater than 0")
 				}
 
-				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset))
+				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset), b, a)
 				if err != nil {
 					return fmt.Errorf("failed to fetch deals: %s", err)
 				}
 			}
 
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{"CID", "Size", "Created", "Archived"})
+			table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived"})
 
 			for _, deal := range deals {
 				isArchived := "N"
 				if deal.IsArchived {
 					isArchived = "Y"
 				}
-				table.Append([]string{deal.CID, fmt.Sprintf("%d", deal.Size), deal.Created, isArchived})
+				timestamp := "(null)"
+				if deal.Timestamp > 0 {
+					timestamp = time.Unix(deal.Timestamp, 0).Format(time.RFC3339)
+				}
+
+				table.Append([]string{
+					deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived,
+				})
 			}
 			table.Render()
 
@@ -593,4 +639,22 @@ func createPublication(
 	}
 
 	return false, nil
+}
+
+func validateBeforeAndAfter(before, after, at string) (app.Timestamp, app.Timestamp, error) {
+	if !strings.EqualFold(at, "") {
+		before, after = at, at
+	}
+
+	b, err := app.ParseTimestamp(before)
+	if err != nil {
+		return app.Timestamp{}, app.Timestamp{}, err
+	}
+
+	a, err := app.ParseTimestamp(after)
+	if err != nil {
+		return app.Timestamp{}, app.Timestamp{}, err
+	}
+
+	return b, a, nil
 }
