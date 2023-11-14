@@ -20,6 +20,7 @@
 - [Running](#running)
 - [Run tests](#run-tests)
 - [Generate Cap'N Proto code](#generate-capn-proto-code)
+- [Retrieving](#retrieving)
 
 # Background
 
@@ -119,11 +120,26 @@ basin publication start --private-key [PRIVATE_KEY] namespace.relation_name
 ## Upload a Parquet file
 
 Before uploading a Parquet file, you need to [Create a publication](#create-a-publication), if not already created. You can omit the `--dburi` flag, in this case.
+
 Then, use `basin publication upload` to upload a Parquet file.
 
 ```bash
 basin publication upload --name [namespace.relation_name] --private-key [PRIVATE_KEY] filepath
 ```
+
+You can attach a timestamp to that file upload, e.g. 
+
+```bash
+basin publication upload --name [namespace.relation_name] --private-key [PRIVATE_KEY] --timestamp 1699984703 filepath
+
+# or use data format
+basin publication upload --name [namespace.relation_name] --private-key [PRIVATE_KEY] --timestamp 2006-01-02 filepath
+
+# or use RFC3339 format
+basin publication upload --name [namespace.relation_name] --private-key [PRIVATE_KEY] --timestamp 2006-01-02T15:04:05Z07:00 filepath
+```
+
+If a timestamp is not provided, the CLI will assume the timestamp is the current client epoch in UTC.
 
 ## Listing Publications
 
@@ -139,6 +155,21 @@ You can list deals of a given publication by running:
 
 ```bash
 basin publication deals --publication [PUBLICATION] --latest 5
+```
+
+Deals command accept `--before`,`--after` , and `--at` flags to filter deals by timestamp
+
+```bash
+# examples
+basin publication deals --publication demotest.data --at 1699569502
+basin publication deals --publication demotest.data --before 2023-11-09T19:38:23-03:00
+basin publication deals --publication demotest.data --after 2023-11-09  
+```
+
+## Retrieving
+
+```bash
+basin publication retrieve bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq
 ```
 
 # Development
