@@ -59,7 +59,7 @@ func newPublicationCommand() *cli.Command {
 func newPublicationCreateCommand() *cli.Command {
 	var owner, dburi, provider string
 	var secure bool
-	var winSize int64
+	var winSize, cache int64
 
 	return &cli.Command{
 		Name:  "create",
@@ -93,6 +93,12 @@ func newPublicationCreateCommand() *cli.Command {
 				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
 				Destination: &winSize,
 				Value:       DefaultWindowSize,
+			},
+			&cli.Int64Flag{
+				Name:        "cache",
+				Usage:       "Time duration (in minutes) that the data will be available in the cache",
+				Destination: &cache,
+				Value:       0,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -147,7 +153,7 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, secure)
+			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, secure, cache)
 			if err != nil {
 				return fmt.Errorf("failed to create publication: %s", err)
 			}
@@ -541,7 +547,7 @@ func newPublicationDealsCommand() *cli.Command {
 
 			if format == "table" {
 				table := tablewriter.NewWriter(os.Stdout)
-				table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived"})
+				table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived", "Expires At"})
 
 				for _, deal := range deals {
 					isArchived := "N"
@@ -553,7 +559,7 @@ func newPublicationDealsCommand() *cli.Command {
 						timestamp = time.Unix(deal.Timestamp, 0).Format(time.RFC3339)
 					}
 					table.Append([]string{
-						deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived,
+						deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived, deal.ExpiresAt,
 					})
 				}
 				table.Render()
@@ -677,7 +683,14 @@ func inspectTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, err
 }
 
 func createPublication(
-	ctx context.Context, dburi string, ns string, rel string, provider string, owner string, secure bool,
+	ctx context.Context,
+	dburi string,
+	ns string,
+	rel string,
+	provider string,
+	owner string,
+	secure bool,
+	cacheDuration int64,
 ) (exists bool, err error) {
 	bp, err := basinprovider.New(ctx, provider, secure)
 	if err != nil {
@@ -686,7 +699,7 @@ func createPublication(
 	defer bp.Close()
 
 	if dburi == "" {
-		exists, err := bp.Create(ctx, ns, rel, basincapnp.Schema{}, common.HexToAddress(owner))
+		exists, err := bp.Create(ctx, ns, rel, basincapnp.Schema{}, common.HexToAddress(owner), cacheDuration)
 		if err != nil {
 			return false, fmt.Errorf("create call: %s", err)
 		}
@@ -751,7 +764,7 @@ func createPublication(
 		return false, fmt.Errorf("failed to create publication: %s", err)
 	}
 
-	if _, err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner)); err != nil {
+	if _, err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner), cacheDuration); err != nil {
 		return false, fmt.Errorf("create call: %s", err)
 	}
 
