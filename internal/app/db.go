@@ -52,8 +52,7 @@ func (dbm *DBManager) Close() error {
 }
 
 // queryFromWAL creates a query for a WAL TX records.
-// (todo): error handling and remapping of types.
-func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
+func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) (string, error) {
 	var columnValsStr string
 
 	// get column names
@@ -65,8 +64,18 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 	recordVals := []string{}
 	for _, r := range tx.Records {
 		columnVals := []string{}
-		for _, c := range r.Columns {
-			columnVals = append(columnVals, strings.ReplaceAll(string(c.Value), "\"", ""))
+		for _, c := range r.Columns {			
+			if strings.HasSuffix(c.Type, ")") {
+				// character(N), character varying(N), numeric(N, M)
+				c.Type = strings.Split(c.Type, "(")[0]
+			}
+			ddbType, ok := typeMap[c.Type]
+			if !ok {
+				// custom enum types are not supported at the moment
+				return "", fmt.Errorf("unsupported type: %s", c.Type)
+			}
+			columnVal := ddbType.transformFn(string(c.Value))
+			columnVals = append(columnVals, columnVal)
 		}
 		columnValsStr = strings.Join(columnVals, ", ")
 		recordVals = append(
@@ -78,7 +87,7 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 		dbm.table,
 		strings.Join(cols, ", "),
 		strings.Join(recordVals, ", "),
-	)
+	), nil
 }
 
 func (dbm *DBManager) replace(ctx context.Context) error {
@@ -172,10 +181,13 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 		}
 	}
 
-	query := dbm.queryFromWAL(tx)
-	slog.Info("replaying", "query", query)
+	query, err := dbm.queryFromWAL(tx)
+	if err != nil {
+		return err
+	}
 
-	_, err := dbm.db.ExecContext(ctx, query)
+	slog.Info("replaying", "query", query)
+	_, err = dbm.db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("cannot replay WAL record %s", err)
 	}
@@ -183,22 +195,294 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 	return nil
 }
 
-var typeMap = map[string]string{
-	"json":    "varchar",
-	"jsonb":   "varchar",
-	"json[]":  "varchar[]",
-	"jsonb[]": "varchar[]",
+type duckdbType struct {
+	typ         string
+	transformFn func(s string) (val string)
+}
+
+var typeMap = map[string]duckdbType{
+	// boolean
+	"boolean": {"boolean", removeDoubleQuotes},
+
+	// numbers
+	"bigint":           {"bigint", removeDoubleQuotes},
+	"double precision": {"double", removeDoubleQuotes},
+	"integer":          {"integer", removeDoubleQuotes},
+	"numeric":          {"double", removeDoubleQuotes},
+	"oid":              {"uinteger", removeDoubleQuotes},
+	"real":             {"float", removeDoubleQuotes},
+	"smallint":         {"smallint", removeDoubleQuotes},
+
+	// (todo): "numeric(a, b)",
+
+	// non standard SQL types
+	// (todo): "point",
+	// (todo): "line",
+	// (todo): "lseg",
+	// (todo): "box",
+	// (todo): "path",
+	// (todo): "polygon",
+	// (todo): "circle",
+	// (todo): money
+	// (todo): xml
+	/// etc.
+
+	// custom types
+	// (todo): custom enum types
+	// (todo): custom types
+
+	// misc
+	"macaddr": {"varchar", replaceDoubleWithSingleQuotes},
+
+	// bytes
+	"bytea": {"blob", replaceDoubleWithSingleQuotes},
+
+	// "char":              {"varchar", replaceDoubleWithSingleQuotes},
+	"character":         {"varchar", replaceDoubleWithSingleQuotes},
+	"character varying": {"varchar", replaceDoubleWithSingleQuotes},
+	"bpchar":            {"varchar", replaceDoubleWithSingleQuotes},
+
+	"json":  {"varchar", wrapSingleQuotes},
+	"jsonb": {"varchar", wrapSingleQuotes},
+	"text":  {"varchar", replaceDoubleWithSingleQuotes},
+	"uuid":  {"uuid", replaceDoubleWithSingleQuotes},
+
+	// (todo): character(n)
+
+	// dates
+	"date":                        {"date", replaceDoubleWithSingleQuotes},
+	"time with time zone":         {"time with time zone", replaceDoubleWithSingleQuotes},
+	"time without time zone":      {"time", replaceDoubleWithSingleQuotes},
+	"timestamp with time zone":    {"timestamp with time zone", replaceDoubleWithSingleQuotes},
+	"timestamp without time zone": {"timestamp", replaceDoubleWithSingleQuotes},
+	"interval":                    {"interval", replaceDoubleWithSingleQuotes},
+
+	// number arrays
+	"boolean[]":          {"boolean[]", createBoolListValues},
+	"bigint[]":           {"double[]", createNumericListValues},
+	"double precision[]": {"double[]", createNumericListValues},
+	"integer[]":          {"double[]", createNumericListValues},
+	"numeric[]":          {"double[]", createNumericListValues},
+	"real[]":             {"float[]", createNumericListValues},
+	"smallint[]":         {"smallint[]", createNumericListValues},
+	// (todo): "numeric[]": 		"decimal(4, 1)[]",
+
+	// char arrays
+	// "char[]":              {"varchar[]", createCharListValues},
+	"character[]":         {"varchar[]", createCharListValues},
+	"character varying[]": {"varchar[]", createCharListValues},
+	"bpchar[]":            {"varchar[]", createCharListValues},
+
+	"text[]":  {"varchar[]", createCharListValues},
+	"bytea[]": {"blob[]", createByteListValues},
+	"json[]":  {"varchar[]", createJSONListValues},
+	"jsonb[]": {"varchar[]", createJSONListValues},
+	"uuid[]":  {"uuid[]", createUUIDListValues},
+
+	// date arrays
+	"date[]":                        {"date[]", createDateListValues},
+	"time with time zone[]":         {"time with time zone[]", createDateListValues},
+	"time without time zone[]":      {"time[]", createDateListValues},
+	"timestamp with time zone[]":    {"timestamp with time zone[]", createTimestampListValues},
+	"timestamp without time zone[]": {"timestamp[]", createTimestampListValues},
+	"interval[]":                    {"interval[]", createTimestampListValues},
+}
+
+func removeDoubleQuotes(s string) string {
+	return strings.ReplaceAll(s, "\"", "")
+}
+
+func removeBackslashes(s string) string {
+	return strings.ReplaceAll(s, "\\", "")
+}
+
+func removePGArrayLiterals(s string) string {
+	return s[1 : len(s)-1]
+}
+
+func replaceDoubleWithSingleQuotes(s string) string {
+	return strings.ReplaceAll(s, "\"", "'")
+}
+
+func wrapSingleQuotes(s string) string {
+	return fmt.Sprintf("'%s'", s)
+}
+
+func createBoolListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		switch v {
+		case "t":
+			vals = append(vals, "true")
+		case "f":
+			vals = append(vals, "false")
+		case "NULL":
+			vals = append(vals, "null")
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
+}
+
+func createNumericListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		if v == "NULL" {
+			vals = append(vals, "null")
+		} else {
+			vals = append(vals, v)
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
+}
+
+func createCharListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		if v == "NULL" {
+			vals = append(vals, "null")
+		} else {
+			vals = append(vals, wrapSingleQuotes(v))
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
+}
+
+func createByteListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	s = removeBackslashes(s)
+	s = strings.ReplaceAll(s, "x", "") // remove hex prefix
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		if v == "NULL" {
+			vals = append(vals, "null")
+		} else {
+			// remove the leading and trailing double quotes
+			vals = append(vals, fmt.Sprintf("'%s'::BLOB", v[1:len(v)-1]))
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
+}
+
+func createJSONListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	s = removeBackslashes(s)
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		if v == "NULL" {
+			vals = append(vals, "null")
+		} else {
+			vals = append(vals, wrapSingleQuotes(v))
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
+}
+
+func createUUIDListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		if v == "NULL" {
+			vals = append(vals, "null")
+		} else {
+			vals = append(vals, fmt.Sprintf("'%s'::UUID", v))
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
+}
+
+func createDateListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		if v == "NULL" {
+			vals = append(vals, "null")
+		} else {
+			vals = append(vals, fmt.Sprintf("'%s'", v))
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
+}
+
+func createTimestampListValues(s string) string {
+	s = removeDoubleQuotes(s)
+	s = removeBackslashes(s)
+	if s == "null" {
+		return "null"
+	}
+
+	var vals []string
+	s = removePGArrayLiterals(s)
+	for _, v := range strings.Split(s, ",") {
+		if v == "NULL" {
+			vals = append(vals, "null")
+		} else {
+			vals = append(vals, fmt.Sprintf("'%s'", v))
+		}
+	}
+
+	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
 }
 
 func (dbm *DBManager) genCreateQuery() (string, error) {
 	var cols, pks string
 	for i, column := range dbm.cols {
 		// convert PG type to duckdb type
-		typ, ok := typeMap[column.Typ]
-		if !ok {
-			typ = column.Typ
+		if strings.HasSuffix(column.Typ, ")") {
+			// handle character(N), character varying(N), numeric(N, M)
+			column.Typ = strings.Split(column.Typ, "(")[0]
 		}
-		col := fmt.Sprintf("%s %s", column.Name, typ)
+		ddbType, ok := typeMap[column.Typ]
+		if !ok {
+			// custom enum types are not supported at the moment
+			return "", fmt.Errorf("unsupported type: %s", column.Typ)
+		}
+
+		col := fmt.Sprintf("%s %s", column.Name, ddbType.typ)
 		if !column.IsNull {
 			col = fmt.Sprintf("%s NOT NULL", col)
 		}
