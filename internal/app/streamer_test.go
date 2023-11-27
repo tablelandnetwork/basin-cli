@@ -44,7 +44,7 @@ func TestBasinStreamerOne(t *testing.T) {
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
-	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
+	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey, Timestamp{})
 	dbm := NewDBManager(
 		testDBDir, testTable, cols, winSize, uploader)
 
@@ -146,7 +146,7 @@ func TestBasinStreamerTwo(t *testing.T) {
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
-	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
+	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey, Timestamp{})
 	dbm := NewDBManager(
 		testDBDir, testTable, cols, winSize, uploader)
 	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
@@ -269,7 +269,7 @@ func (bp *basinProviderMock) Reconnect() error {
 }
 
 func (bp *basinProviderMock) Upload(
-	_ context.Context, _ string, _ string, _ uint64, f io.Reader, _ *Signer, _ io.Writer,
+	_ context.Context, _ string, _ string, _ uint64, f io.Reader, _ *Signer, _ io.Writer, _ Timestamp,
 ) error {
 	file := f.(*os.File)
 	file.Fd()
