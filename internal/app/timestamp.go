@@ -12,6 +12,11 @@ type Timestamp struct {
 	t time.Time
 }
 
+// NewTimestamp creates a new Timestamp.
+func NewTimestamp(t time.Time) Timestamp {
+	return Timestamp{t}
+}
+
 // Seconds returns the timestamp in seconds.
 func (t *Timestamp) Seconds() int64 {
 	return t.t.Unix()

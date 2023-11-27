@@ -259,9 +259,8 @@ func newPublicationStartCommand() *cli.Command {
 			// Creates a new db manager when replication starts
 			dbDir := path.Join(dir, publication)
 			winSize := time.Duration(cfg.Publications[publication].WindowSize) * time.Second
-			// Uploader is initialized with a default timestamp
-			// before every upload, the timestamp is updated
-			uploader := app.NewBasinUploader(ns, rel, bp, privateKey, app.Timestamp{})
+			ts := app.NewTimestamp(time.Now().UTC())
+			uploader := app.NewBasinUploader(ns, rel, bp, privateKey, ts)
 			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
 
 			// Before starting replication, upload the remaining data
