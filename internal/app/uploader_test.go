@@ -18,10 +18,10 @@ func TestBasinUploader(t *testing.T) {
 
 	mock := &basinProviderUploderMock{}
 
-	uploader := NewBasinUploader("test", "test", mock, privateKey, Timestamp{})
+	uploader := NewBasinUploader("test", "test", mock, privateKey)
 
 	buf := bytes.NewBuffer(make([]byte, 0, 10))
-	err = uploader.Upload(context.Background(), "testdata/test.parquet", buf)
+	err = uploader.Upload(context.Background(), "testdata/test.parquet", buf, Timestamp{})
 	require.NoError(t, err)
 	// there's no much logic to test in this component apart from the fact that the file was read
 	// the test file has 113629 bytes

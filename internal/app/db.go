@@ -291,8 +291,8 @@ func (dbm *DBManager) UploadAt(ctx context.Context, exportPath string) error {
 		"Uploading file...",
 	)
 
-	dbm.uploader.timestamp = NewTimestamp(time.Now().UTC())
-	if err := dbm.uploader.Upload(ctx, exportPath, progress); err != nil {
+	ts := NewTimestamp(time.Now().UTC())
+	if err := dbm.uploader.Upload(ctx, exportPath, progress, ts); err != nil {
 		return fmt.Errorf("upload: %s", err)
 	}
 

@@ -23,24 +23,22 @@ type BasinUploader struct {
 	relation   string
 	privateKey *ecdsa.PrivateKey
 	provider   BasinProviderUploader
-	timestamp  Timestamp
 }
 
 // NewBasinUploader creates new uploader.
 func NewBasinUploader(
-	ns string, rel string, bp BasinProviderUploader, pk *ecdsa.PrivateKey, timestamp Timestamp,
+	ns string, rel string, bp BasinProviderUploader, pk *ecdsa.PrivateKey,
 ) *BasinUploader {
 	return &BasinUploader{
 		namespace:  ns,
 		relation:   rel,
 		provider:   bp,
 		privateKey: pk,
-		timestamp:  timestamp,
 	}
 }
 
 // Upload sends file to provider for upload.
-func (bu *BasinUploader) Upload(ctx context.Context, filepath string, progress io.Writer) error {
+func (bu *BasinUploader) Upload(ctx context.Context, filepath string, progress io.Writer, ts Timestamp) error {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return fmt.Errorf("open file: %s", err)
@@ -55,7 +53,7 @@ func (bu *BasinUploader) Upload(ctx context.Context, filepath string, progress i
 	}
 
 	if err := bu.provider.Upload(
-		ctx, bu.namespace, bu.relation, uint64(fi.Size()), f, NewSigner(bu.privateKey), progress, bu.timestamp,
+		ctx, bu.namespace, bu.relation, uint64(fi.Size()), f, NewSigner(bu.privateKey), progress, ts,
 	); err != nil {
 		return fmt.Errorf("upload: %s", err)
 	}
