@@ -6,90 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	//"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
-
-var numTypeCols = []Column{
-	{Name: "bool_col", Typ: "boolean", IsNull: true, IsPrimary: false},
-	{Name: "smallint_col", Typ: "smallint", IsNull: true, IsPrimary: false},
-	{Name: "integer_col", Typ: "integer", IsNull: true, IsPrimary: false},
-	{Name: "bigint_col", Typ: "bigint", IsNull: true, IsPrimary: false},
-	{Name: "float_col", Typ: "real", IsNull: true, IsPrimary: false},
-	{Name: "double_col", Typ: "double precision", IsNull: true, IsPrimary: false},
-	{Name: "decimal_col", Typ: "numeric", IsNull: true, IsPrimary: false},
-	{Name: "udecimal_col", Typ: "numeric", IsNull: true, IsPrimary: false},
-}
-
-var byteTypeCols = []Column{
-	{Name: "char_default", Typ: "character", IsNull: true, IsPrimary: false},
-	{Name: "char_1_col", Typ: "character", IsNull: true, IsPrimary: false},
-	{Name: "char_9_col", Typ: "character", IsNull: true, IsPrimary: false},
-	{Name: "varchar_1_col", Typ: "character varying", IsNull: true, IsPrimary: false},
-	{Name: "varchar_9_col", Typ: "character varying", IsNull: true, IsPrimary: false},
-	{Name: "text_col", Typ: "text", IsNull: true, IsPrimary: false},
-	{Name: "blob_col", Typ: "bytea", IsNull: true, IsPrimary: false},
-	{Name: "json_col_old", Typ: "json", IsNull: true, IsPrimary: false},
-	{Name: "json_col_new", Typ: "jsonb", IsNull: true, IsPrimary: false},
-	{Name: "uuid_col", Typ: "uuid", IsNull: true, IsPrimary: false},
-}
-
-var dateTypeCols = []Column{
-	{Name: "date_col", Typ: "date", IsNull: true, IsPrimary: false},
-	{Name: "time_col", Typ: "time without time zone", IsNull: true, IsPrimary: false},
-	{Name: "timetz_col", Typ: "time with time zone", IsNull: true, IsPrimary: false},
-	{Name: "timestamp_col", Typ: "timestamp without time zone", IsNull: true, IsPrimary: false},
-	{Name: "timestamptz_col", Typ: "timestamp with time zone", IsNull: true, IsPrimary: false},
-}
-
-var numArrayTypeCols = []Column{
-	{Name: "bool_col", Typ: "boolean[]", IsNull: true, IsPrimary: false},
-	{Name: "smallint_col", Typ: "smallint[]", IsNull: true, IsPrimary: false},
-	{Name: "integer_col", Typ: "integer[]", IsNull: true, IsPrimary: false},
-	{Name: "bigint_col", Typ: "bigint[]", IsNull: true, IsPrimary: false},
-	{Name: "float_col", Typ: "real[]", IsNull: true, IsPrimary: false},
-	{Name: "double_col", Typ: "double precision[]", IsNull: true, IsPrimary: false},
-	{Name: "numeric_col", Typ: "numeric[]", IsNull: true, IsPrimary: false},
-	{Name: "unumeric_col", Typ: "numeric[]", IsNull: true, IsPrimary: false},
-}
-
-var byteArrayTypeCols = []Column{
-	{Name: "char_col", Typ: "char[]", IsNull: true, IsPrimary: false},
-	{Name: "bpchar_col", Typ: "character[]", IsNull: true, IsPrimary: false},
-	{Name: "varchar_col", Typ: "character varying[]", IsNull: true, IsPrimary: false},
-	{Name: "uvarchar_col", Typ: "character varying[]", IsNull: true, IsPrimary: false},
-	{Name: "text_col", Typ: "text[]", IsNull: true, IsPrimary: false},
-	{Name: "blob_col", Typ: "bytea[]", IsNull: true, IsPrimary: false},
-	{Name: "json_col", Typ: "json[]", IsNull: true, IsPrimary: false},
-	{Name: "uuid_col", Typ: "uuid[]", IsNull: true, IsPrimary: false},
-}
-
-var macaddrTypeCols = []Column{
-	{Name: "macaddr_col", Typ: "macaddr", IsNull: true, IsPrimary: false},
-}
-
-var enumArrayTypeCols = []Column{
-	// custom enum type
-	{Name: "enum_col", Typ: "enum_type_foo[]", IsNull: true, IsPrimary: false},
-}
-
-var dateArrayTypeCols = []Column{
-	{Name: "date_col", Typ: "date[]", IsNull: true, IsPrimary: false},
-	{Name: "time_col", Typ: "time without time zone[]", IsNull: true, IsPrimary: false},
-	{Name: "timetz_col", Typ: "time with time zone[]", IsNull: true, IsPrimary: false},
-	{Name: "timestamp_col", Typ: "timestamp without time zone[]", IsNull: true, IsPrimary: false},
-	{Name: "timestamptz_col", Typ: "timestamp with time zone[]", IsNull: true, IsPrimary: false},
-}
-
-var multidiemnsionalArrayTypeCols = []Column{
-	{Name: "i", Typ: "integer[]", IsNull: true, IsPrimary: false},
-	{Name: "s", Typ: "character varying[]", IsNull: true, IsPrimary: false},
-}
 
 func TestGenCreateQuery(t *testing.T) {
 	testCases := []struct {
@@ -148,8 +70,8 @@ func TestGenCreateQuery(t *testing.T) {
 					bigint_col bigint[],
 					float_col float[],
 					double_col double[],
-					numeric_col double[],
-					unumeric_col double[]
+					numeric_col integer[],
+					unumeric_col integer[]
 				)`,
 		},
 		{
@@ -178,14 +100,6 @@ func TestGenCreateQuery(t *testing.T) {
 				)`,
 		},
 		{
-			"multidimensional_array_types",
-			multidiemnsionalArrayTypeCols,
-			`CREATE TABLE IF NOT EXISTS multidimensional_array_types (
-					i integer[],
-					s varchar[]
-				)`,
-		},
-		{
 			"mac_addr_types",
 			macaddrTypeCols,
 			`CREATE TABLE IF NOT EXISTS mac_addr_types (
@@ -195,25 +109,20 @@ func TestGenCreateQuery(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		dbm := NewDBManager(
-			t.TempDir(), tc.tableName, tc.cols, 3*time.Second, nil)
-		query, err := dbm.genCreateQuery()
-		require.NoError(t, err)
+		t.Run(tc.tableName, func(t *testing.T) {
+			dbm := NewDBManager(
+				t.TempDir(), tc.tableName, tc.cols, 3*time.Second, nil)
+			query, err := dbm.genCreateQuery()
+			require.NoError(t, err)
 
-		// remove query formatting before comparison
-		tc.expectedCreateStmt = strings.ReplaceAll(tc.expectedCreateStmt, "\n", "")
-		tc.expectedCreateStmt = strings.ReplaceAll(tc.expectedCreateStmt, "\t", "")
+			// remove query formatting before comparison
+			tc.expectedCreateStmt = strings.ReplaceAll(tc.expectedCreateStmt, "\n", "")
+			tc.expectedCreateStmt = strings.ReplaceAll(tc.expectedCreateStmt, "\t", "")
 
-		// assert correct create statement
-		require.Equal(t, tc.expectedCreateStmt, query)
-
-		// assert statement is correctly applied
-		require.NoError(t, dbm.NewDB(context.Background()))
-
-		_, err = dbm.db.Exec(query)
-		require.NoError(t, err)
+			// assert correct create statement
+			require.Equal(t, tc.expectedCreateStmt, query)
+		})
 	}
-
 }
 
 func TestGenCreateQueryUnsupported(t *testing.T) {
@@ -227,130 +136,524 @@ func TestGenCreateQueryUnsupported(t *testing.T) {
 			enumArrayTypeCols,
 			errors.New("unsupported type: enum_type_foo[]"),
 		},
+		{
+			"custom_composite_types",
+			customCompositeTypeCols,
+			errors.New("unsupported type: USER-DEFINED"),
+		},
 	}
 
 	for _, tc := range testCases {
-		dbm := NewDBManager(
-			t.TempDir(), tc.tableName, tc.cols, 3*time.Second, nil)
-		_, err := dbm.genCreateQuery()
-		fmt.Println(err)
-		require.EqualError(t, err, tc.expectedErr.Error())
+		t.Run(tc.tableName, func(t *testing.T) {
+			dbm := NewDBManager(
+				t.TempDir(), tc.tableName, tc.cols, 3*time.Second, nil)
+			_, err := dbm.genCreateQuery()
+			require.EqualError(t, err, tc.expectedErr.Error())
+		})
 	}
-
-}
-
-var multidiemnsionalArrayTypeInsert = `
-INSERT INTO multidimensional_arrays VALUES (
-	ARRAY[ARRAY[[1, 2, 3]], ARRAY[[4, 5, 6]], ARRAY[[7, 8, 9]]],
-	ARRAY[ARRAY['hello world', 'abc'], ARRAY['this is', 'an array']]);
-`
-
-var wal = `
-{
-	"commit_lsn":957398296,
-	"records":[
-		{
-			"action":"I",
-			"xid":1058,
-			"lsn":"0/3910B898",
-			"nextlsn":"",
-			"timestamp":"2023-08-22 14:44:04.043586-03",
-			"schema":"public",
-			"table":"t",
-			"columns":[
-				{
-					"name":"id",
-					"type":"%s",
-					"value":%s
-				}				
-			]			
-		}
-	]
-}
-`
-
-var supportedTypes = map[string][]string{
-	"boolean":                       {"true", "false", "null"},
-	"bigint":                        {"42", "-42", "null"},
-	"double precision":              {"42.01", "-42.01", "null"},
-	"integer":                       {"42", "-42", "null"},
-	"numeric(4, 7)":                 {"42.01", "-42.01", "null"},
-	"real":                          {"42.01", "-42.01", "null"},
-	"smallint":                      {"42", "-42", "null"},
-	"oid":                           {"42.42", "null"},
-	"macaddr":                       {"\"08:00:2b:01:02:03\"", "null"},
-	"bytea":                         {"\"00010203\"", "null"},
-	"bpchar":                        {"\"a\"", "\"Z\"", "null"},
-	"character(1)":                  {"\"a\"", "\"Z\"", "null"},
-	"character(5)":                  {"\"aaaaa\"", "\"ZZZZZ\"", "null"},
-	"character varying":             {"\"a\"", "\"Zzzzzzzz\"", "null"},
-	"character varying(5)":          {"\"aaaaa\"", "\"ZZZZZ\"", "null"},
-	"json":                          {"{\"foo\": \"bar\"}", "{\"foo\": {\"bar\": 3}}", "null"},
-	"jsonb":                         {"{\"foo\": \"bar\"}", "{\"foo\": {\"bar\": 3}}", "null"},
-	"text":                          {"\"dpfkg\"", "null"},
-	"uuid":                          {"\"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"", "null"},
-	"date":                          {"\"2021-03-01\"", "null"},
-	"time with time zone":           {"\"12:00:00-08\"", "null"},
-	"time without time zone":        {"\"12:45:01\"", "null"},
-	"timestamp with time zone":      {"\"2021-03-01 12:45:01+08\"", "null"},
-	"timestamp without time zone":   {"\"2021-03-01 12:45:01\"", "null"},
-	"interval":                      {"\"1 year\"", "\"2 mons\"", "\"21 days\"", "\"05:00:00\"", "\"-00:00:07\"", "\"1 year 2 mons 21 days 05:00:00\"", "\"-17 days\"", "null"},
-	"boolean[]":                     {"\"{t,f,NULL}\"", "null"},
-	"bigint[]":                      {"\"{42,-42,NULL}\"", "null"},
-	"double precision[]":            {"\"{42.01,-42.01,NULL}\"", "null"},
-	"integer[]":                     {"\"{42,-42,NULL}\"", "null"},
-	"numeric[]":                     {"\"{42.01,-42.01,NULL}\"", "null"},
-	"real[]":                        {"\"{42.01,-42.01,NULL}\"", "null"},
-	"smallint[]":                    {"\"{42,-42,NULL}\"", "null"},
-	"character[]":                   {"\"{a,Z,NULL}\"", "null"},
-	"character varying[]":           {"\"{a,Z,NULL}\"", "null"},
-	"text[]":                        {"\"{dpfkg,NULL}\"", "null"},
-	"bytea[]":                       {`"{\"\\\\x3030303130323033\",NULL}"`, "null"},
-	"json[]":                        {`"{\"{\\\"key\\\": \\\"value\\\"}\",NULL}"`, "null"},
-	"jsonb[]":                       {`"{\"{\\\"key\\\": \\\"value\\\"}\",NULL}"`, "null"},
-	"uuid[]":                        {"\"{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11,NULL}\"", "null"},
-	"date[]":                        {"\"{2021-03-01,NULL}\"", "null"},
-	"time with time zone[]":         {"\"{12:45:01+08,NULL}\"", "null"},
-	"time without time zone[]":      {"\"{12:45:01,NULL}\"", "null"},
-	"timestamp with time zone[]":    {`"{\"2021-03-01 12:45:01+08\",NULL}"`, "null"},
-	"timestamp without time zone[]": {`"{\"2021-03-01 12:45:01\",NULL}"`, "null"},
-	"interval[]":                    {`"{\"1 day\",\"2 mons\",\"21 days\",05:00:00,\"-17 days\",NULL}"`, "null"},
-}
-
-func assertInsertQuery(t *testing.T, tx pgrepl.Tx, dbm *DBManager) {
-	createQuery, err := dbm.genCreateQuery()
-	require.NoError(t, err)
-	require.NoError(t, dbm.NewDB(context.Background()))
-	_, err = dbm.db.Exec(createQuery)
-	require.NoError(t, err)
-
-	insertQuery, err := dbm.queryFromWAL(&tx)
-	require.NoError(t, err)
-
-	_, err = dbm.db.Exec(insertQuery)
-	require.NoError(t, err)
-
 }
 
 func TestQueryFromWAL(t *testing.T) {
+	testCases := []struct {
+		typ                 string
+		vals                []string
+		expectedInsertStmts []string
+	}{
+		{
+			"boolean",
+			[]string{"true", "false", "null"},
+			[]string{
+				"insert into t (id) values (true)",
+				"insert into t (id) values (false)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"bigint",
+			[]string{"42", "-42", "null"},
+			[]string{
+				"insert into t (id) values (42)",
+				"insert into t (id) values (-42)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"double precision",
+			[]string{"42.01", "-42.01", "null"},
+			[]string{
+				"insert into t (id) values (42.01)",
+				"insert into t (id) values (-42.01)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"integer",
+			[]string{"42", "-42", "null"},
+			[]string{
+				"insert into t (id) values (42)",
+				"insert into t (id) values (-42)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"numeric(4, 7)",
+			[]string{"42.01", "-42.01", "null"},
+			[]string{
+				"insert into t (id) values (42.01)",
+				"insert into t (id) values (-42.01)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"real",
+			[]string{"42.01", "-42.01", "null"},
+			[]string{
+				"insert into t (id) values (42.01)",
+				"insert into t (id) values (-42.01)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"smallint",
+			[]string{"42", "-42", "null"},
+			[]string{
+				"insert into t (id) values (42)",
+				"insert into t (id) values (-42)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"oid",
+			[]string{"42.42", "null"},
+			[]string{
+				"insert into t (id) values (42.42)",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"macaddr",
+			[]string{"\"08:00:2b:01:02:03\"", "null"},
+			[]string{
+				"insert into t (id) values ('08:00:2b:01:02:03')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"bytea",
+			[]string{"\"00010203\"", "null"},
+			[]string{
+				"insert into t (id) values ('00010203')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"bpchar",
+			[]string{"\"a\"", "\"Z\"", "null"},
+			[]string{
+				"insert into t (id) values ('a')",
+				"insert into t (id) values ('Z')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"character(1)",
+			[]string{"\"a\"", "\"Z\"", "null"},
+			[]string{
+				"insert into t (id) values ('a')",
+				"insert into t (id) values ('Z')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"character(5)",
+			[]string{"\"aaaaa\"", "\"ZZZZZ\"", "null"},
+			[]string{
+				"insert into t (id) values ('aaaaa')",
+				"insert into t (id) values ('ZZZZZ')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"character varying",
+			[]string{"\"a\"", "\"Zzzzzzzz\"", "null"},
+			[]string{
+				"insert into t (id) values ('a')",
+				"insert into t (id) values ('Zzzzzzzz')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"character varying(5)",
+			[]string{"\"aaaaa\"", "\"ZZZZZ\"", "null"},
+			[]string{
+				"insert into t (id) values ('aaaaa')",
+				"insert into t (id) values ('ZZZZZ')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"json",
+			[]string{"{\"foo\": \"bar\"}", "{\"foo\": {\"bar\": 3}}", "null"},
+			[]string{
+				"insert into t (id) values ('{\"foo\": \"bar\"}')",
+				"insert into t (id) values ('{\"foo\": {\"bar\": 3}}')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"jsonb",
+			[]string{"{\"foo\": \"bar\"}", "{\"foo\": {\"bar\": 3}}", "null"},
+			[]string{
+				"insert into t (id) values ('{\"foo\": \"bar\"}')",
+				"insert into t (id) values ('{\"foo\": {\"bar\": 3}}')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"text",
+			[]string{"\"dpfkg\"", "null"},
+			[]string{
+				"insert into t (id) values ('dpfkg')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"uuid",
+			[]string{"\"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11\"", "null"},
+			[]string{
+				"insert into t (id) values ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"date",
+			[]string{"\"2021-03-01\"", "null"},
+			[]string{
+				"insert into t (id) values ('2021-03-01')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"time with time zone",
+			[]string{"\"12:00:00-08\"", "null"},
+			[]string{
+				"insert into t (id) values ('12:00:00-08')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"time without time zone",
+			[]string{"\"12:45:01\"", "null"},
+			[]string{
+				"insert into t (id) values ('12:45:01')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"timestamp with time zone",
+			[]string{"\"2021-03-01 12:45:01+08\"", "null"},
+			[]string{
+				"insert into t (id) values ('2021-03-01 12:45:01+08')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"timestamp without time zone",
+			[]string{"\"2021-03-01 12:45:01\"", "null"},
+			[]string{
+				"insert into t (id) values ('2021-03-01 12:45:01')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"interval",
+			[]string{"\"1 year\"", "\"2 mons\"", "\"21 days\"", "\"05:00:00\"", "\"-00:00:07\"", "\"1 year 2 mons 21 days 05:00:00\"", "\"-17 days\"", "null"}, // nolint
+			[]string{
+				"insert into t (id) values ('1 year')",
+				"insert into t (id) values ('2 mons')",
+				"insert into t (id) values ('21 days')",
+				"insert into t (id) values ('05:00:00')",
+				"insert into t (id) values ('-00:00:07')",
+				"insert into t (id) values ('1 year 2 mons 21 days 05:00:00')",
+				"insert into t (id) values ('-17 days')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"boolean[]",
+			[]string{"\"{t,f,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value(true,false,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"bigint[]",
+			[]string{"\"{42,-42,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value(42,-42,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"double precision[]",
+			[]string{"\"{42.01,-42.01,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value(42.01,-42.01,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"integer[]",
+			[]string{"\"{42,-42,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value(42,-42,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"numeric[]",
+			[]string{"\"{42.01,-42.01,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value(42.01,-42.01,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"real[]",
+			[]string{"\"{42.01,-42.01,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value(42.01,-42.01,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"smallint[]",
+			[]string{"\"{42,-42,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value(42,-42,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"character[]",
+			[]string{"\"{a,Z,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('a','Z',null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"character varying[]",
+			[]string{"\"{a,Z,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('a','Z',null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"text[]",
+			[]string{"\"{dpfkg,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('dpfkg',null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"bytea[]",
+			[]string{`"{\"\\\\x3030303130323033\",NULL}"`, "null"},
+			[]string{
+				"insert into t (id) values (list_value('3030303130323033'::BLOB,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"json[]",
+			[]string{`"{\"{\\\"key\\\": \\\"value\\\"}\",NULL}"`, "null"},
+			[]string{
+				`insert into t (id) values (list_value('{"key": "value"}',null))`,
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"jsonb[]",
+			[]string{`"{\"{\\\"key\\\": \\\"value\\\"}\",NULL}"`, "null"},
+			[]string{
+				`insert into t (id) values (list_value('{"key": "value"}',null))`,
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"uuid[]",
+			[]string{"\"{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::UUID,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"date[]",
+			[]string{"\"{2021-03-01,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('2021-03-01',null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"time with time zone[]",
+			[]string{"\"{12:45:01+08,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('12:45:01+08',null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"time without time zone[]",
+			[]string{"\"{12:45:01,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('12:45:01',null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"timestamp with time zone[]",
+			[]string{`"{\"2021-03-01 12:45:01+08\",NULL}"`, "null"},
+			[]string{
+				`insert into t (id) values (list_value('2021-03-01 12:45:01+08',null))`,
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"timestamp without time zone[]",
+			[]string{`"{\"2021-03-01 12:45:01\",NULL}"`, "null"},
+			[]string{
+				`insert into t (id) values (list_value('2021-03-01 12:45:01',null))`,
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			"interval[]",
+			[]string{`"{\"1 day\",\"2 mons\",\"21 days\",05:00:00,\"-17 days\",NULL}"`, "null"},
+			[]string{
+				`insert into t (id) values (list_value('1 day','2 mons','21 days','05:00:00','-17 days',null))`,
+				"insert into t (id) values (null)",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.typ, func(t *testing.T) {
+			for i, val := range tc.vals {
+				colsJSON := fmt.Sprintf(wal, tc.typ, val)
+				var tx pgrepl.Tx
+				require.NoError(
+					t, json.Unmarshal([]byte(colsJSON), &tx))
+
+				valIsNull := val == "null"
+				cols := []Column{
+					{Name: "id", Typ: tc.typ, IsNull: valIsNull, IsPrimary: false},
+				}
+				dbm := NewDBManager(
+					t.TempDir(), "t", cols, 3*time.Second, nil)
+				insertQuery, err := dbm.queryFromWAL(&tx)
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedInsertStmts[i], insertQuery)
+			}
+		})
+	}
+}
+
+func TestQueryFromWALUnsupported(t *testing.T) {
+	testCases := []struct {
+		typ         string
+		vals        []string
+		expectedErr error
+	}{
+		{
+			"public.enum_type_foo[]",
+			[]string{"\"{}\"", "\"{foo,bar,baz}\"", "\"{foo,NULL}\"", "null"},
+			errors.New("unsupported type: public.enum_type_foo[]"),
+		},
+		{
+			"public.composite_type",
+			[]string{"\"(foo,42,42.01)\"", "null"},
+			errors.New("unsupported type: public.composite_type"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.typ, func(t *testing.T) {
+			for _, val := range tc.vals {
+				colsJSON := fmt.Sprintf(wal, tc.typ, val)
+				var tx pgrepl.Tx
+				require.NoError(
+					t, json.Unmarshal([]byte(colsJSON), &tx))
+
+				valIsNull := val == "null"
+				cols := []Column{
+					{Name: "id", Typ: tc.typ, IsNull: valIsNull, IsPrimary: false},
+				}
+				dbm := NewDBManager(
+					t.TempDir(), "t", cols, 3*time.Second, nil)
+				_, err := dbm.queryFromWAL(&tx)
+				require.EqualError(t, err, tc.expectedErr.Error())
+			}
+		})
+	}
+}
+
+func TestReplay(t *testing.T) {
 	pgtypes := []string{}
-	for pgtype := range supportedTypes {
+	for pgtype := range supportedTypeVals {
 		pgtypes = append(pgtypes, pgtype)
 	}
 	for _, typ := range pgtypes {
-		for _, val := range supportedTypes[typ] {
-			colsJSON := fmt.Sprintf(wal, typ, val)
-			var tx pgrepl.Tx
-			require.NoError(
-				t, json.Unmarshal([]byte(colsJSON), &tx))
+		t.Run(typ, func(t *testing.T) {
+			for _, val := range supportedTypeVals[typ] {
+				colsJSON := fmt.Sprintf(wal, typ, val)
+				var tx pgrepl.Tx
+				require.NoError(
+					t, json.Unmarshal([]byte(colsJSON), &tx))
 
-			valIsNull := val == "null"
-			cols := []Column{
-				{Name: "id", Typ: typ, IsNull: valIsNull, IsPrimary: false},
+				valIsNull := val == jsonNULL
+				cols := []Column{
+					{Name: "id", Typ: typ, IsNull: valIsNull, IsPrimary: false},
+				}
+				// use a large window for testing
+				dbm := NewDBManager(
+					t.TempDir(), "t", cols, 3*time.Hour, nil)
+
+				// assert new db setup (create queries are correctly applied)
+				ctx := context.Background()
+				require.NoError(t, dbm.NewDB(ctx))
+
+				// assert replaying a transaction as insert query does not err
+				require.NoError(t, dbm.Replay(ctx, &tx))
 			}
-			dbm := NewDBManager(
-				t.TempDir(), "t", cols, 3*time.Second, nil)
-			assertInsertQuery(t, tx, dbm)
-		}
+		})
 	}
+}
+
+func TestReplayUnsupported(t *testing.T) {
+	typ := "integer[]" // unsupported multi-dimensional array.
+	val := "\"{{1,2},{3,4}}\""
+	colsJSON := fmt.Sprintf(wal, typ, val)
+	var tx pgrepl.Tx
+	require.NoError(
+		t, json.Unmarshal([]byte(colsJSON), &tx))
+
+	valIsNull := val == jsonNULL
+	cols := []Column{
+		{Name: "id", Typ: typ, IsNull: valIsNull, IsPrimary: false},
+	}
+	dbm := NewDBManager(
+		t.TempDir(), "t", cols, 3*time.Hour, nil)
+	// assert new db setup (create queries are correctly applied)
+	ctx := context.Background()
+	err := dbm.NewDB(ctx)
+	require.NoError(t, err)
+
+	// assert replaying a transaction gives error
+	err = dbm.Replay(ctx, &tx)
+	require.ErrorContains(t, err, errors.New("cannot replay WAL record").Error())
 }

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb" // register duckdb driver
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"golang.org/x/exp/slog"
@@ -184,274 +184,21 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 	slog.Info("replaying", "query", query)
 	_, err = dbm.db.ExecContext(ctx, query)
 	if err != nil {
-		return fmt.Errorf("cannot replay WAL record %s", err)
+		return fmt.Errorf("cannot replay WAL record: %v", err)
 	}
 
 	return nil
 }
 
-type duckdbType struct {
-	typeName    string
-	transformFn func(s string) (val string)
-}
-
-var typeMap = map[string]duckdbType{
-	// boolean
-	"boolean": {"boolean", removeDoubleQuotes},
-
-	// numbers
-	"bigint":           {"bigint", removeDoubleQuotes},
-	"double precision": {"double", removeDoubleQuotes},
-	"integer":          {"integer", removeDoubleQuotes},
-	"numeric":          {"double", removeDoubleQuotes},
-	"oid":              {"uinteger", removeDoubleQuotes},
-	"real":             {"float", removeDoubleQuotes},
-	"smallint":         {"smallint", removeDoubleQuotes},
-
-	// misc
-	"macaddr": {"varchar", replaceDoubleWithSingleQuotes},
-
-	// bytes
-	"bytea": {"blob", replaceDoubleWithSingleQuotes},
-
-	// "char":              {"varchar", replaceDoubleWithSingleQuotes},
-	"character":         {"varchar", replaceDoubleWithSingleQuotes},
-	"character varying": {"varchar", replaceDoubleWithSingleQuotes},
-	"bpchar":            {"varchar", replaceDoubleWithSingleQuotes},
-
-	"json":  {"varchar", wrapSingleQuotes},
-	"jsonb": {"varchar", wrapSingleQuotes},
-	"text":  {"varchar", replaceDoubleWithSingleQuotes},
-	"uuid":  {"uuid", replaceDoubleWithSingleQuotes},
-
-	// dates
-	"date":                        {"date", replaceDoubleWithSingleQuotes},
-	"time with time zone":         {"time with time zone", replaceDoubleWithSingleQuotes},
-	"time without time zone":      {"time", replaceDoubleWithSingleQuotes},
-	"timestamp with time zone":    {"timestamp with time zone", replaceDoubleWithSingleQuotes},
-	"timestamp without time zone": {"timestamp", replaceDoubleWithSingleQuotes},
-	"interval":                    {"interval", replaceDoubleWithSingleQuotes},
-
-	// number arrays
-	"boolean[]":          {"boolean[]", createBoolListValues},
-	"bigint[]":           {"double[]", createNumericListValues},
-	"double precision[]": {"double[]", createNumericListValues},
-	"integer[]":          {"double[]", createNumericListValues},
-	"numeric[]":          {"double[]", createNumericListValues},
-	"real[]":             {"float[]", createNumericListValues},
-	"smallint[]":         {"smallint[]", createNumericListValues},
-	// (todo): "numeric[]": 		"decimal(4, 1)[]",
-
-	// char arrays
-	// "char[]":              {"varchar[]", createCharListValues},
-	"character[]":         {"varchar[]", createCharListValues},
-	"character varying[]": {"varchar[]", createCharListValues},
-	"bpchar[]":            {"varchar[]", createCharListValues},
-
-	"text[]":  {"varchar[]", createCharListValues},
-	"bytea[]": {"blob[]", createByteListValues},
-	"json[]":  {"varchar[]", createJSONListValues},
-	"jsonb[]": {"varchar[]", createJSONListValues},
-	"uuid[]":  {"uuid[]", createUUIDListValues},
-
-	// date arrays
-	"date[]":                        {"date[]", createDateListValues},
-	"time with time zone[]":         {"time with time zone[]", createDateListValues},
-	"time without time zone[]":      {"time[]", createDateListValues},
-	"timestamp with time zone[]":    {"timestamp with time zone[]", createTimestampListValues},
-	"timestamp without time zone[]": {"timestamp[]", createTimestampListValues},
-	"interval[]":                    {"interval[]", createTimestampListValues},
-}
-
-func removeDoubleQuotes(s string) string {
-	return strings.ReplaceAll(s, "\"", "")
-}
-
-func removeBackslashes(s string) string {
-	return strings.ReplaceAll(s, "\\", "")
-}
-
-func removePGArrayLiterals(s string) string {
-	return s[1 : len(s)-1]
-}
-
-func replaceDoubleWithSingleQuotes(s string) string {
-	return strings.ReplaceAll(s, "\"", "'")
-}
-
-func wrapSingleQuotes(s string) string {
-	return fmt.Sprintf("'%s'", s)
-}
-
-func createBoolListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		switch v {
-		case "t":
-			vals = append(vals, "true")
-		case "f":
-			vals = append(vals, "false")
-		case "NULL":
-			vals = append(vals, "null")
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
-func createNumericListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		if v == "NULL" {
-			vals = append(vals, "null")
-		} else {
-			vals = append(vals, v)
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
-func createCharListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		if v == "NULL" {
-			vals = append(vals, "null")
-		} else {
-			vals = append(vals, wrapSingleQuotes(v))
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
-func createByteListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	s = removeBackslashes(s)
-	s = strings.ReplaceAll(s, "x", "") // remove hex prefix
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		if v == "NULL" {
-			vals = append(vals, "null")
-		} else {
-			// remove the leading and trailing double quotes
-			vals = append(vals, fmt.Sprintf("'%s'::BLOB", v[1:len(v)-1]))
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
-func createJSONListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	s = removeBackslashes(s)
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		if v == "NULL" {
-			vals = append(vals, "null")
-		} else {
-			vals = append(vals, wrapSingleQuotes(v))
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
-func createUUIDListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		if v == "NULL" {
-			vals = append(vals, "null")
-		} else {
-			vals = append(vals, fmt.Sprintf("'%s'::UUID", v))
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
-func createDateListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		if v == "NULL" {
-			vals = append(vals, "null")
-		} else {
-			vals = append(vals, fmt.Sprintf("'%s'", v))
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
-func createTimestampListValues(s string) string {
-	s = removeDoubleQuotes(s)
-	s = removeBackslashes(s)
-	if s == "null" {
-		return "null"
-	}
-
-	var vals []string
-	s = removePGArrayLiterals(s)
-	for _, v := range strings.Split(s, ",") {
-		if v == "NULL" {
-			vals = append(vals, "null")
-		} else {
-			vals = append(vals, fmt.Sprintf("'%s'", v))
-		}
-	}
-
-	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
-}
-
+// pgToDDBType maps a PG type to a duckdb type.
 func (dbm *DBManager) pgToDDBType(typ string) (duckdbType, error) {
-	// convert PG type to duckdb type
+	// handle character(N), character varying(N), numeric(N, M)
 	if strings.HasSuffix(typ, ")") {
-		// handle character(N), character varying(N), numeric(N, M)
 		typ = strings.Split(typ, "(")[0]
 	}
-	ddbType, ok := typeMap[typ]
+	ddbType, ok := typeConversionMap[typ]
 	if !ok {
-		// custom enum types are not supported at the moment
+		// custom enum, stucts and n-d array types are not supported
 		return duckdbType{}, fmt.Errorf("unsupported type: %s", typ)
 	}
 	return ddbType, nil
