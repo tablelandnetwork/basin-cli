@@ -50,7 +50,14 @@ func TestBasinProvider_Upload(t *testing.T) {
 	{
 		buf := bytes.NewReader(filedata1)
 		err := client.Upload(
-			context.Background(), "test", "test", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}),
+			context.Background(),
+			"test",
+			"test",
+			uint64(5),
+			buf,
+			app.NewSigner(privateKey),
+			bytes.NewBuffer([]byte{}),
+			app.Timestamp{},
 		)
 		require.NoError(t, err)
 		require.Equal(t, filedata1, server.uploads["test.test"][0].bytes)
@@ -61,7 +68,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 	filedata2 := []byte{'W', 'o', 'r', 'l', 'd'}
 	{
 		buf := bytes.NewReader(filedata2)
-		err := client.Upload(context.Background(), "test2", "test2", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{})) // nolint
+		err := client.Upload(context.Background(), "test2", "test2", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}), app.Timestamp{}) // nolint
 		require.NoError(t, err)
 		require.Equal(t, filedata2, server.uploads["test2.test2"][0].bytes)
 		require.Equal(t, "3ad572a3483971285f3c6dc0e71d234a58543876f98b23183dc4e60008c1a92310f42202858b48ad917588535c2234c85413e124a2dcdd0759df9c555a9f585901", hex.EncodeToString(server.uploads["test2.test2"][0].sig)) // nolint
@@ -71,7 +78,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 	filedata3 := []byte{'W', 'O', 'R', 'L', 'D'}
 	{
 		buf := bytes.NewReader(filedata3)
-		err := client.Upload(context.Background(), "test", "test", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{})) // nolint
+		err := client.Upload(context.Background(), "test", "test", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}), app.Timestamp{}) // nolint
 		require.NoError(t, err)
 		require.Equal(t, filedata3, server.uploads["test.test"][1].bytes)
 		require.Equal(t, "94dcba2012dd83edf1e379bbdc640e95321ea30d5318e1f5dfd46154603bba4970729b44a71844e3f4e07955dfb529ccf60d31b74a9971649d64fd8c12a32a7d00", hex.EncodeToString(server.uploads["test.test"][1].sig)) // nolint
@@ -79,7 +86,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 
 	// check latest 2 deals for test2.test2, should return filedata2
 	{
-		dealInfo, err := client.LatestDeals(context.Background(), "test2", "test2", 2)
+		dealInfo, err := client.LatestDeals(context.Background(), "test2", "test2", 2, app.Timestamp{}, app.Timestamp{})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(dealInfo))
 		hash := sha1.Sum(filedata2)
@@ -88,7 +95,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 
 	// check deals for test.test, limit 1, offset 1, should return filedata3
 	{
-		dealInfo, err := client.Deals(context.Background(), "test", "test", 1, 1)
+		dealInfo, err := client.Deals(context.Background(), "test", "test", 1, 1, app.Timestamp{}, app.Timestamp{})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(dealInfo))
 		hash := sha1.Sum(filedata3)

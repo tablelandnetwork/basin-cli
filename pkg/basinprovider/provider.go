@@ -131,7 +131,14 @@ func (bp *BasinProvider) Create(
 
 // Upload uploads a file to th server.
 func (bp *BasinProvider) Upload(
-	ctx context.Context, ns string, rel string, size uint64, r io.Reader, signer *app.Signer, progress io.Writer,
+	ctx context.Context,
+	ns string,
+	rel string,
+	size uint64,
+	r io.Reader,
+	signer *app.Signer,
+	progress io.Writer,
+	timestamp app.Timestamp,
 ) error {
 	uploadFuture, uploadRelease := bp.p.Upload(ctx, func(p Publications_upload_Params) error {
 		if err := p.SetNs(ns); err != nil {
@@ -143,6 +150,7 @@ func (bp *BasinProvider) Upload(
 		}
 
 		p.SetSize(size)
+		p.SetTimestamp(timestamp.Seconds())
 
 		return nil
 	})
@@ -224,7 +232,7 @@ func (bp *BasinProvider) List(ctx context.Context, owner common.Address) ([]stri
 
 // Deals lists deals from a given publication.
 func (bp *BasinProvider) Deals(
-	ctx context.Context, ns string, rel string, limit uint32, offset uint64,
+	ctx context.Context, ns string, rel string, limit uint32, offset uint64, before app.Timestamp, after app.Timestamp,
 ) ([]app.DealInfo, error) {
 	f, release := bp.p.Deals(ctx, func(call Publications_deals_Params) error {
 		if err := call.SetNs(ns); err != nil {
@@ -237,6 +245,8 @@ func (bp *BasinProvider) Deals(
 
 		call.SetLimit(limit)
 		call.SetOffset(offset)
+		call.SetBefore(before.Seconds())
+		call.SetAfter(after.Seconds())
 
 		return nil
 	})
@@ -260,14 +270,9 @@ func (bp *BasinProvider) Deals(
 			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
 		}
 
-		created, err := deal.Created()
-		if err != nil {
-			return []app.DealInfo{}, fmt.Errorf("failed to get created: %s", err)
-		}
-
 		deals[i] = app.DealInfo{
 			CID:        cid,
-			Created:    created,
+			Timestamp:  deal.Timestamp(),
 			IsArchived: deal.Archived(),
 			Size:       deal.Size(),
 		}
@@ -278,7 +283,7 @@ func (bp *BasinProvider) Deals(
 
 // LatestDeals lists latest deals from a given publication.
 func (bp *BasinProvider) LatestDeals(
-	ctx context.Context, ns string, rel string, n uint32,
+	ctx context.Context, ns string, rel string, n uint32, before app.Timestamp, after app.Timestamp,
 ) ([]app.DealInfo, error) {
 	f, release := bp.p.LatestDeals(ctx, func(call Publications_latestDeals_Params) error {
 		if err := call.SetNs(ns); err != nil {
@@ -290,6 +295,8 @@ func (bp *BasinProvider) LatestDeals(
 		}
 
 		call.SetN(n)
+		call.SetBefore(before.Seconds())
+		call.SetAfter(after.Seconds())
 		return nil
 	})
 	defer release()
@@ -312,14 +319,9 @@ func (bp *BasinProvider) LatestDeals(
 			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
 		}
 
-		created, err := deal.Created()
-		if err != nil {
-			return []app.DealInfo{}, fmt.Errorf("failed to get created: %s", err)
-		}
-
 		deals[i] = app.DealInfo{
 			CID:        cid,
-			Created:    created,
+			Timestamp:  deal.Timestamp(),
 			IsArchived: deal.Archived(),
 			Size:       deal.Size(),
 		}
@@ -518,7 +520,7 @@ func (s *BasinServerMock) Deals(_ context.Context, call Publications_deals) erro
 			dealInfo := dealInfoList.At(int(i))
 			fakeCID := sha1.Sum(callback.bytes)
 			_ = dealInfo.SetCid(string(fakeCID[:]))
-			_ = dealInfo.SetCreated("does not matter")
+			dealInfo.SetTimestamp(0)
 			dealInfo.SetArchived(false)
 			dealInfo.SetSize(30)
 		}
@@ -553,7 +555,7 @@ func (s *BasinServerMock) LatestDeals(_ context.Context, call Publications_lates
 			dealInfo := dealInfoList.At(int(i))
 			fakeCID := sha1.Sum(callback.bytes)
 			_ = dealInfo.SetCid(string(fakeCID[:]))
-			_ = dealInfo.SetCreated("does not matter")
+			dealInfo.SetTimestamp(0)
 			dealInfo.SetArchived(false)
 			dealInfo.SetSize(30)
 		}

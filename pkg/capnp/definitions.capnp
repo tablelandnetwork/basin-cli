@@ -42,6 +42,6 @@ struct Schema {
 struct DealInfo {
     cid @0 :Text;
     size @1 :UInt32;
-    created @2 :Text; 
+    timestamp @2 :Int64; 
     archived @3 :Bool;
 }
