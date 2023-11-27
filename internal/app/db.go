@@ -64,15 +64,10 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) (string, error) {
 	recordVals := []string{}
 	for _, r := range tx.Records {
 		columnVals := []string{}
-		for _, c := range r.Columns {			
-			if strings.HasSuffix(c.Type, ")") {
-				// character(N), character varying(N), numeric(N, M)
-				c.Type = strings.Split(c.Type, "(")[0]
-			}
-			ddbType, ok := typeMap[c.Type]
-			if !ok {
-				// custom enum types are not supported at the moment
-				return "", fmt.Errorf("unsupported type: %s", c.Type)
+		for _, c := range r.Columns {
+			ddbType, err := dbm.pgToDDBType(c.Type)
+			if err != nil {
+				return "", err
 			}
 			columnVal := ddbType.transformFn(string(c.Value))
 			columnVals = append(columnVals, columnVal)
@@ -196,7 +191,7 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 }
 
 type duckdbType struct {
-	typ         string
+	typeName    string
 	transformFn func(s string) (val string)
 }
 
@@ -213,24 +208,6 @@ var typeMap = map[string]duckdbType{
 	"real":             {"float", removeDoubleQuotes},
 	"smallint":         {"smallint", removeDoubleQuotes},
 
-	// (todo): "numeric(a, b)",
-
-	// non standard SQL types
-	// (todo): "point",
-	// (todo): "line",
-	// (todo): "lseg",
-	// (todo): "box",
-	// (todo): "path",
-	// (todo): "polygon",
-	// (todo): "circle",
-	// (todo): money
-	// (todo): xml
-	/// etc.
-
-	// custom types
-	// (todo): custom enum types
-	// (todo): custom types
-
 	// misc
 	"macaddr": {"varchar", replaceDoubleWithSingleQuotes},
 
@@ -246,8 +223,6 @@ var typeMap = map[string]duckdbType{
 	"jsonb": {"varchar", wrapSingleQuotes},
 	"text":  {"varchar", replaceDoubleWithSingleQuotes},
 	"uuid":  {"uuid", replaceDoubleWithSingleQuotes},
-
-	// (todo): character(n)
 
 	// dates
 	"date":                        {"date", replaceDoubleWithSingleQuotes},
@@ -468,21 +443,28 @@ func createTimestampListValues(s string) string {
 	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
 }
 
+func (dbm *DBManager) pgToDDBType(typ string) (duckdbType, error) {
+	// convert PG type to duckdb type
+	if strings.HasSuffix(typ, ")") {
+		// handle character(N), character varying(N), numeric(N, M)
+		typ = strings.Split(typ, "(")[0]
+	}
+	ddbType, ok := typeMap[typ]
+	if !ok {
+		// custom enum types are not supported at the moment
+		return duckdbType{}, fmt.Errorf("unsupported type: %s", typ)
+	}
+	return ddbType, nil
+}
+
 func (dbm *DBManager) genCreateQuery() (string, error) {
 	var cols, pks string
 	for i, column := range dbm.cols {
-		// convert PG type to duckdb type
-		if strings.HasSuffix(column.Typ, ")") {
-			// handle character(N), character varying(N), numeric(N, M)
-			column.Typ = strings.Split(column.Typ, "(")[0]
+		ddbType, err := dbm.pgToDDBType(column.Typ)
+		if err != nil {
+			return "", err
 		}
-		ddbType, ok := typeMap[column.Typ]
-		if !ok {
-			// custom enum types are not supported at the moment
-			return "", fmt.Errorf("unsupported type: %s", column.Typ)
-		}
-
-		col := fmt.Sprintf("%s %s", column.Name, ddbType.typ)
+		col := fmt.Sprintf("%s %s", column.Name, ddbType.typeName)
 		if !column.IsNull {
 			col = fmt.Sprintf("%s NOT NULL", col)
 		}
