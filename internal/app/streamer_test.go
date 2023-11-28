@@ -242,7 +242,7 @@ type basinProviderMock struct {
 }
 
 func (bp *basinProviderMock) Create(
-	_ context.Context, ns string, _ string, _ basincapnp.Schema, owner common.Address,
+	_ context.Context, ns string, _ string, _ basincapnp.Schema, owner common.Address, _ int64,
 ) (bool, error) {
 	bp.owner[ns] = owner.Hex()
 	return false, nil

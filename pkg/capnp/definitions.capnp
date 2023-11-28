@@ -44,4 +44,5 @@ struct DealInfo {
     size @1 :UInt32;
     timestamp @2 :Int64; 
     archived @3 :Bool;
+    expiresAt @4 :Text;
 }

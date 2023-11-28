@@ -102,8 +102,12 @@ func connectWithBackoff(
 
 // Create creates a publication on Basin Provider.
 func (bp *BasinProvider) Create(
-	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address,
+	ctx context.Context, ns string, rel string, schema basincapnp.Schema, owner common.Address, cacheDuration int64,
 ) (bool, error) {
+	if cacheDuration < 0 {
+		return false, errors.New("cache duration cannot be less than zero")
+	}
+
 	f, release := bp.p.Create(ctx, func(bp Publications_create_Params) error {
 		if err := bp.SetNs(ns); err != nil {
 			return fmt.Errorf("setting ns: %s", err)
@@ -117,6 +121,9 @@ func (bp *BasinProvider) Create(
 		if err := bp.SetOwner(owner.Bytes()); err != nil {
 			return fmt.Errorf("setting owner: %s", err)
 		}
+
+		bp.SetCache_duration(cacheDuration)
+
 		return nil
 	})
 	defer release()
@@ -270,11 +277,17 @@ func (bp *BasinProvider) Deals(
 			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
 		}
 
+		expiresAt, err := deal.ExpiresAt()
+		if err != nil {
+			return []app.DealInfo{}, fmt.Errorf("failed to get expires at: %s", err)
+		}
+
 		deals[i] = app.DealInfo{
-			CID:        cid,
-			Timestamp:  deal.Timestamp(),
-			IsArchived: deal.Archived(),
-			Size:       deal.Size(),
+			CID:         cid,
+			Timestamp:   deal.Timestamp(),
+			IsArchived:  deal.Archived(),
+			Size:        deal.Size(),
+			CacheExpiry: expiresAt,
 		}
 	}
 
@@ -319,11 +332,17 @@ func (bp *BasinProvider) LatestDeals(
 			return []app.DealInfo{}, fmt.Errorf("failed to get cid: %s", err)
 		}
 
+		expiresAt, err := deal.ExpiresAt()
+		if err != nil {
+			return []app.DealInfo{}, fmt.Errorf("failed to get expires at: %s", err)
+		}
+
 		deals[i] = app.DealInfo{
-			CID:        cid,
-			Timestamp:  deal.Timestamp(),
-			IsArchived: deal.Archived(),
-			Size:       deal.Size(),
+			CID:         cid,
+			Timestamp:   deal.Timestamp(),
+			IsArchived:  deal.Archived(),
+			Size:        deal.Size(),
+			CacheExpiry: expiresAt,
 		}
 	}
 

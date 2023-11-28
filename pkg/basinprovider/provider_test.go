@@ -23,11 +23,11 @@ func TestBasinProvider_CreateAndList(t *testing.T) {
 	// send to the server, the server deserialize it and send the value back
 
 	bp, _ := newClientAndServer()
-	exists, err := bp.Create(context.Background(), "n", "t", basincapnp.Schema{}, common.HexToAddress(""))
+	exists, err := bp.Create(context.Background(), "n", "t", basincapnp.Schema{}, common.HexToAddress(""), 0)
 	require.NoError(t, err)
 	require.False(t, exists)
 
-	exists, err = bp.Create(context.Background(), "n", "t2", basincapnp.Schema{}, common.HexToAddress(""))
+	exists, err = bp.Create(context.Background(), "n", "t2", basincapnp.Schema{}, common.HexToAddress(""), 0)
 	require.NoError(t, err)
 	require.False(t, exists)
 
