@@ -9,11 +9,13 @@ require (
 	github.com/filecoin-project/lassie v0.21.0
 	github.com/google/go-cmp v0.5.9
 	github.com/ipfs/go-cid v0.4.1
+	github.com/ipld/go-car/v2 v2.13.1
+	github.com/ipld/go-trustless-utils v0.4.1
 	github.com/jackc/pglogrepl v0.0.0-20230728225306-38e8a4e50913
 	github.com/jackc/pgx/v5 v5.4.3
 	github.com/lib/pq v1.2.0
+	github.com/marcboeker/go-duckdb v1.4.4
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/multiformats/go-multibase v0.2.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/schollz/progressbar/v3 v3.13.1
@@ -99,10 +101,8 @@ require (
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
 	github.com/ipfs/go-peertaskqueue v0.8.1 // indirect
 	github.com/ipfs/go-unixfsnode v1.9.0 // indirect
-	github.com/ipld/go-car/v2 v2.13.1 // indirect
 	github.com/ipld/go-codec-dagpb v1.6.0 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect
-	github.com/ipld/go-trustless-utils v0.4.1 // indirect
 	github.com/ipni/go-libipni v0.5.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -136,7 +136,7 @@ require (
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/mitchellh/mapstructure v1.4.1 // indirect
+	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/term v0.0.0-20201216013528-df9cb8a40635 // indirect
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/multiformats/go-base32 v0.1.0 // indirect
@@ -144,6 +144,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.11.0 // indirect
 	github.com/multiformats/go-multiaddr-dns v0.3.1 // indirect
 	github.com/multiformats/go-multiaddr-fmt v0.1.0 // indirect
+	github.com/multiformats/go-multibase v0.2.0 // indirect
 	github.com/multiformats/go-multicodec v0.9.0 // indirect
 	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/multiformats/go-multistream v0.4.1 // indirect

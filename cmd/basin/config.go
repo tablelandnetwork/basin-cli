@@ -12,6 +12,10 @@ import (
 // DefaultProviderHost is the address of Basin Provider.
 const DefaultProviderHost = "basin.tableland.xyz:3000"
 
+// DefaultWindowSize is the number of seconds for which WAL updates
+// are buffered before being sent to the provider.
+const DefaultWindowSize = 3600
+
 type config struct {
 	Publications map[string]publication `yaml:"publications"`
 }
@@ -23,6 +27,7 @@ type publication struct {
 	Port         int    `yaml:"port"`
 	Database     string `yaml:"database"`
 	ProviderHost string `yaml:"provider_host"`
+	WindowSize   int64  `yaml:"window_size"`
 }
 
 func newConfig() *config {
