@@ -196,6 +196,12 @@ func (dbm *DBManager) pgToDDBType(typ string) (duckdbType, error) {
 	if strings.HasSuffix(typ, ")") {
 		typ = strings.Split(typ, "(")[0]
 	}
+
+	// handle character(N)[], character varying(N)[], numeric(N, M)[]
+	if strings.HasSuffix(typ, ")[]") {
+		typ = strings.Split(typ, "(")[0] + "[]"
+	}
+
 	ddbType, ok := typeConversionMap[typ]
 	if !ok {
 		// custom enum, stucts and n-d array types are not supported

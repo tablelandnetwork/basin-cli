@@ -256,6 +256,15 @@ func TestQueryFromWAL(t *testing.T) {
 			},
 		},
 		{
+			`\"char\"`,
+			[]string{"\"a\"", "\"Z\"", "null"},
+			[]string{
+				"insert into t (id) values ('a')",
+				"insert into t (id) values ('Z')",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
 			"character(1)",
 			[]string{"\"a\"", "\"Z\"", "null"},
 			[]string{
@@ -293,19 +302,19 @@ func TestQueryFromWAL(t *testing.T) {
 		},
 		{
 			"json",
-			[]string{"{\"foo\": \"bar\"}", "{\"foo\": {\"bar\": 3}}", "null"},
+			[]string{`"{\"foo\": \"bar\"}"`, `"{\"foo\": {\"bar\": 3}}"`, "null"},
 			[]string{
-				"insert into t (id) values ('{\"foo\": \"bar\"}')",
-				"insert into t (id) values ('{\"foo\": {\"bar\": 3}}')",
+				`insert into t (id) values ('{"foo": "bar"}')`,
+				`insert into t (id) values ('{"foo": {"bar": 3}}')`,
 				"insert into t (id) values (null)",
 			},
 		},
 		{
 			"jsonb",
-			[]string{"{\"foo\": \"bar\"}", "{\"foo\": {\"bar\": 3}}", "null"},
+			[]string{`"{\"foo\": \"bar\"}"`, `"{\"foo\": {\"bar\": 3}}"`, "null"},
 			[]string{
-				"insert into t (id) values ('{\"foo\": \"bar\"}')",
-				"insert into t (id) values ('{\"foo\": {\"bar\": 3}}')",
+				`insert into t (id) values ('{"foo": "bar"}')`,
+				`insert into t (id) values ('{"foo": {"bar": 3}}')`,
 				"insert into t (id) values (null)",
 			},
 		},
@@ -381,7 +390,7 @@ func TestQueryFromWAL(t *testing.T) {
 		},
 		{
 			"boolean[]",
-			[]string{"\"{t,f,NULL}\"", "null"},
+			[]string{`"{t,f,NULL}"`, "null"},
 			[]string{
 				"insert into t (id) values (list_value(true,false,null))",
 				"insert into t (id) values (null)",
@@ -432,6 +441,14 @@ func TestQueryFromWAL(t *testing.T) {
 			[]string{"\"{42,-42,NULL}\"", "null"},
 			[]string{
 				"insert into t (id) values (list_value(42,-42,null))",
+				"insert into t (id) values (null)",
+			},
+		},
+		{
+			`\"char\"[]`,
+			[]string{"\"{a,Z,NULL}\"", "null"},
+			[]string{
+				"insert into t (id) values (list_value('a','Z',null))",
 				"insert into t (id) values (null)",
 			},
 		},

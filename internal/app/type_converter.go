@@ -18,7 +18,7 @@ func removeBackslashes(s string) string {
 	return strings.ReplaceAll(s, "\\", "")
 }
 
-func removePGArrayLiterals(s string) string {
+func removeOuterChars(s string) string {
 	return s[1 : len(s)-1]
 }
 
@@ -39,9 +39,9 @@ func createBoolListValues(s string) string {
 	}
 
 	s = removeDoubleQuotes(s)
+	s = removeOuterChars(s) // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		switch v {
 		case "t":
@@ -62,9 +62,9 @@ func createNumericListValues(s string) string {
 	}
 
 	s = removeDoubleQuotes(s)
+	s = removeOuterChars(s) // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		if v == pgNULL {
 			vals = append(vals, "null")
@@ -82,9 +82,9 @@ func createCharListValues(s string) string {
 	}
 
 	s = removeDoubleQuotes(s)
+	s = removeOuterChars(s) // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		if v == pgNULL {
 			vals = append(vals, "null")
@@ -104,9 +104,9 @@ func createByteListValues(s string) string {
 	s = removeDoubleQuotes(s)
 	s = removeBackslashes(s)
 	s = strings.ReplaceAll(s, "x", "") // remove hex prefix
+	s = removeOuterChars(s)            // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		if v == pgNULL {
 			vals = append(vals, "null")
@@ -118,16 +118,26 @@ func createByteListValues(s string) string {
 	return fmt.Sprintf("list_value(%s)", strings.Join(vals, ","))
 }
 
+func createJSONValue(s string) string {
+	if s == jsonNULL {
+		return s
+	}
+
+	s = removeOuterChars(s) // remove outer quotes
+	s = removeBackslashes(s)
+	return wrapSingleQuotes(s)
+}
+
 func createJSONListValues(s string) string {
 	if s == jsonNULL {
 		return s
 	}
 
-	s = s[1 : len(s)-1] // remove outer quotes
+	s = removeOuterChars(s) // remove outer quotes
 	s = removeBackslashes(s)
+	s = removeOuterChars(s) // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		if v == pgNULL {
 			vals = append(vals, "null")
@@ -146,9 +156,9 @@ func createUUIDListValues(s string) string {
 	}
 
 	s = removeDoubleQuotes(s)
+	s = removeOuterChars(s) // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		if v == pgNULL {
 			vals = append(vals, "null")
@@ -166,9 +176,9 @@ func createDateListValues(s string) string {
 	}
 
 	s = removeDoubleQuotes(s)
+	s = removeOuterChars(s) // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		if v == pgNULL {
 			vals = append(vals, "null")
@@ -187,9 +197,9 @@ func createTimestampListValues(s string) string {
 
 	s = removeDoubleQuotes(s)
 	s = removeBackslashes(s)
+	s = removeOuterChars(s) // remove array literals
 
 	var vals []string
-	s = removePGArrayLiterals(s)
 	for _, v := range strings.Split(s, ",") {
 		if v == pgNULL {
 			vals = append(vals, "null")
@@ -229,11 +239,12 @@ var typeConversionMap = map[string]duckdbType{
 
 	// bytes
 	"bytea":             {"blob", replaceDoubleWithSingleQuotes},
+	"\"char\"":          {"varchar", replaceDoubleWithSingleQuotes},
 	"character":         {"varchar", replaceDoubleWithSingleQuotes},
 	"character varying": {"varchar", replaceDoubleWithSingleQuotes},
 	"bpchar":            {"varchar", replaceDoubleWithSingleQuotes},
-	"json":              {"varchar", wrapSingleQuotes},
-	"jsonb":             {"varchar", wrapSingleQuotes},
+	"json":              {"varchar", createJSONValue},
+	"jsonb":             {"varchar", createJSONValue},
 	"text":              {"varchar", replaceDoubleWithSingleQuotes},
 	"uuid":              {"uuid", replaceDoubleWithSingleQuotes},
 
@@ -255,6 +266,7 @@ var typeConversionMap = map[string]duckdbType{
 	"smallint[]":         {"smallint[]", createNumericListValues},
 
 	// byte arrays
+	"\"char\"[]":          {"varchar[]", createCharListValues},
 	"character[]":         {"varchar[]", createCharListValues},
 	"character varying[]": {"varchar[]", createCharListValues},
 	"bpchar[]":            {"varchar[]", createCharListValues},
