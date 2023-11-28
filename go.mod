@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	capnproto.org/go/capnp/v3 v3.0.0-alpha-29
+	github.com/bwesterb/go-ristretto v1.2.3
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/ethereum/go-ethereum v1.12.2
 	github.com/filecoin-project/lassie v0.21.0
