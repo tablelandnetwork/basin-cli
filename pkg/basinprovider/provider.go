@@ -283,11 +283,11 @@ func (bp *BasinProvider) Deals(
 		}
 
 		deals[i] = app.DealInfo{
-			CID:        cid,
-			Timestamp:  deal.Timestamp(),
-			IsArchived: deal.Archived(),
-			Size:       deal.Size(),
-			ExpiresAt:  expiresAt,
+			CID:         cid,
+			Timestamp:   deal.Timestamp(),
+			IsArchived:  deal.Archived(),
+			Size:        deal.Size(),
+			CacheExpiry: expiresAt,
 		}
 	}
 
@@ -338,11 +338,11 @@ func (bp *BasinProvider) LatestDeals(
 		}
 
 		deals[i] = app.DealInfo{
-			CID:        cid,
-			Timestamp:  deal.Timestamp(),
-			IsArchived: deal.Archived(),
-			Size:       deal.Size(),
-			ExpiresAt:  expiresAt,
+			CID:         cid,
+			Timestamp:   deal.Timestamp(),
+			IsArchived:  deal.Archived(),
+			Size:        deal.Size(),
+			CacheExpiry: expiresAt,
 		}
 	}
 

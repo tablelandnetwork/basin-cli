@@ -10,11 +10,11 @@ import (
 
 // DealInfo represents information about a deal.
 type DealInfo struct {
-	CID        string `json:"cid"`
-	Timestamp  int64  `json:"timestamp"`
-	Size       uint32 `json:"size"`
-	IsArchived bool   `json:"is_archived"`
-	ExpiresAt  string `json:"expires_at"`
+	CID         string `json:"cid"`
+	Timestamp   int64  `json:"timestamp"`
+	Size        uint32 `json:"size"`
+	IsArchived  bool   `json:"is_archived"`
+	CacheExpiry string `json:"cache_expiry"`
 }
 
 // BasinProvider ...

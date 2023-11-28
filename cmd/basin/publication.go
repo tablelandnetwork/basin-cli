@@ -547,7 +547,7 @@ func newPublicationDealsCommand() *cli.Command {
 
 			if format == "table" {
 				table := tablewriter.NewWriter(os.Stdout)
-				table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived", "Expires At"})
+				table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived", "Cache Expiry"})
 
 				for _, deal := range deals {
 					isArchived := "N"
@@ -559,7 +559,7 @@ func newPublicationDealsCommand() *cli.Command {
 						timestamp = time.Unix(deal.Timestamp, 0).Format(time.RFC3339)
 					}
 					table.Append([]string{
-						deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived, deal.ExpiresAt,
+						deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived, deal.CacheExpiry,
 					})
 				}
 				table.Render()
