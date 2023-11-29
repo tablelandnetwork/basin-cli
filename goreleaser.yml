@@ -65,21 +65,6 @@ builds:
     - -trimpath
   ldflags:
     - -s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date={{.CommitDate}}
-- id: basin-windows-amd64
-  binary: basin
-  main: ./cmd/basin
-  goarch:
-    - amd64  
-  goos:    
-    - windows  
-  env:
-    - CC=x86_64-w64-mingw32-gcc
-    - CXX=x86_64-w64-mingw32-g++
-  flags:
-    - -trimpath
-    - -buildmode=exe
-  ldflags:
-    - -s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date={{.CommitDate}}
 
 archives:
   - id: basin-archive
@@ -91,13 +76,6 @@ archives:
       - basin-darwin-arm64
       - basin-linux-amd64
       - basin-linux-arm64
-    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
-  - id: basin-archive-win
-    format: zip
-    files:
-      - none*
-    builds:
-      - basin-windows-amd64
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
 
 checksum:
