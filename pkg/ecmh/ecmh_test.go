@@ -1,10 +1,8 @@
 package ecmh
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/bwesterb/go-ristretto"
 	"github.com/stretchr/testify/require"
 
 	// Register duckdb driver.
@@ -25,21 +23,15 @@ func TestECMHInsertRemove(t *testing.T) {
 	for _, tc := range testCases {
 		currentHash := NewMultisetHash()
 		for _, item := range tc.items {
-			newItem := ristretto.Point{}
-			currentHash.Insert(newItem.DeriveDalek([]byte(item)))
+			currentHash.Insert([]byte(item))
 		}
 		cr1 := currentHash.String()
-		fmt.Println("cr1", cr1)
 
 		// check if item is in the set?
-		newItem := ristretto.Point{}
-		currentHash.Remove(newItem.DeriveDalek([]byte(tc.items[0])))
-		cr2 := currentHash.String()
-		fmt.Println("cr2", cr2)
+		currentHash.Remove([]byte(tc.items[0]))
 
-		currentHash.Insert(newItem.DeriveDalek([]byte(tc.items[0])))
+		currentHash.Insert([]byte(tc.items[0]))
 		cr3 := currentHash.String()
-		fmt.Println("cr3", cr3)
 		require.Equal(t, cr1, cr3)
 	}
 }
@@ -61,14 +53,12 @@ func TestECMHUnionDiff(t *testing.T) {
 	for _, tc := range testCases {
 		currentHash1 := NewMultisetHash()
 		for _, item := range tc.items1 {
-			newItem := ristretto.Point{}
-			currentHash1.Insert(newItem.DeriveDalek([]byte(item)))
+			currentHash1.Insert([]byte(item))
 		}
 
 		currentHash2 := NewMultisetHash()
 		for _, item := range tc.items2 {
-			newItem := ristretto.Point{}
-			currentHash2.Insert(newItem.DeriveDalek([]byte(item)))
+			currentHash2.Insert([]byte(item))
 		}
 
 		currentHash1.Union(currentHash2)
@@ -78,7 +68,6 @@ func TestECMHUnionDiff(t *testing.T) {
 
 		currentHash1.Union(currentHash2)
 		cr3 := currentHash1.String()
-		fmt.Println("cr3", cr3)
 		require.Equal(t, cr1, cr3)
 	}
 }
