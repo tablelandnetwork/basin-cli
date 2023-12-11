@@ -646,17 +646,29 @@ func inspectTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, err
 					ccu.column_name
 			FROM information_schema.table_constraints tc
 			JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
-			WHERE constraint_type = 'PRIMARY KEY' )
+			WHERE constraint_type = 'PRIMARY KEY' ),
+			array_type_info AS
+				(SELECT c.table_name,
+						c.column_name,
+						pg_catalog.format_type(t.oid, NULL) AS full_data_type
+				FROM information_schema.columns AS c
+				JOIN pg_catalog.pg_type AS t ON c.udt_name = t.typname
+				WHERE c.data_type = 'ARRAY')
 		SELECT
 			c.column_name,
-			c.data_type,
+			CASE
+			WHEN c.data_type = 'ARRAY' THEN ati.full_data_type
+			ELSE c.data_type
+			END AS data_type,
 			c.is_nullable = 'YES' AS is_nullable,
 			pki.column_name IS NOT NULL AS is_primary
 		FROM information_schema.columns AS c
 		LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
 			AND pki.table_name = c.table_name
 			AND pki.column_name = c.column_name
-		WHERE c.table_name = $1; 
+		LEFT JOIN array_type_info ati ON c.table_name = ati.table_name
+    		AND c.column_name = ati.column_name
+			WHERE c.table_name = $1;
 		`, rel,
 	)
 	if err != nil {

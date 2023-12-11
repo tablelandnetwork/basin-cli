@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/marcboeker/go-duckdb" // register duckdb driver
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"golang.org/x/exp/slog"
@@ -51,8 +52,7 @@ func (dbm *DBManager) Close() error {
 }
 
 // queryFromWAL creates a query for a WAL TX records.
-// (todo): error handling and remapping of types.
-func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
+func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) (string, error) {
 	var columnValsStr string
 
 	// get column names
@@ -65,7 +65,12 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 	for _, r := range tx.Records {
 		columnVals := []string{}
 		for _, c := range r.Columns {
-			columnVals = append(columnVals, strings.ReplaceAll(string(c.Value), "\"", ""))
+			ddbType, err := dbm.pgToDDBType(c.Type)
+			if err != nil {
+				return "", err
+			}
+			columnVal := ddbType.transformFn(string(c.Value))
+			columnVals = append(columnVals, columnVal)
 		}
 		columnValsStr = strings.Join(columnVals, ", ")
 		recordVals = append(
@@ -77,7 +82,7 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) string {
 		dbm.table,
 		strings.Join(cols, ", "),
 		strings.Join(recordVals, ", "),
-	)
+	), nil
 }
 
 func (dbm *DBManager) replace(ctx context.Context) error {
@@ -171,21 +176,48 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 		}
 	}
 
-	query := dbm.queryFromWAL(tx)
-	slog.Info("replaying", "query", query)
-
-	_, err := dbm.db.ExecContext(ctx, query)
+	query, err := dbm.queryFromWAL(tx)
 	if err != nil {
-		return fmt.Errorf("cannot replay WAL record %s", err)
+		return err
+	}
+
+	slog.Info("replaying", "query", query)
+	_, err = dbm.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("cannot replay WAL record: %v", err)
 	}
 
 	return nil
 }
 
+// pgToDDBType maps a PG type to a duckdb type.
+func (dbm *DBManager) pgToDDBType(typ string) (duckdbType, error) {
+	// handle character(N), character varying(N), numeric(N, M)
+	if strings.HasSuffix(typ, ")") {
+		typ = strings.Split(typ, "(")[0]
+	}
+
+	// handle character(N)[], character varying(N)[], numeric(N, M)[]
+	if strings.HasSuffix(typ, ")[]") {
+		typ = strings.Split(typ, "(")[0] + "[]"
+	}
+
+	ddbType, ok := typeConversionMap[typ]
+	if !ok {
+		// custom enum, stucts and n-d array types are not supported
+		return duckdbType{}, fmt.Errorf("unsupported type: %s", typ)
+	}
+	return ddbType, nil
+}
+
 func (dbm *DBManager) genCreateQuery() (string, error) {
 	var cols, pks string
 	for i, column := range dbm.cols {
-		col := fmt.Sprintf("%s %s", column.Name, column.Typ)
+		ddbType, err := dbm.pgToDDBType(column.Typ)
+		if err != nil {
+			return "", err
+		}
+		col := fmt.Sprintf("%s %s", column.Name, ddbType.typeName)
 		if !column.IsNull {
 			col = fmt.Sprintf("%s NOT NULL", col)
 		}
