@@ -12,8 +12,3 @@ build:
 test: 
 	go test ./... -short -race -timeout 1m
 .PHONY: test
-
-generate:
-	capnp compile -I ../go-capnp/std -ogo pkg/capnp/definitions.capnp
-	capnp compile -I ../go-capnp/std -ogo pkg/basinprovider/provider.capnp
-.PHONY: generate

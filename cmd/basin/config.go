@@ -10,7 +10,7 @@ import (
 )
 
 // DefaultProviderHost is the address of Basin Provider.
-const DefaultProviderHost = "basin.tableland.xyz:3000"
+const DefaultProviderHost = "https://basin.tableland.xyz"
 
 // DefaultWindowSize is the number of seconds for which WAL updates
 // are buffered before being sent to the provider.

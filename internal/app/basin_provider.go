@@ -2,26 +2,44 @@ package app
 
 import (
 	"context"
-
-	"github.com/ethereum/go-ethereum/common"
-
-	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
+	"io"
 )
-
-// DealInfo represents information about a deal.
-type DealInfo struct {
-	CID         string `json:"cid"`
-	Timestamp   int64  `json:"timestamp"`
-	Size        uint32 `json:"size"`
-	IsArchived  bool   `json:"is_archived"`
-	CacheExpiry string `json:"cache_expiry"`
-}
 
 // BasinProvider ...
 type BasinProvider interface {
-	Create(context.Context, string, string, basincapnp.Schema, common.Address, int64) (bool, error)
-	List(context.Context, common.Address) ([]string, error)
-	Deals(context.Context, string, string, uint32, uint64, Timestamp, Timestamp) ([]DealInfo, error)
-	LatestDeals(context.Context, string, string, uint32, Timestamp, Timestamp) ([]DealInfo, error)
-	Reconnect() error
+	CreateVault(context.Context, CreateVaultParams) error
+	ListVaults(context.Context, ListVaultsParams) ([]Vault, error)
+	ListVaultEvents(context.Context, ListVaultEventsParams) ([]EventInfo, error)
+	WriteVaultEvent(context.Context, WriteVaultEventParams) error
+}
+
+// CreateVaultParams ...
+type CreateVaultParams struct {
+	Vault         Vault
+	Account       *Account
+	CacheDuration CacheDuration
+}
+
+// ListVaultsParams ...
+type ListVaultsParams struct {
+	Account *Account
+}
+
+// ListVaultEventsParams ...
+type ListVaultEventsParams struct {
+	Vault  Vault
+	Limit  uint32
+	Offset uint32
+	Before Timestamp
+	After  Timestamp
+}
+
+// WriteVaultEventParams ...
+type WriteVaultEventParams struct {
+	Vault       Vault
+	Signature   string
+	Timestamp   Timestamp
+	Content     io.Reader
+	ProgressBar io.Writer
+	Size        int64
 }

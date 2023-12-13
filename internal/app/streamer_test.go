@@ -9,12 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/jackc/pglogrepl"
 	"github.com/stretchr/testify/require"
 
-	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 )
 
@@ -241,37 +239,27 @@ type basinProviderMock struct {
 	uploaderInputs chan *os.File
 }
 
-func (bp *basinProviderMock) Create(
-	_ context.Context, ns string, _ string, _ basincapnp.Schema, owner common.Address, _ int64,
-) (bool, error) {
-	bp.owner[ns] = owner.Hex()
-	return false, nil
-}
-
-func (bp *basinProviderMock) List(_ context.Context, _ common.Address) ([]string, error) {
-	return []string{}, nil
-}
-
-func (bp *basinProviderMock) Deals(
-	context.Context, string, string, uint32, uint64, Timestamp, Timestamp,
-) ([]DealInfo, error) {
-	return []DealInfo{}, nil
-}
-
-func (bp *basinProviderMock) LatestDeals(
-	context.Context, string, string, uint32, Timestamp, Timestamp,
-) ([]DealInfo, error) {
-	return []DealInfo{}, nil
-}
-
-func (bp *basinProviderMock) Reconnect() error {
+func (bp *basinProviderMock) CreateVault(
+	_ context.Context, params CreateVaultParams,
+) error {
+	bp.owner[string(params.Vault)] = params.Account.Hex()
 	return nil
 }
 
-func (bp *basinProviderMock) Upload(
-	_ context.Context, _ string, _ string, _ uint64, f io.Reader, _ *Signer, _ io.Writer, _ Timestamp,
+func (bp *basinProviderMock) ListVaults(_ context.Context, _ ListVaultsParams) ([]Vault, error) {
+	return []Vault{}, nil
+}
+
+func (bp *basinProviderMock) ListVaultEvents(
+	context.Context, ListVaultEventsParams,
+) ([]EventInfo, error) {
+	return []EventInfo{}, nil
+}
+
+func (bp *basinProviderMock) WriteVaultEvent(
+	_ context.Context, params WriteVaultEventParams,
 ) error {
-	file := f.(*os.File)
+	file := params.Content.(*os.File)
 	file.Fd()
 
 	// re-create a copy of the file for assertions
