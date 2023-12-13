@@ -7,9 +7,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"golang.org/x/crypto/sha3"
+	"github.com/tablelandnetwork/basin-cli/pkg/ecmh"
 )
 
 // BasinProviderUploader ...
@@ -63,28 +62,26 @@ func (bu *BasinUploader) Upload(ctx context.Context, filepath string, progress i
 
 // Signer allows you to sign a big stream of bytes by calling Sum multiple times, then Sign.
 type Signer struct {
-	state      crypto.KeccakState
+	state      *ecmh.MultisetHash
 	privateKey *ecdsa.PrivateKey
 }
 
 // NewSigner creates a new signer.
 func NewSigner(pk *ecdsa.PrivateKey) *Signer {
 	return &Signer{
-		state:      sha3.NewLegacyKeccak256().(crypto.KeccakState),
+		state:      ecmh.NewMultisetHash(),
 		privateKey: pk,
 	}
 }
 
 // Sum updates the hash state with a new chunk.
 func (s *Signer) Sum(chunk []byte) {
-	s.state.Write(chunk)
+	s.state.Insert(chunk)
 }
 
 // Sign signs the internal state.
 func (s *Signer) Sign() ([]byte, error) {
-	var h common.Hash
-	_, _ = s.state.Read(h[:])
-	signature, err := crypto.Sign(h.Bytes(), s.privateKey)
+	signature, err := crypto.Sign(s.state.Bytes(), s.privateKey)
 	if err != nil {
 		return []byte{}, fmt.Errorf("sign: %s", err)
 	}
