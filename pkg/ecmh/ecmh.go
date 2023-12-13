@@ -11,7 +11,9 @@ type MultisetHash struct {
 // NewMultisetHash creates a new multiset hash.
 func NewMultisetHash() *MultisetHash {
 	p := ristretto.Point{}
-	p.SetZero()
+	// shoud we use SetZero() here? base is the generator
+	// point
+	p.SetBase()
 
 	return &MultisetHash{
 		accumulator: &p,
@@ -23,20 +25,14 @@ func (h *MultisetHash) String() string {
 	return h.accumulator.String()
 }
 
-// Bytes returns the byte representation of the multiset hash.
-func (h *MultisetHash) Bytes() []byte {
-	return h.accumulator.Bytes()
+// Insert inserts a new item (point) into the multiset hash.
+func (h *MultisetHash) Insert(p *ristretto.Point) {
+	h.accumulator.Add(h.accumulator, p)
 }
 
-// Insert inserts a new item (byte array) into the multiset hash.
-func (h *MultisetHash) Insert(item []byte) {
-	p := ristretto.Point{}
-	h.accumulator.Add(h.accumulator, p.DeriveDalek(item))
-}
-
-// InsertAll inserts all items into the multiset hash.
-func (h *MultisetHash) InsertAll(items [][]byte) {
-	for _, item := range items {
+// InsertAll inserts all items (points) into the multiset hash.
+func (h *MultisetHash) InsertAll(ps []*ristretto.Point) {
+	for _, item := range ps {
 		h.Insert(item)
 	}
 }
@@ -51,15 +47,14 @@ func (h *MultisetHash) Difference(other *MultisetHash) {
 	h.accumulator.Sub(h.accumulator, other.accumulator)
 }
 
-// Remove removes an item (byte array) from the multiset hash.
-func (h *MultisetHash) Remove(item []byte) {
-	p := ristretto.Point{}
-	h.accumulator.Sub(h.accumulator, p.DeriveDalek(item))
+// Remove removes an item (point) from the multiset hash.
+func (h *MultisetHash) Remove(p *ristretto.Point) {
+	h.accumulator.Sub(h.accumulator, p)
 }
 
 // RemoveAll removes all items (points) from the multiset hash.
-func (h *MultisetHash) RemoveAll(items [][]byte) {
-	for _, item := range items {
+func (h *MultisetHash) RemoveAll(ps []*ristretto.Point) {
+	for _, item := range ps {
 		h.Remove(item)
 	}
 }

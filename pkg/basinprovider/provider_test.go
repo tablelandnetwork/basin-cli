@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
-	"github.com/tablelandnetwork/basin-cli/pkg/ecmh"
 	"google.golang.org/grpc/test/bufconn"
 )
 
@@ -62,13 +61,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Equal(t, filedata1, server.uploads["test.test"][0].bytes)
-		require.Equal(t, "1e75e243758ec30e3bbdfa3c48ec5d1f25eccae3e19b81372b5bb18fff70baed5b16436c07b2cf8963b14657b282ee7675efec88feb0c0b934508fd38be1b48f00", hex.EncodeToString(server.uploads["test.test"][0].sig)) // nolint
-
-		// verify signature
-		h := ecmh.NewMultisetHash()
-		h.Insert([]byte("hello"))
-		pubKey := crypto.PubkeyToAddress(privateKey.PublicKey)
-		crypto.VerifySignature(pubKey.Bytes(), h.Bytes(), server.uploads["test.test"][0].sig)
+		require.Equal(t, "801fb03a3a34fd9d3ac5445f693df74c822d2e8cfa736191e7919e099931d8a51cd0a62fc67da6d8f0aab4302c18aa0cf381c973a8817b7062805f19d03f88ce00", hex.EncodeToString(server.uploads["test.test"][0].sig)) // nolint
 	}
 
 	// Upload data 2 on test2.test2
@@ -78,13 +71,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 		err := client.Upload(context.Background(), "test2", "test2", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}), app.Timestamp{}) // nolint
 		require.NoError(t, err)
 		require.Equal(t, filedata2, server.uploads["test2.test2"][0].bytes)
-		require.Equal(t, "f58c418ba46fececdd48b7979ca29bc2d200836f2f750e449d67d8c62e23a91a0bfcfbba35773da844bf6afed21cb689ea2b836ee4c88abf15831e6202734fa301", hex.EncodeToString(server.uploads["test2.test2"][0].sig)) // nolint
-
-		// verify signature
-		h := ecmh.NewMultisetHash()
-		h.Insert([]byte("World"))
-		pubKey := crypto.PubkeyToAddress(privateKey.PublicKey)
-		crypto.VerifySignature(pubKey.Bytes(), h.Bytes(), server.uploads["test2.test2"][0].sig)
+		require.Equal(t, "3ad572a3483971285f3c6dc0e71d234a58543876f98b23183dc4e60008c1a92310f42202858b48ad917588535c2234c85413e124a2dcdd0759df9c555a9f585901", hex.EncodeToString(server.uploads["test2.test2"][0].sig)) // nolint
 	}
 
 	// Upload data 3 on test.test
@@ -94,13 +81,7 @@ func TestBasinProvider_Upload(t *testing.T) {
 		err := client.Upload(context.Background(), "test", "test", uint64(5), buf, app.NewSigner(privateKey), bytes.NewBuffer([]byte{}), app.Timestamp{}) // nolint
 		require.NoError(t, err)
 		require.Equal(t, filedata3, server.uploads["test.test"][1].bytes)
-		require.Equal(t, "b0e5f145193a3a53da3cab406058037e96079630c120bd2faa59b545b29c7c060bfc53d7c86b222491d59e361d812c6a36b7f0372abf2bffd0e02aee1c8a731201", hex.EncodeToString(server.uploads["test.test"][1].sig)) // nolint
-
-		// verify signature
-		h := ecmh.NewMultisetHash()
-		h.Insert([]byte("WORLD"))
-		pubKey := crypto.PubkeyToAddress(privateKey.PublicKey)
-		crypto.VerifySignature(pubKey.Bytes(), h.Bytes(), server.uploads["test.test"][1].sig)
+		require.Equal(t, "94dcba2012dd83edf1e379bbdc640e95321ea30d5318e1f5dfd46154603bba4970729b44a71844e3f4e07955dfb529ccf60d31b74a9971649d64fd8c12a32a7d00", hex.EncodeToString(server.uploads["test.test"][1].sig)) // nolint
 	}
 
 	// check latest 2 deals for test2.test2, should return filedata2
