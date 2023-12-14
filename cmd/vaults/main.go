@@ -9,10 +9,15 @@ import (
 
 func main() {
 	cliApp := &cli.App{
-		Name:  "basin",
-		Usage: "Continuously publish data from your database to the Tableland network.",
+		Name:  "vaults",
+		Usage: "Continuously publish data from your database to the Textile Vaults network.",
 		Commands: []*cli.Command{
-			newPublicationCommand(),
+			newVaultCreateCommand(),
+			newStreamCommand(),
+			newWriteCommand(),
+			newListCommand(),
+			newListEventsCommand(),
+			newRetrieveCommand(),
 			newWalletCommand(),
 		},
 	}

@@ -5,8 +5,8 @@ import (
 	"io"
 )
 
-// BasinProvider ...
-type BasinProvider interface {
+// VaultsProvider defines Vaults API.
+type VaultsProvider interface {
 	CreateVault(context.Context, CreateVaultParams) error
 	ListVaults(context.Context, ListVaultsParams) ([]Vault, error)
 	ListVaultEvents(context.Context, ListVaultEventsParams) ([]EventInfo, error)

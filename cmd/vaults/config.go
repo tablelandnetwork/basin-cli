@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DefaultProviderHost is the address of Basin Provider.
+// DefaultProviderHost is the address of Vaults Provider.
 const DefaultProviderHost = "https://basin.tableland.xyz"
 
 // DefaultWindowSize is the number of seconds for which WAL updates

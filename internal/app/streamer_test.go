@@ -29,7 +29,7 @@ var cols = []Column{
 
 // Test when window threshold is crossed before
 // second Tx is received: <T1, W, T2, C>.
-func TestBasinStreamerOne(t *testing.T) {
+func TestVaultsStreamerOne(t *testing.T) {
 	// used for testing
 	privateKey, err := crypto.HexToECDSA(pk)
 	require.NoError(t, err)
@@ -38,15 +38,15 @@ func TestBasinStreamerOne(t *testing.T) {
 	feed := make(chan *pgrepl.Tx)
 	testDBDir := t.TempDir()
 	winSize := 3 * time.Second
-	providerMock := &basinProviderMock{
+	providerMock := &vaultsProviderMock{
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
-	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
+	uploader := NewVaultsUploader(testNS, testTable, providerMock, privateKey)
 	dbm := NewDBManager(
 		testDBDir, testTable, cols, winSize, uploader)
 
-	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
+	streamer := NewVaultsStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
 		// start listening to WAL records in a separate goroutine
 		err = streamer.Run(context.Background())
@@ -105,7 +105,7 @@ func TestBasinStreamerOne(t *testing.T) {
 		dbm.db = nil
 		dbm.dbFname = ""
 		dbm.createdAT = time.Time{}
-		uploader.provider = &basinProviderMock{
+		uploader.provider = &vaultsProviderMock{
 			owner:          make(map[string]string),
 			uploaderInputs: ch2,
 		}
@@ -132,7 +132,7 @@ func TestBasinStreamerOne(t *testing.T) {
 
 // Test when window threshold is crossed after
 // second Tx is received: <T1, T2, W, C>.
-func TestBasinStreamerTwo(t *testing.T) {
+func TestVaultsStreamerTwo(t *testing.T) {
 	privateKey, err := crypto.HexToECDSA(pk)
 	require.NoError(t, err)
 
@@ -140,14 +140,14 @@ func TestBasinStreamerTwo(t *testing.T) {
 	feed := make(chan *pgrepl.Tx)
 	testDBDir := t.TempDir()
 	winSize := 3 * time.Second
-	providerMock := &basinProviderMock{
+	providerMock := &vaultsProviderMock{
 		owner:          make(map[string]string),
 		uploaderInputs: make(chan *os.File),
 	}
-	uploader := NewBasinUploader(testNS, testTable, providerMock, privateKey)
+	uploader := NewVaultsUploader(testNS, testTable, providerMock, privateKey)
 	dbm := NewDBManager(
 		testDBDir, testTable, cols, winSize, uploader)
-	streamer := NewBasinStreamer(testNS, &replicatorMock{feed: feed}, dbm)
+	streamer := NewVaultsStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
 		// start listening to WAL records in a separate goroutine
 		err = streamer.Run(context.Background())
@@ -234,29 +234,29 @@ func (rm *replicatorMock) Shutdown() {
 	close(rm.feed)
 }
 
-type basinProviderMock struct {
+type vaultsProviderMock struct {
 	owner          map[string]string
 	uploaderInputs chan *os.File
 }
 
-func (bp *basinProviderMock) CreateVault(
+func (bp *vaultsProviderMock) CreateVault(
 	_ context.Context, params CreateVaultParams,
 ) error {
 	bp.owner[string(params.Vault)] = params.Account.Hex()
 	return nil
 }
 
-func (bp *basinProviderMock) ListVaults(_ context.Context, _ ListVaultsParams) ([]Vault, error) {
+func (bp *vaultsProviderMock) ListVaults(_ context.Context, _ ListVaultsParams) ([]Vault, error) {
 	return []Vault{}, nil
 }
 
-func (bp *basinProviderMock) ListVaultEvents(
+func (bp *vaultsProviderMock) ListVaultEvents(
 	context.Context, ListVaultEventsParams,
 ) ([]EventInfo, error) {
 	return []EventInfo{}, nil
 }
 
-func (bp *basinProviderMock) WriteVaultEvent(
+func (bp *vaultsProviderMock) WriteVaultEvent(
 	_ context.Context, params WriteVaultEventParams,
 ) error {
 	file := params.Content.(*os.File)

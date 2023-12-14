@@ -32,11 +32,11 @@ type DBManager struct {
 	createdAT time.Time
 	cols      []Column
 	winSize   time.Duration
-	uploader  *BasinUploader
+	uploader  *VaultsUploader
 }
 
 // NewDBManager creates a new DBManager.
-func NewDBManager(dbDir, table string, cols []Column, winSize time.Duration, uploader *BasinUploader) *DBManager {
+func NewDBManager(dbDir, table string, cols []Column, winSize time.Duration, uploader *VaultsUploader) *DBManager {
 	return &DBManager{
 		dbDir:    dbDir,
 		table:    table,

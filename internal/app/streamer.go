@@ -19,24 +19,24 @@ type Replicator interface {
 	Shutdown()
 }
 
-// BasinStreamer contains logic of streaming Postgres changes to Basin Provider.
-type BasinStreamer struct {
+// VaultsStreamer contains logic of streaming Postgres changes to Vaults Provider.
+type VaultsStreamer struct {
 	namespace  string
 	replicator Replicator
 	dbMngr     *DBManager
 }
 
-// NewBasinStreamer creates new streamer.
-func NewBasinStreamer(ns string, r Replicator, dbm *DBManager) *BasinStreamer {
-	return &BasinStreamer{
+// NewVaultsStreamer creates new streamer.
+func NewVaultsStreamer(ns string, r Replicator, dbm *DBManager) *VaultsStreamer {
+	return &VaultsStreamer{
 		namespace:  ns,
 		replicator: r,
 		dbMngr:     dbm,
 	}
 }
 
-// Run runs the BasinStreamer logic.
-func (b *BasinStreamer) Run(ctx context.Context) error {
+// Run runs the VaultsStreamer logic.
+func (b *VaultsStreamer) Run(ctx context.Context) error {
 	// Open a local DB for replaying txs
 	if err := b.dbMngr.NewDB(ctx); err != nil {
 		return err
