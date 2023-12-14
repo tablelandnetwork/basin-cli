@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"capnproto.org/go/capnp/v3"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/filecoin-project/lassie/pkg/lassie"
@@ -27,7 +26,6 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	"github.com/tablelandnetwork/basin-cli/pkg/basinprovider"
-	basincapnp "github.com/tablelandnetwork/basin-cli/pkg/capnp"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
@@ -58,7 +56,6 @@ func newPublicationCommand() *cli.Command {
 
 func newPublicationCreateCommand() *cli.Command {
 	var owner, dburi, provider string
-	var secure bool
 	var winSize, cache int64
 
 	return &cli.Command{
@@ -81,12 +78,6 @@ func newPublicationCreateCommand() *cli.Command {
 				Usage:       "The provider's address and port (e.g. localhost:8080)",
 				Destination: &provider,
 				Value:       DefaultProviderHost,
-			},
-			&cli.BoolFlag{
-				Name:        "secure",
-				Usage:       "Uses TLS connection",
-				Destination: &secure,
-				Value:       true,
 			},
 			&cli.Int64Flag{
 				Name:        "window-size",
@@ -153,7 +144,7 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, secure, cache)
+			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, cache)
 			if err != nil {
 				return fmt.Errorf("failed to create publication: %s", err)
 			}
@@ -175,7 +166,6 @@ func newPublicationCreateCommand() *cli.Command {
 
 func newPublicationStartCommand() *cli.Command {
 	var privateKey string
-	var secure bool
 
 	return &cli.Command{
 		Name:  "start",
@@ -186,12 +176,6 @@ func newPublicationStartCommand() *cli.Command {
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
-			},
-			&cli.BoolFlag{
-				Name:        "secure",
-				Usage:       "Uses TLS connection",
-				Destination: &secure,
-				Value:       true,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -233,11 +217,7 @@ func newPublicationStartCommand() *cli.Command {
 				return err
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publication].ProviderHost, secure)
-			if err != nil {
-				return err
-			}
-			defer bp.Close()
+			bp := basinprovider.New(cfg.Publications[publication].ProviderHost)
 
 			pgxConn, err := pgx.Connect(cCtx.Context, connString)
 			if err != nil {
@@ -285,7 +265,6 @@ func newPublicationStartCommand() *cli.Command {
 
 func newPublicationUploadCommand() *cli.Command {
 	var privateKey, publicationName string
-	var secure bool
 	var timestamp string
 
 	return &cli.Command{
@@ -303,12 +282,6 @@ func newPublicationUploadCommand() *cli.Command {
 				Usage:       "Publication name",
 				Destination: &publicationName,
 				Required:    true,
-			},
-			&cli.BoolFlag{
-				Name:        "secure",
-				Usage:       "Uses TLS connection",
-				Destination: &secure,
-				Value:       true,
 			},
 			&cli.StringFlag{
 				Name:        "timestamp",
@@ -340,11 +313,7 @@ func newPublicationUploadCommand() *cli.Command {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, cfg.Publications[publicationName].ProviderHost, secure)
-			if err != nil {
-				return err
-			}
-			defer bp.Close()
+			bp := basinprovider.New(cfg.Publications[publicationName].ProviderHost)
 
 			filepath := cCtx.Args().First()
 
@@ -376,7 +345,7 @@ func newPublicationUploadCommand() *cli.Command {
 			}
 
 			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey)
-			if err := basinStreamer.Upload(cCtx.Context, filepath, bar, ts); err != nil {
+			if err := basinStreamer.Upload(cCtx.Context, filepath, bar, ts, fi.Size()); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
 
@@ -387,7 +356,6 @@ func newPublicationUploadCommand() *cli.Command {
 
 func newPublicationListCommand() *cli.Command {
 	var owner, provider string
-	var secure bool
 
 	return &cli.Command{
 		Name:  "list",
@@ -405,31 +373,21 @@ func newPublicationListCommand() *cli.Command {
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
-			&cli.BoolFlag{
-				Name:        "secure",
-				Usage:       "Uses TLS connection",
-				Destination: &secure,
-				Value:       true,
-			},
 		},
 		Action: func(cCtx *cli.Context) error {
-			if !common.IsHexAddress(owner) {
+			account, err := app.NewAccount(owner)
+			if err != nil {
 				return fmt.Errorf("%s is not a valid Ethereum wallet address", owner)
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, provider, secure)
-			if err != nil {
-				return fmt.Errorf("new basin provider: %s", err)
-			}
-			defer bp.Close()
-
-			publications, err := bp.List(cCtx.Context, common.HexToAddress(owner))
+			bp := basinprovider.New(provider)
+			vaults, err := bp.ListVaults(cCtx.Context, app.ListVaultsParams{Account: account})
 			if err != nil {
 				return fmt.Errorf("failed to list publications: %s", err)
 			}
 
-			for _, pub := range publications {
-				fmt.Printf("%s\n", pub)
+			for _, vault := range vaults {
+				fmt.Printf("%s\n", vault)
 			}
 
 			return nil
@@ -439,9 +397,7 @@ func newPublicationListCommand() *cli.Command {
 
 func newPublicationDealsCommand() *cli.Command {
 	var publication, provider, before, after, at, format string
-	var limit, latest int
-	var offset int64
-	var secure bool
+	var limit, offset, latest int
 
 	return &cli.Command{
 		Name:  "deals",
@@ -470,17 +426,11 @@ func newPublicationDealsCommand() *cli.Command {
 				Usage:       "The latest N deals to fetch",
 				Destination: &latest,
 			},
-			&cli.Int64Flag{
+			&cli.IntFlag{
 				Name:        "offset",
 				Usage:       "The epoch to start from",
 				Destination: &offset,
 				Value:       0,
-			},
-			&cli.BoolFlag{
-				Name:        "secure",
-				Usage:       "Uses TLS connection",
-				Destination: &secure,
-				Value:       true,
 			},
 			&cli.StringFlag{
 				Name:        "before",
@@ -513,22 +463,21 @@ func newPublicationDealsCommand() *cli.Command {
 				return err
 			}
 
-			bp, err := basinprovider.New(cCtx.Context, provider, secure)
-			if err != nil {
-				return fmt.Errorf("new basin provider: %s", err)
-			}
-			defer bp.Close()
+			bp := basinprovider.New(provider)
 
 			b, a, err := validateBeforeAndAfter(before, after, at)
 			if err != nil {
 				return err
 			}
 
-			var deals []app.DealInfo
+			var req app.ListVaultEventsParams
 			if latest > 0 {
-				deals, err = bp.LatestDeals(cCtx.Context, ns, rel, uint32(latest), b, a)
-				if err != nil {
-					return fmt.Errorf("failed to fetch deals: %s", err)
+				req = app.ListVaultEventsParams{
+					Vault:  app.Vault(fmt.Sprintf("%s.%s", ns, rel)),
+					Limit:  uint32(latest),
+					Offset: 0,
+					Before: b,
+					After:  a,
 				}
 			} else {
 				if offset < 0 {
@@ -539,34 +488,42 @@ func newPublicationDealsCommand() *cli.Command {
 					return errors.New("limit has to be greater than 0")
 				}
 
-				deals, err = bp.Deals(cCtx.Context, ns, rel, uint32(limit), uint64(offset), b, a)
-				if err != nil {
-					return fmt.Errorf("failed to fetch deals: %s", err)
+				req = app.ListVaultEventsParams{
+					Vault:  app.Vault(fmt.Sprintf("%s.%s", ns, rel)),
+					Limit:  uint32(limit),
+					Offset: uint32(offset),
+					Before: b,
+					After:  a,
 				}
+			}
+
+			events, err := bp.ListVaultEvents(cCtx.Context, req)
+			if err != nil {
+				return fmt.Errorf("failed to fetch deals: %s", err)
 			}
 
 			if format == "table" {
 				table := tablewriter.NewWriter(os.Stdout)
 				table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived", "Cache Expiry"})
 
-				for _, deal := range deals {
+				for _, event := range events {
 					isArchived := "N"
-					if deal.IsArchived {
+					if event.IsArchived {
 						isArchived = "Y"
 					}
 					timestamp := "(null)"
-					if deal.Timestamp > 0 {
-						timestamp = time.Unix(deal.Timestamp, 0).Format(time.RFC3339)
+					if event.Timestamp > 0 {
+						timestamp = time.Unix(event.Timestamp, 0).Format(time.RFC3339)
 					}
 					table.Append([]string{
-						deal.CID, fmt.Sprintf("%d", deal.Size), timestamp, isArchived, deal.CacheExpiry,
+						event.CID, fmt.Sprintf("%d", event.Size), timestamp, isArchived, event.CacheExpiry,
 					})
 				}
 				table.Render()
 			} else if format == "json" {
-				jsonData, err := json.Marshal(deals)
+				jsonData, err := json.Marshal(events)
 				if err != nil {
-					return fmt.Errorf("error serializing deals to JSON")
+					return fmt.Errorf("error serializing events to JSON")
 				}
 				fmt.Println(string(jsonData))
 			} else {
@@ -701,19 +658,23 @@ func createPublication(
 	rel string,
 	provider string,
 	owner string,
-	secure bool,
 	cacheDuration int64,
 ) (exists bool, err error) {
-	bp, err := basinprovider.New(ctx, provider, secure)
+	account, err := app.NewAccount(owner)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("not a valid account: %s", err)
 	}
-	defer bp.Close()
+
+	bp := basinprovider.New(provider)
+	req := app.CreateVaultParams{
+		Account:       account,
+		Vault:         app.Vault(fmt.Sprintf("%s.%s", ns, rel)),
+		CacheDuration: app.CacheDuration(cacheDuration),
+	}
 
 	if dburi == "" {
-		exists, err := bp.Create(ctx, ns, rel, basincapnp.Schema{}, common.HexToAddress(owner), cacheDuration)
-		if err != nil {
-			return false, fmt.Errorf("create call: %s", err)
+		if err := bp.CreateVault(ctx, req); err != nil {
+			return false, fmt.Errorf("create vault: %s", err)
 		}
 
 		return exists, nil
@@ -737,36 +698,6 @@ func createPublication(
 		}
 	}()
 
-	columns, err := inspectTable(ctx, tx, rel)
-	if err != nil {
-		return false, fmt.Errorf("failed to inspect table: %s", err)
-	}
-
-	_, seg, err := capnp.NewMessage(capnp.SingleSegment(nil))
-	if err != nil {
-		return false, fmt.Errorf("capnp new message: %s", err)
-	}
-
-	capnpSchema, err := basincapnp.NewRootSchema(seg)
-	if err != nil {
-		return false, fmt.Errorf("capnp new tx: %s", err)
-	}
-
-	columnsList, err := basincapnp.NewSchema_Column_List(seg, int32(len(columns)))
-	if err != nil {
-		return false, fmt.Errorf("capnp new columns list: %s", err)
-	}
-
-	for i, col := range columns {
-		column := columnsList.At(i)
-
-		_ = column.SetName(col.Name)
-		_ = column.SetType(col.Typ)
-		column.SetIsNullable(col.IsNull)
-		column.SetIsPartOfPrimaryKey(col.IsPrimary)
-	}
-	_ = capnpSchema.SetColumns(columnsList)
-
 	if _, err := tx.Exec(
 		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", pgrepl.Publication(rel).FullName(), rel),
 	); err != nil {
@@ -776,7 +707,7 @@ func createPublication(
 		return false, fmt.Errorf("failed to create publication: %s", err)
 	}
 
-	if _, err := bp.Create(ctx, ns, rel, capnpSchema, common.HexToAddress(owner), cacheDuration); err != nil {
+	if err := bp.CreateVault(ctx, req); err != nil {
 		return false, fmt.Errorf("create call: %s", err)
 	}
 

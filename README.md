@@ -19,7 +19,6 @@
 - [Listing Deals](#listing-deals)
 - [Running](#running)
 - [Run tests](#run-tests)
-- [Generate Cap'N Proto code](#generate-capn-proto-code)
 - [Retrieving](#retrieving)
 
 # Background
@@ -197,11 +196,6 @@ make test
 
 Note: One of the tests requires Docker Engine to be running.
 
-## Generate Cap'N Proto code
-
-```bash
-make generate
-```
 
 # Contributing
 
