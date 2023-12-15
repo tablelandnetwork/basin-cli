@@ -93,7 +93,7 @@ func newVaultCreateCommand() *cli.Command {
 				return fmt.Errorf("parse config: %s", err)
 			}
 
-			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
@@ -106,12 +106,12 @@ func newVaultCreateCommand() *cli.Command {
 				_ = f.Close()
 			}()
 
-			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			cfg.Publications[pub] = publication{
+			cfg.Vaults[pub] = vault{
 				Host:         pgConfig.Host,
 				Port:         int(pgConfig.Port),
 				User:         pgConfig.User,
@@ -170,22 +170,22 @@ func newStreamCommand() *cli.Command {
 				return err
 			}
 
-			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
 
 			connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
-				cfg.Publications[vault].User,
-				cfg.Publications[vault].Password,
-				cfg.Publications[vault].Host,
-				cfg.Publications[vault].Port,
-				cfg.Publications[vault].Database,
+				cfg.Vaults[vault].User,
+				cfg.Vaults[vault].Password,
+				cfg.Vaults[vault].Host,
+				cfg.Vaults[vault].Port,
+				cfg.Vaults[vault].Database,
 			)
 
 			r, err := pgrepl.New(connString, pgrepl.Publication(rel))
@@ -198,7 +198,7 @@ func newStreamCommand() *cli.Command {
 				return err
 			}
 
-			bp := vaultsprovider.New(cfg.Publications[vault].ProviderHost)
+			bp := vaultsprovider.New(cfg.Vaults[vault].ProviderHost)
 
 			pgxConn, err := pgx.Connect(cCtx.Context, connString)
 			if err != nil {
@@ -225,7 +225,7 @@ func newStreamCommand() *cli.Command {
 
 			// Creates a new db manager when replication starts
 			dbDir := path.Join(dir, vault)
-			winSize := time.Duration(cfg.Publications[vault].WindowSize) * time.Second
+			winSize := time.Duration(cfg.Vaults[vault].WindowSize) * time.Second
 			uploader := app.NewVaultsUploader(ns, rel, bp, privateKey)
 			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
 
@@ -284,17 +284,17 @@ func newWriteCommand() *cli.Command {
 				return err
 			}
 
-			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			bp := vaultsprovider.New(cfg.Publications[vaultName].ProviderHost)
+			bp := vaultsprovider.New(cfg.Vaults[vaultName].ProviderHost)
 
 			filepath := cCtx.Args().First()
 

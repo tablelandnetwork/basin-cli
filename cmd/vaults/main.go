@@ -8,6 +8,9 @@ import (
 )
 
 func main() {
+	// migrate v1 config to v2 config
+	migrateConfigV1ToV2()
+
 	cliApp := &cli.App{
 		Name:  "vaults",
 		Usage: "Continuously publish data from your database to the Textile Vaults network.",
