@@ -40,42 +40,53 @@ func newVaultCreateCommand() *cli.Command {
 	var winSize, cache int64
 
 	return &cli.Command{
-		Name:  "create",
-		Usage: "create a new vault",
+		Name:        "create",
+		Usage:       "Create a new vault",
+		UsageText:   "vaults create <vault_name> [command options]",
+		Description: "Create a vault for a given account's address as either database streaming or file uploading. Optionally, also set a cache duration for the data.",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "account",
+				Aliases:     []string{"a"},
+				Category:    "REQUIRED",
 				Usage:       "Ethereum wallet address",
 				Destination: &address,
 				Required:    true,
 			},
 			&cli.StringFlag{
-				Name:        "dburi",
-				Usage:       "PostgreSQL connection string",
-				Destination: &dburi,
-			},
-			&cli.StringFlag{
 				Name:        "provider",
-				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Category:    "OPTIONAL",
+				Aliases:     []string{"p"},
+				Usage:       "The provider's address and port (e.g., localhost:8080)",
+				DefaultText: DefaultProviderHost,
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
 			&cli.Int64Flag{
-				Name:        "window-size",
-				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
-				Destination: &winSize,
-				Value:       DefaultWindowSize,
-			},
-			&cli.Int64Flag{
 				Name:        "cache",
+				Category:    "OPTIONAL",
 				Usage:       "Time duration (in minutes) that the data will be available in the cache",
 				Destination: &cache,
 				Value:       0,
 			},
+			&cli.StringFlag{
+				Name:        "dburi",
+				Category:    "DATABASE",
+				Usage:       "PostgreSQL connection string (e.g., postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres)",
+				Destination: &dburi,
+			},
+			&cli.Int64Flag{
+				Name:        "window-size",
+				Category:    "DATABASE",
+				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
+				DefaultText: fmt.Sprintf("%d", DefaultWindowSize),
+				Destination: &winSize,
+				Value:       DefaultWindowSize,
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			if cCtx.NArg() != 1 {
-				return errors.New("one argument should be provided")
+				return errors.New("must provide a vault name")
 			}
 
 			pub := cCtx.Args().First()
@@ -149,11 +160,14 @@ func newStreamCommand() *cli.Command {
 	var privateKey string
 
 	return &cli.Command{
-		Name:  "stream",
-		Usage: "starts a daemon process that streams Postgres changes to a vault",
+		Name:      "stream",
+		Usage:     "Starts a daemon process that streams Postgres changes to a vault",
+		UsageText: "vaults stream <vault_name> [command options]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
+				Aliases:     []string{"k"},
+				Category:    "REQUIRED",
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
@@ -161,7 +175,7 @@ func newStreamCommand() *cli.Command {
 		},
 		Action: func(cCtx *cli.Context) error {
 			if cCtx.NArg() != 1 {
-				return errors.New("one argument should be provided")
+				return errors.New("must provide a vault name")
 			}
 
 			vault := cCtx.Args().First()
@@ -249,30 +263,36 @@ func newWriteCommand() *cli.Command {
 	var timestamp string
 
 	return &cli.Command{
-		Name:  "write",
-		Usage: "write a Parquet file",
+		Name:      "write",
+		Usage:     "Write a Parquet file",
+		UsageText: "vaults write <filename> [command options]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
+				Aliases:     []string{"k"},
+				Category:    "REQUIRED",
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "vault",
+				Category:    "REQUIRED",
 				Usage:       "Vault name",
 				Destination: &vaultName,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "timestamp",
-				Usage:       "The time the file was created (default: current epoch in UTC)",
+				Category:    "OPTIONAL",
+				Usage:       "The time the file was created",
+				DefaultText: "current epoch in UTC",
 				Destination: &timestamp,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			if cCtx.NArg() != 1 {
-				return errors.New("one argument should be provided")
+				return errors.New("must provide a file path")
 			}
 			ns, rel, err := parseVaultName(vaultName)
 			if err != nil {
@@ -339,18 +359,24 @@ func newListCommand() *cli.Command {
 	var address, provider string
 
 	return &cli.Command{
-		Name:  "list",
-		Usage: "list vaults of a given account",
+		Name:      "list",
+		Usage:     "List vaults of a given account",
+		UsageText: "vaults list [command options]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "account",
+				Aliases:     []string{"a"},
+				Category:    "REQUIRED",
 				Usage:       "Ethereum wallet address",
 				Destination: &address,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "provider",
-				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Aliases:     []string{"p"},
+				Category:    "OPTIONAL",
+				Usage:       "The provider's address and port (e.g., localhost:8080)",
+				DefaultText: DefaultProviderHost,
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
@@ -381,59 +407,74 @@ func newListEventsCommand() *cli.Command {
 	var limit, offset, latest int
 
 	return &cli.Command{
-		Name:  "events",
-		Usage: "list events of a given vault",
+		Name:      "events",
+		Usage:     "List events of a given vault",
+		UsageText: "vaults events [command options]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "vault",
+				Category:    "REQUIRED",
 				Usage:       "vault name",
 				Destination: &vault,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "provider",
-				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Category:    "OPTIONAL",
+				Aliases:     []string{"p"},
+				Usage:       "The provider's address and port (e.g., localhost:8080)",
+				DefaultText: DefaultProviderHost,
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
 			&cli.IntFlag{
 				Name:        "limit",
+				Category:    "OPTIONAL",
 				Usage:       "The number of deals to fetch",
+				DefaultText: "10",
 				Destination: &limit,
 				Value:       10,
 			},
 			&cli.IntFlag{
 				Name:        "latest",
+				Category:    "OPTIONAL",
 				Usage:       "The latest N deals to fetch",
 				Destination: &latest,
 			},
 			&cli.IntFlag{
 				Name:        "offset",
+				Category:    "OPTIONAL",
 				Usage:       "The epoch to start from",
+				DefaultText: "0",
 				Destination: &offset,
 				Value:       0,
 			},
 			&cli.StringFlag{
 				Name:        "before",
+				Category:    "OPTIONAL",
 				Usage:       "Filter deals created before this timestamp",
 				Destination: &before,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "after",
+				Category:    "OPTIONAL",
 				Usage:       "Filter deals created after this timestamp",
 				Destination: &after,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "at",
+				Category:    "OPTIONAL",
 				Usage:       "Filter deals created at this timestamp",
 				Destination: &at,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "format",
+				Category:    "OPTIONAL",
 				Usage:       "The output format (table or json)",
+				DefaultText: "table",
 				Destination: &format,
 				Value:       "table",
 			},
@@ -517,8 +558,10 @@ func newListEventsCommand() *cli.Command {
 
 func newRetrieveCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "retrieve",
-		Usage: "Retrieve an event by CID",
+		Name:        "retrieve",
+		Usage:       "Retrieve an event by CID",
+		UsageText:   "vaults retrieve <event>",
+		Description: "Retrieving an event will download the event's CAR file into the current directory.",
 		Action: func(cCtx *cli.Context) error {
 			arg := cCtx.Args().Get(0)
 			if arg == "" {
@@ -567,12 +610,14 @@ func newRetrieveCommand() *cli.Command {
 
 func newWalletCommand() *cli.Command {
 	return &cli.Command{
-		Name:  "wallet",
-		Usage: "wallet commands",
+		Name:  "account",
+		Usage: "Account management for an Ethereum-style wallet",
 		Subcommands: []*cli.Command{
 			{
-				Name:  "create",
-				Usage: "creates a new wallet",
+				Name:        "create",
+				Usage:       "Creates a new account",
+				UsageText:   "vaults account create <filename>",
+				Description: "Create an Ethereum-style wallet (secp256k1 key pair) at a provided file path.",
 				Action: func(cCtx *cli.Context) error {
 					filename := cCtx.Args().Get(0)
 					if filename == "" {
@@ -597,8 +642,9 @@ func newWalletCommand() *cli.Command {
 				},
 			},
 			{
-				Name:  "pubkey",
-				Usage: "print the public key for a private key",
+				Name:      "address",
+				Usage:     "Print the public key for an account's private key",
+				UsageText: "vaults account address <filename>",
 				Action: func(cCtx *cli.Context) error {
 					filename := cCtx.Args().Get(0)
 					if filename == "" {
