@@ -280,6 +280,7 @@ func newWriteCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "vault",
+				Aliases:     []string{"v"},
 				Category:    "REQUIRED",
 				Usage:       "Vault name",
 				Destination: &vaultName,
@@ -435,6 +436,7 @@ func newListEventsCommand() *cli.Command {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "vault",
+				Aliases:     []string{"v"},
 				Category:    "REQUIRED",
 				Usage:       "Vault name",
 				Destination: &vault,
