@@ -114,7 +114,7 @@ A new private key will be written to `FILENAME`.
 The name of a vault contains a `namespace` (e.g. `my_company`) and the name of an existing database relation (e.g. `my_table`), separated by a period (`.`). Use `vaults create` to create a new vault. See `vaults create --help` for more info.
 
 ```bash
-vaults create  --dburi [DBURI] --account [WALLET_ADDRESS] namespace.relation_name
+vaults create --dburi [DBURI] --account [WALLET_ADDRESS] namespace.relation_name
 ```
 
 🚧 Vaults currently only replicates `INSERT` statements, which means that it only replicates append-only data (e.g., log-style data). Row updates and deletes will be ignored. 🚧
@@ -178,8 +178,22 @@ vaults events --vault demotest.data --after 2023-11-09
 
 ### Retrieving
 
+You can retrieve a file from a vault by running:
+
 ```bash
 vaults retrieve bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq
+```
+
+You can also specify where to save the file:
+
+```bash
+vaults retrieve --output /path/to/dir bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq
+```
+
+Or stream the file to stdout the `-` value (note: the short form `-o` is for `--output`), and then pipe it to something like [`car extract`](https://github.com/ipld/go-car) to unpack the CAR file's contents:
+
+```bash
+vaults retrieve -o - bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq | car extract
 ```
 
 ## Development

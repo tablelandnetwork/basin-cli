@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"regexp"
@@ -581,20 +582,32 @@ func newListEventsCommand() *cli.Command {
 }
 
 func newRetrieveCommand() *cli.Command {
+	var output string
+
 	return &cli.Command{
 		Name:        "retrieve",
 		Usage:       "Retrieve an event by CID",
-		UsageText:   "vaults retrieve <event>",
-		Description: "Retrieving an event will download the event's CAR file into the current directory.",
+		ArgsUsage:   "<event_cid>",
+		Description: "Retrieving an event will download the event's CAR file into the current directory, a provided directory path, or to stdout.\n\nExample:\n\nvaults retrieve --output /path/to/dir bafy...",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				Category:    "OPTIONAL",
+				Usage:       "Output directory path, or '-' for stdout",
+				DefaultText: "current directory",
+				Destination: &output,
+			},
+		},
 		Action: func(cCtx *cli.Context) error {
 			arg := cCtx.Args().Get(0)
 			if arg == "" {
-				return errors.New("argument is empty")
+				return errors.New("must provide an event CID")
 			}
 
 			rootCid, err := cid.Parse(arg)
 			if err != nil {
-				return errors.New("cid is invalid")
+				return errors.New("CID is invalid")
 			}
 
 			lassie, err := lassie.NewLassie(cCtx.Context)
@@ -607,7 +620,35 @@ func newRetrieveCommand() *cli.Command {
 				car.StoreIdentityCIDs(false),
 				car.UseWholeCIDs(false),
 			}
-			carWriter := deferred.NewDeferredCarWriterForPath(fmt.Sprintf("./%s.car", arg), []cid.Cid{rootCid}, carOpts...)
+
+			var carWriter *deferred.DeferredCarWriter
+			var tmpFile *os.File
+
+			if output == "-" {
+				// Create a temporary file only for writing to stdout case
+				tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s.car", arg))
+				if err != nil {
+					return fmt.Errorf("failed to create temporary file: %s", err)
+				}
+				defer os.Remove(tmpFile.Name())
+				carWriter = deferred.NewDeferredCarWriterForPath(tmpFile.Name(), []cid.Cid{rootCid}, carOpts...)
+			} else {
+				// Write to the provided path or current directory
+				if output == "" {
+					output = "." // Default to current directory
+				}
+				// Ensure path is a valid directory
+				info, err := os.Stat(output)
+				if err != nil {
+					return fmt.Errorf("failed to access output directory: %s", err)
+				}
+				if !info.IsDir() {
+					return fmt.Errorf("output path is not a directory: %s", output)
+				}
+				carPath := path.Join(output, fmt.Sprintf("%s.car", arg))
+				carWriter = deferred.NewDeferredCarWriterForPath(carPath, []cid.Cid{rootCid}, carOpts...)
+			}
+
 			defer func() {
 				_ = carWriter.Close()
 			}()
@@ -625,6 +666,15 @@ func newRetrieveCommand() *cli.Command {
 
 			if _, err := lassie.Fetch(cCtx.Context, request, []types.FetchOption{}...); err != nil {
 				return fmt.Errorf("failed to fetch: %s", err)
+			}
+
+			// Write to stdout only if the output flag is set to '-'
+			if output == "-" && tmpFile != nil {
+				_, _ = tmpFile.Seek(0, io.SeekStart)
+				_, err = io.Copy(os.Stdout, tmpFile)
+				if err != nil {
+					return fmt.Errorf("failed to write to stdout: %s", err)
+				}
 			}
 
 			return nil

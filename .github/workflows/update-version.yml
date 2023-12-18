@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - dtb/cli-positionals # tmp
   workflow_dispatch:
 
 jobs:
@@ -23,7 +22,7 @@ jobs:
       - name: Update version.json
         run: |
           echo "{
-            \"version\": \"${{steps.get-tag.outputs.LATEST_TAG}}\"  
+            \"version\": \"${{steps.get-tag.outputs.LATEST_TAG}}\"
           }" > version.json
 
       - name: Commit changes
