@@ -1,38 +1,32 @@
-name: Update Version
+name: Update version file
 
 on:
   push:
     branches:
       - main
       - dtb/cli-positionals # tmp
+  workflow_dispatch:
 
 jobs:
-  update-version:
+  update_version:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Git
-        run: |
-          git config --global user.name 'GitHub Actions'
-          git config --global user.email 'actions@github.com'
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Get latest tag
-        id: get-latest-tag
-        run: echo ::set-output name=TAG::$(git describe --tags --abbrev=0)
+        id: get-tag
+        run: |
+          echo "LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))" >> $GITHUB_OUTPUT
 
       - name: Update version.json
         run: |
-          echo "{\"version\": \"${{ steps.get-latest-tag.outputs.TAG }}\"}" > version.json
+          echo "{
+            \"version\": \"${{steps.get-tag.outputs.LATEST_TAG}}\"  
+          }" > version.json
 
-      - name: Commit and push if changed
-        run: |
-          git diff
-          if [ -n "$(git diff --name-only)" ]; then
-            git add version.json
-            git commit -m "Update version to ${{ steps.get-latest-tag.outputs.TAG }}"
-            git push
-          else
-            echo "No changes in version.json"
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "chore: update version to ${{steps.get-tag.outputs.LATEST_TAG}}"

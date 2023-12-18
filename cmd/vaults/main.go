@@ -11,7 +11,7 @@ import (
 func init() {
 	cli.VersionFlag = &cli.BoolFlag{Name: "version", Aliases: []string{"V"}, Usage: "show version"} // Enforce uppercase
 	cli.VersionPrinter = func(c *cli.Context) {
-		fmt.Printf("v%s\n", c.App.Version)
+		fmt.Printf("%s\n", c.App.Version)
 	}
 }
 
