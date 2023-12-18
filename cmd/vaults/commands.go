@@ -41,15 +41,17 @@ func newVaultCreateCommand() *cli.Command {
 	var winSize, cache int64
 
 	return &cli.Command{
-		Name:        "create",
-		Usage:       "Create a new vault",
-		ArgsUsage:   "<vault_name>",
-		Description: "Create a vault for a given account's address as either database streaming or file uploading. Optionally, also set a cache duration for the data.\n\nExample:\n\nvaults create --account 0x1234abcd --cache 10 my.vault",
+		Name:      "create",
+		Usage:     "Create a new vault",
+		ArgsUsage: "<vault_name>",
+		Description: "Create a vault for a given account's address as either database streaming \n" +
+			"or file uploading. Optionally, also set a cache duration for the data.\n\nEXAMPLE:\n\n" +
+			"vaults create --account 0x1234abcd --cache 10 my.vault",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "account",
 				Aliases:     []string{"a"},
-				Category:    "REQUIRED",
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet address",
 				Destination: &address,
 				Required:    true,
@@ -57,7 +59,7 @@ func newVaultCreateCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:        "provider",
 				Aliases:     []string{"p"},
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The provider's address and port (e.g., localhost:8080)",
 				DefaultText: DefaultProviderHost,
 				Destination: &provider,
@@ -65,7 +67,7 @@ func newVaultCreateCommand() *cli.Command {
 			},
 			&cli.Int64Flag{
 				Name:        "cache",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "Time duration (in minutes) that the data will be available in the cache",
 				DefaultText: "0",
 				Destination: &cache,
@@ -73,13 +75,13 @@ func newVaultCreateCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "dburi",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "PostgreSQL connection string (e.g., postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres)",
 				Destination: &dburi,
 			},
 			&cli.Int64Flag{
 				Name:        "window-size",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
 				DefaultText: fmt.Sprintf("%d", DefaultWindowSize),
 				Destination: &winSize,
@@ -162,15 +164,18 @@ func newStreamCommand() *cli.Command {
 	var privateKey string
 
 	return &cli.Command{
-		Name:        "stream",
-		Usage:       "Starts a daemon process that streams Postgres changes to a vault",
-		ArgsUsage:   "<vault_name>",
-		Description: "The daemon will continuously stream database changes (except deletions) to the vault, as long as the daemon is actively running.\n\nExample:\n\nvaults stream --vault my.vault --private-key 0x1234abcd",
+		Name:      "stream",
+		Usage:     "Starts a daemon process that streams Postgres changes to a vault",
+		ArgsUsage: "<vault_name>",
+		Description: "The daemon will continuously stream database changes (except deletions) \n" +
+			"to the vault, as long as the daemon is actively running.\n\n" +
+			"EXAMPLE:\n\nvaults stream --vault my.vault --private-key 0x1234abcd",
+
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
 				Aliases:     []string{"k"},
-				Category:    "REQUIRED",
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
@@ -266,15 +271,17 @@ func newWriteCommand() *cli.Command {
 	var timestamp string
 
 	return &cli.Command{
-		Name:        "write",
-		Usage:       "Write a Parquet file",
-		ArgsUsage:   "<file_path>",
-		Description: "A Parquet file can be pushed directly to the vault, as an alternative to continuous Postgres data streaming.\n\nExample:\n\nvaults write --vault my.vault --private-key 0x1234abcd /path/to/file.parquet",
+		Name:      "write",
+		Usage:     "Write a Parquet file",
+		ArgsUsage: "<file_path>",
+		Description: "A Parquet file can be pushed directly to the vault, as an \n" +
+			"alternative to continuous Postgres data streaming.\n\n" +
+			"EXAMPLE:\n\nvaults write --vault my.vault --private-key 0x1234abcd /path/to/file.parquet",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
 				Aliases:     []string{"k"},
-				Category:    "REQUIRED",
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
@@ -282,14 +289,14 @@ func newWriteCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:        "vault",
 				Aliases:     []string{"v"},
-				Category:    "REQUIRED",
+				Category:    "REQUIRED:",
 				Usage:       "Vault name",
 				Destination: &vaultName,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "timestamp",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The time the file was created",
 				DefaultText: "current epoch in UTC",
 				Destination: &timestamp,
@@ -364,14 +371,16 @@ func newListCommand() *cli.Command {
 	var address, provider, format string
 
 	return &cli.Command{
-		Name:        "list",
-		Usage:       "List vaults of a given account",
-		Description: "Listing vaults will show all vaults that have been created by the provided account's address and logged as either line delimited text or a json array.\n\nExample:\n\nvaults list --account 0x1234abcd --format json",
+		Name:  "list",
+		Usage: "List vaults of a given account",
+		Description: "Listing vaults will show all vaults that have been created by the provided \n" +
+			"account's address and logged as either line delimited text or a json array.\n\n" +
+			"EXAMPLE:\n\nvaults list --account 0x1234abcd --format json",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "account",
 				Aliases:     []string{"a"},
-				Category:    "REQUIRED",
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet address",
 				Destination: &address,
 				Required:    true,
@@ -379,7 +388,7 @@ func newListCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:        "provider",
 				Aliases:     []string{"p"},
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The provider's address and port (e.g., localhost:8080)",
 				DefaultText: DefaultProviderHost,
 				Destination: &provider,
@@ -387,7 +396,7 @@ func newListCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "format",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The output format (text or json)",
 				DefaultText: "text",
 				Destination: &format,
@@ -430,15 +439,20 @@ func newListEventsCommand() *cli.Command {
 	var limit, offset, latest int
 
 	return &cli.Command{
-		Name:        "events",
-		Usage:       "List events of a given vault",
-		UsageText:   "vaults events [command options]",
-		Description: "Vault events can be filtered by date ranges (unix, ISO 8601 date, or ISO 8601 date & time), returning the event metadata and corresponding CID.\n\nExample:\n\nvaults events --vault my.vault \\\n--limit 10 --offset 3 \\\n--after 2023-09-01 --before 2023-12-01 \\\n--format json",
+		Name:      "events",
+		Usage:     "List events of a given vault",
+		UsageText: "vaults events [command options]",
+		Description: "Vault events can be filtered by date ranges (unix, ISO 8601 date,\n" +
+			"or ISO 8601 date & time), returning the event metadata and \n" +
+			"corresponding CID.\n\n" +
+			"EXAMPLE:\n\nvaults events --vault my.vault \\\n" +
+			"--limit 10 --offset 3 \\\n--after 2023-09-01 --before 2023-12-01 \\\n" +
+			"--format json",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "vault",
 				Aliases:     []string{"v"},
-				Category:    "REQUIRED",
+				Category:    "REQUIRED:",
 				Usage:       "Vault name",
 				Destination: &vault,
 				Required:    true,
@@ -446,7 +460,7 @@ func newListEventsCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:        "provider",
 				Aliases:     []string{"p"},
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The provider's address and port (e.g., localhost:8080)",
 				DefaultText: DefaultProviderHost,
 				Destination: &provider,
@@ -454,7 +468,7 @@ func newListEventsCommand() *cli.Command {
 			},
 			&cli.IntFlag{
 				Name:        "limit",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The number of deals to fetch",
 				DefaultText: "10",
 				Destination: &limit,
@@ -462,13 +476,13 @@ func newListEventsCommand() *cli.Command {
 			},
 			&cli.IntFlag{
 				Name:        "latest",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The latest N deals to fetch",
 				Destination: &latest,
 			},
 			&cli.IntFlag{
 				Name:        "offset",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The epoch to start from",
 				DefaultText: "0",
 				Destination: &offset,
@@ -476,28 +490,28 @@ func newListEventsCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:        "before",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "Filter deals created before this timestamp",
 				Destination: &before,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "after",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "Filter deals created after this timestamp",
 				Destination: &after,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "at",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "Filter deals created at this timestamp",
 				Destination: &at,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "format",
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "The output format (table or json)",
 				DefaultText: "table",
 				Destination: &format,
@@ -585,15 +599,17 @@ func newRetrieveCommand() *cli.Command {
 	var output string
 
 	return &cli.Command{
-		Name:        "retrieve",
-		Usage:       "Retrieve an event by CID",
-		ArgsUsage:   "<event_cid>",
-		Description: "Retrieving an event will download the event's CAR file into the current directory, a provided directory path, or to stdout.\n\nExample:\n\nvaults retrieve --output /path/to/dir bafy...",
+		Name:      "retrieve",
+		Usage:     "Retrieve an event by CID",
+		ArgsUsage: "<event_cid>",
+		Description: "Retrieving an event will download the event's CAR file into the \n" +
+			"current directory, a provided directory path, or to stdout.\n\n" +
+			"EXAMPLE:\n\nvaults retrieve --output /path/to/dir bafy...",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "output",
 				Aliases:     []string{"o"},
-				Category:    "OPTIONAL",
+				Category:    "OPTIONAL:",
 				Usage:       "Output directory path, or '-' for stdout",
 				DefaultText: "current directory",
 				Destination: &output,
@@ -630,7 +646,9 @@ func newRetrieveCommand() *cli.Command {
 				if err != nil {
 					return fmt.Errorf("failed to create temporary file: %s", err)
 				}
-				defer os.Remove(tmpFile.Name())
+				defer func() {
+					_ = os.Remove(tmpFile.Name())
+				}()
 				carWriter = deferred.NewDeferredCarWriterForPath(tmpFile.Name(), []cid.Cid{rootCid}, carOpts...)
 			} else {
 				// Write to the provided path or current directory
@@ -689,10 +707,12 @@ func newWalletCommand() *cli.Command {
 		UsageText: "vaults account <subcommand> [arguments...]",
 		Subcommands: []*cli.Command{
 			{
-				Name:        "create",
-				Usage:       "Creates a new account",
-				UsageText:   "vaults account create <file_path>",
-				Description: "Create an Ethereum-style wallet (secp256k1 key pair) at a provided file path.\n\nExample:\n\nvaults account create /path/to/file",
+				Name:      "create",
+				Usage:     "Creates a new account",
+				UsageText: "vaults account create <file_path>",
+				Description: "Create an Ethereum-style wallet (secp256k1 key pair) at a \n" +
+					"provided file path.\n\n" +
+					"EXAMPLE:\n\nvaults account create /path/to/file",
 				Action: func(cCtx *cli.Context) error {
 					filename := cCtx.Args().Get(0)
 					if filename == "" {
@@ -717,10 +737,12 @@ func newWalletCommand() *cli.Command {
 				},
 			},
 			{
-				Name:        "address",
-				Usage:       "Print the public key for an account's private key",
-				UsageText:   "vaults account address <file_path>",
-				Description: "The result of the `vaults account create` command will write a private key to a file, and this lets you retrieve that value for use in other commands.\n\nExample:\n\nvaults account address /path/to/file",
+				Name:      "address",
+				Usage:     "Print the public key for an account's private key",
+				UsageText: "vaults account address <file_path>",
+				Description: "The result of the `vaults account create` command will write a private key to a file, \n" +
+					"and this lets you retrieve the public key value for use in other commands.\n\n" +
+					"EXAMPLE:\n\nvaults account address /path/to/file",
 				Action: func(cCtx *cli.Context) error {
 					filename := cCtx.Args().Get(0)
 					if filename == "" {
@@ -746,7 +768,10 @@ func newWalletCommand() *cli.Command {
 func parseVaultName(name string) (ns string, rel string, err error) {
 	match := pubNameRx.FindStringSubmatch(name)
 	if len(match) != 3 {
-		return "", "", errors.New("vault name must be of the form `namespace.relation_name` using only letters, numbers, and underscores (_), where `namespace` and `relation` do not start with a number") // nolint
+		return "", "", errors.New(
+			"vault name must be of the form `namespace.relation_name` using only letters, numbers, " +
+				"and underscores (_), where `namespace` and `relation` do not start with a number",
+		) // nolint
 	}
 	ns = match[1]
 	rel = match[2]

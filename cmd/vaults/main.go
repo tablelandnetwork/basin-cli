@@ -9,7 +9,12 @@ import (
 )
 
 func init() {
-	cli.VersionFlag = &cli.BoolFlag{Name: "version", Aliases: []string{"V"}, Usage: "show version"} // Enforce uppercase
+	// Enforce uppercase version shorthand flag
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   "show version",
+	}
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Printf("%s\n", c.App.Version)
 	}
@@ -18,7 +23,7 @@ func init() {
 func main() {
 	// migrate v1 config to v2 config
 	migrateConfigV1ToV2()
-	var version = getVersion()
+	version := getVersion()
 
 	cliApp := &cli.App{
 		Name:    "vaults",
