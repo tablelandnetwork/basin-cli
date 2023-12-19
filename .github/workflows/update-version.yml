@@ -1,10 +1,9 @@
 name: Update version file
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  release:
+    types:
+      - created
 
 jobs:
   update_version:
@@ -14,18 +13,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get latest tag
-        id: get-tag
-        run: |
-          echo "LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1))" >> $GITHUB_OUTPUT
-
       - name: Update version.json
         run: |
           echo "{
-            \"version\": \"${{steps.get-tag.outputs.LATEST_TAG}}\"
+            \"version\": \"${{ github.event.release.tag_name }}\"
           }" > version.json
 
       - name: Commit changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "chore: update version to ${{steps.get-tag.outputs.LATEST_TAG}}"
+          commit_message: "chore: update version to ${{ github.event.release.tag_name }}"
