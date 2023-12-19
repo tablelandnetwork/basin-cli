@@ -37,7 +37,7 @@ Textile Vaults is a secure and verifiable open data platform. The Vaults CLI is 
 You can either install the CLI from the remote source:
 
 ```bash
-go install github.com/tablelandnetwork/basin-cli/cmd/basin@latest
+go install github.com/tablelandnetwork/basin-cli/cmd/vaults@latest
 ```
 
 Or clone from source and run the Makefile `install` command:
