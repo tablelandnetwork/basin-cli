@@ -8,6 +8,11 @@ build:
 	go build -o vaults cmd/vaults/*
 .PHONY: build
 
+# Install
+install:
+	go install ./cmd/vaults
+.PHONY: install
+
 # Test
 test: 
 	go test ./... -short -race -timeout 1m
