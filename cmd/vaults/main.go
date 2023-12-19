@@ -20,10 +20,11 @@ func init() {
 	}
 }
 
+var version = "dev"
+
 func main() {
 	// migrate v1 config to v2 config
 	migrateConfigV1ToV2()
-	version := getVersion()
 
 	cliApp := &cli.App{
 		Name:    "vaults",
