@@ -34,7 +34,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var pubNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-zA-Z0-9_]*$)`)
+var vaultNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-zA-Z0-9_]*$)`)
 
 func newVaultCreateCommand() *cli.Command {
 	var address, dburi, provider string
@@ -766,7 +766,7 @@ func newWalletCommand() *cli.Command {
 }
 
 func parseVaultName(name string) (ns string, rel string, err error) {
-	match := pubNameRx.FindStringSubmatch(name)
+	match := vaultNameRx.FindStringSubmatch(name)
 	if len(match) != 3 {
 		return "", "", errors.New(
 			"vault name must be of the form `namespace.relation_name` using only letters, numbers, " +
