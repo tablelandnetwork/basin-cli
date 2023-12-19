@@ -6,12 +6,12 @@ before:
 env:
   - CGO_ENABLED=1
 
-project_name: basin
+project_name: vaults
 
 builds:
-- id: basin-darwin-amd64
-  binary: basin
-  main: ./cmd/basin
+- id: vaults-darwin-amd64
+  binary: vaults
+  main: ./cmd/vaults
   goarch:
     - amd64
   goos:
@@ -23,9 +23,9 @@ builds:
     - -trimpath
   ldflags:
     - -s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date={{.CommitDate}}
-- id: basin-darwin-arm64
-  binary: basin
-  main: ./cmd/basin
+- id: vaults-darwin-arm64
+  binary: vaults
+  main: ./cmd/vaults
   goarch:
     - arm64
   goos:
@@ -37,9 +37,9 @@ builds:
     - -trimpath
   ldflags: 
     - -s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date={{.CommitDate}}
-- id: basin-linux-amd64
-  binary: basin
-  main: ./cmd/basin
+- id: vaults-linux-amd64
+  binary: vaults
+  main: ./cmd/vaults
   goarch: 
     - amd64
   goos:
@@ -51,9 +51,9 @@ builds:
     - -trimpath
   ldflags:
     - -s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date={{.CommitDate}}
-- id: basin-linux-arm64
-  binary: basin
-  main: ./cmd/basin
+- id: vaults-linux-arm64
+  binary: vaults
+  main: ./cmd/vaults
   goarch: 
     - arm64
   goos:
@@ -67,15 +67,15 @@ builds:
     - -s -w -X main.version={{.Version}} -X main.commit={{.FullCommit}} -X main.date={{.CommitDate}}
 
 archives:
-  - id: basin-archive
+  - id: vaults-archive
     format: tar.gz
     files:
       - none*
     builds:
-      - basin-darwin-amd64
-      - basin-darwin-arm64
-      - basin-linux-amd64
-      - basin-linux-arm64
+      - vaults-darwin-amd64
+      - vaults-darwin-arm64
+      - vaults-linux-amd64
+      - vaults-linux-arm64
     name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
 
 checksum:

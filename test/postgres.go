@@ -55,7 +55,7 @@ func (dp *DockerPool) RunPostgres() (db *sql.DB, resource *dockertest.Resource, 
 		Env: []string{
 			"POSTGRES_PASSWORD=secret",
 			"POSTGRES_USER=admin",
-			"POSTGRES_DB=basin",
+			"POSTGRES_DB=vaults",
 			"listen_addresses = '*'",
 		},
 	}, func(config *docker.HostConfig) {
@@ -68,7 +68,7 @@ func (dp *DockerPool) RunPostgres() (db *sql.DB, resource *dockertest.Resource, 
 
 	_ = resource.Expire(120) // Tell docker to hard kill the container in 120 seconds
 
-	uri = fmt.Sprintf("postgres://admin:secret@%s/basin?sslmode=disable", resource.GetHostPort("5432/tcp"))
+	uri = fmt.Sprintf("postgres://admin:secret@%s/vaults?sslmode=disable", resource.GetHostPort("5432/tcp"))
 	db, err = sql.Open("postgres", uri)
 	if err != nil {
 		log.Fatalf("Could not open the database: %s", err)

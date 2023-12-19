@@ -1,4 +1,4 @@
-package basinprovider
+package vaultsprovider
 
 import (
 	"context"
@@ -14,28 +14,28 @@ import (
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 )
 
-// BasinProvider implements the app.BasinProvider interface.
-type BasinProvider struct {
+// VaultsProvider implements the app.VaultsProvider interface.
+type VaultsProvider struct {
 	provider string
 	client   *http.Client
 }
 
-var _ app.BasinProvider = (*BasinProvider)(nil)
+var _ app.VaultsProvider = (*VaultsProvider)(nil)
 
-// New creates a new BasinProvider.
-func New(provider string) *BasinProvider {
+// New creates a new VaultsProvider.
+func New(provider string) *VaultsProvider {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
-	return &BasinProvider{
+	return &VaultsProvider{
 		provider: provider,
 		client:   client,
 	}
 }
 
 // CreateVault creates a vault.
-func (bp *BasinProvider) CreateVault(ctx context.Context, params app.CreateVaultParams) error {
+func (bp *VaultsProvider) CreateVault(ctx context.Context, params app.CreateVaultParams) error {
 	form := url.Values{}
 	form.Add("account", params.Account.Hex())
 	form.Add("cache", fmt.Sprint(params.CacheDuration))
@@ -63,7 +63,7 @@ func (bp *BasinProvider) CreateVault(ctx context.Context, params app.CreateVault
 }
 
 // ListVaults lists all vaults from a given account.
-func (bp *BasinProvider) ListVaults(
+func (bp *VaultsProvider) ListVaults(
 	ctx context.Context, params app.ListVaultsParams,
 ) ([]app.Vault, error) {
 	req, err := http.NewRequestWithContext(
@@ -88,7 +88,7 @@ func (bp *BasinProvider) ListVaults(
 }
 
 // ListVaultEvents lists all events from a given vault.
-func (bp *BasinProvider) ListVaultEvents(
+func (bp *VaultsProvider) ListVaultEvents(
 	ctx context.Context, params app.ListVaultEventsParams,
 ) ([]app.EventInfo, error) {
 	req, err := http.NewRequestWithContext(
@@ -120,7 +120,7 @@ func (bp *BasinProvider) ListVaultEvents(
 }
 
 // WriteVaultEvent write an event.
-func (bp *BasinProvider) WriteVaultEvent(ctx context.Context, params app.WriteVaultEventParams) error {
+func (bp *VaultsProvider) WriteVaultEvent(ctx context.Context, params app.WriteVaultEventParams) error {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,

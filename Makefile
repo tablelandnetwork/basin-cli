@@ -5,8 +5,13 @@ lint:
 
 # Build
 build:
-	go build -o basin cmd/basin/*
+	go build -o vaults cmd/vaults/*
 .PHONY: build
+
+# Install
+install:
+	go install ./cmd/vaults
+.PHONY: install
 
 # Test
 test: 

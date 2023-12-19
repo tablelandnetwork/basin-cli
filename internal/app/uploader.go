@@ -15,19 +15,19 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-// BasinUploader contains logic of uploading Parquet files to Basin Provider.
-type BasinUploader struct {
+// VaultsUploader contains logic of uploading Parquet files to Vaults Provider.
+type VaultsUploader struct {
 	namespace  string
 	relation   string
 	privateKey *ecdsa.PrivateKey
-	provider   BasinProvider
+	provider   VaultsProvider
 }
 
-// NewBasinUploader creates new uploader.
-func NewBasinUploader(
-	ns string, rel string, bp BasinProvider, pk *ecdsa.PrivateKey,
-) *BasinUploader {
-	return &BasinUploader{
+// NewVaultsUploader creates new uploader.
+func NewVaultsUploader(
+	ns string, rel string, bp VaultsProvider, pk *ecdsa.PrivateKey,
+) *VaultsUploader {
+	return &VaultsUploader{
 		namespace:  ns,
 		relation:   rel,
 		provider:   bp,
@@ -36,7 +36,7 @@ func NewBasinUploader(
 }
 
 // Upload sends file to provider for upload.
-func (bu *BasinUploader) Upload(
+func (bu *VaultsUploader) Upload(
 	ctx context.Context, filepath string, progress io.Writer, ts Timestamp, sz int64,
 ) error {
 	f, err := os.Open(filepath)

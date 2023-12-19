@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"regexp"
@@ -12,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/filecoin-project/lassie/pkg/lassie"
 	"github.com/filecoin-project/lassie/pkg/storage"
@@ -25,94 +28,87 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
-	"github.com/tablelandnetwork/basin-cli/pkg/basinprovider"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
+	"github.com/tablelandnetwork/basin-cli/pkg/vaultsprovider"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
 )
 
-var pubNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-zA-Z0-9_]*$)`)
+var vaultNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-zA-Z0-9_]*$)`)
 
-func newPublicationCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "publication",
-		Usage: "publication commands",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:  "dir",
-				Usage: "The directory where config will be stored (default: $HOME)",
-			},
-		},
-		Subcommands: []*cli.Command{
-			newPublicationCreateCommand(),
-			newPublicationStartCommand(),
-			newPublicationUploadCommand(),
-			newPublicationListCommand(),
-			newPublicationDealsCommand(),
-			newPublicationRetrieveCommand(),
-		},
-	}
-}
-
-func newPublicationCreateCommand() *cli.Command {
-	var owner, dburi, provider string
+func newVaultCreateCommand() *cli.Command {
+	var address, dburi, provider string
 	var winSize, cache int64
 
 	return &cli.Command{
-		Name:  "create",
-		Usage: "create a new publication",
+		Name:      "create",
+		Usage:     "Create a new vault",
+		ArgsUsage: "<vault_name>",
+		Description: "Create a vault for a given account's address as either database streaming \n" +
+			"or file uploading. Optionally, also set a cache duration for the data.\n\nEXAMPLE:\n\n" +
+			"vaults create --account 0x1234abcd --cache 10 my.vault",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:        "address",
+				Name:        "account",
+				Aliases:     []string{"a"},
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet address",
-				Destination: &owner,
+				Destination: &address,
 				Required:    true,
 			},
 			&cli.StringFlag{
-				Name:        "dburi",
-				Usage:       "PostgreSQL connection string",
-				Destination: &dburi,
-			},
-			&cli.StringFlag{
 				Name:        "provider",
-				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Aliases:     []string{"p"},
+				Category:    "OPTIONAL:",
+				Usage:       "The provider's address and port (e.g., localhost:8080)",
+				DefaultText: DefaultProviderHost,
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
 			&cli.Int64Flag{
-				Name:        "window-size",
-				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
-				Destination: &winSize,
-				Value:       DefaultWindowSize,
-			},
-			&cli.Int64Flag{
 				Name:        "cache",
+				Category:    "OPTIONAL:",
 				Usage:       "Time duration (in minutes) that the data will be available in the cache",
+				DefaultText: "0",
 				Destination: &cache,
 				Value:       0,
+			},
+			&cli.StringFlag{
+				Name:        "dburi",
+				Category:    "OPTIONAL:",
+				Usage:       "PostgreSQL connection string (e.g., postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres)",
+				Destination: &dburi,
+			},
+			&cli.Int64Flag{
+				Name:        "window-size",
+				Category:    "OPTIONAL:",
+				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
+				DefaultText: fmt.Sprintf("%d", DefaultWindowSize),
+				Destination: &winSize,
+				Value:       DefaultWindowSize,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			if cCtx.NArg() != 1 {
-				return errors.New("one argument should be provided")
+				return errors.New("must provide a vault name")
 			}
 
 			pub := cCtx.Args().First()
-			ns, rel, err := parsePublicationName(pub)
+			ns, rel, err := parseVaultName(pub)
 			if err != nil {
 				return err
 			}
 
-			if !common.IsHexAddress(owner) {
-				return fmt.Errorf("%s is not a valid Ethereum wallet address", owner)
+			account, err := app.NewAccount(address)
+			if err != nil {
+				return fmt.Errorf("not a valid account: %s", err)
 			}
-
 			pgConfig, err := pgconn.ParseConfig(dburi)
 			if err != nil {
 				return fmt.Errorf("parse config: %s", err)
 			}
 
-			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
@@ -125,12 +121,12 @@ func newPublicationCreateCommand() *cli.Command {
 				_ = f.Close()
 			}()
 
-			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			cfg.Publications[pub] = publication{
+			cfg.Vaults[pub] = vault{
 				Host:         pgConfig.Host,
 				Port:         int(pgConfig.Port),
 				User:         pgConfig.User,
@@ -144,13 +140,13 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			exists, err := createPublication(cCtx.Context, dburi, ns, rel, provider, owner, cache)
+			exists, err := createVault(cCtx.Context, dburi, ns, rel, provider, account, cache)
 			if err != nil {
-				return fmt.Errorf("failed to create publication: %s", err)
+				return fmt.Errorf("failed to create vault: %s", err)
 			}
 
 			if exists {
-				fmt.Printf("Publication %s.%s already exists.\n\n", ns, rel)
+				fmt.Printf("Vault %s.%s already exists.\n\n", ns, rel)
 				return nil
 			}
 
@@ -158,21 +154,28 @@ func newPublicationCreateCommand() *cli.Command {
 				return fmt.Errorf("mk db dir: %s", err)
 			}
 
-			fmt.Printf("\033[32mPublication %s.%s created.\033[0m\n\n", ns, rel)
+			fmt.Printf("\033[32mVault %s.%s created.\033[0m\n\n", ns, rel)
 			return nil
 		},
 	}
 }
 
-func newPublicationStartCommand() *cli.Command {
+func newStreamCommand() *cli.Command {
 	var privateKey string
 
 	return &cli.Command{
-		Name:  "start",
-		Usage: "start a daemon process that replicates Postgres changes to Basin server",
+		Name:      "stream",
+		Usage:     "Starts a daemon process that streams Postgres changes to a vault",
+		ArgsUsage: "<vault_name>",
+		Description: "The daemon will continuously stream database changes (except deletions) \n" +
+			"to the vault, as long as the daemon is actively running.\n\n" +
+			"EXAMPLE:\n\nvaults stream --vault my.vault --private-key 0x1234abcd",
+
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
+				Aliases:     []string{"k"},
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
@@ -180,31 +183,31 @@ func newPublicationStartCommand() *cli.Command {
 		},
 		Action: func(cCtx *cli.Context) error {
 			if cCtx.NArg() != 1 {
-				return errors.New("one argument should be provided")
+				return errors.New("must provide a vault name")
 			}
 
-			publication := cCtx.Args().First()
-			ns, rel, err := parsePublicationName(publication)
+			vault := cCtx.Args().First()
+			ns, rel, err := parseVaultName(vault)
 			if err != nil {
 				return err
 			}
 
-			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
 
 			connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
-				cfg.Publications[publication].User,
-				cfg.Publications[publication].Password,
-				cfg.Publications[publication].Host,
-				cfg.Publications[publication].Port,
-				cfg.Publications[publication].Database,
+				cfg.Vaults[vault].User,
+				cfg.Vaults[vault].Password,
+				cfg.Vaults[vault].Host,
+				cfg.Vaults[vault].Port,
+				cfg.Vaults[vault].Database,
 			)
 
 			r, err := pgrepl.New(connString, pgrepl.Publication(rel))
@@ -217,7 +220,7 @@ func newPublicationStartCommand() *cli.Command {
 				return err
 			}
 
-			bp := basinprovider.New(cfg.Publications[publication].ProviderHost)
+			bp := vaultsprovider.New(cfg.Vaults[vault].ProviderHost)
 
 			pgxConn, err := pgx.Connect(cCtx.Context, connString)
 			if err != nil {
@@ -243,9 +246,9 @@ func newPublicationStartCommand() *cli.Command {
 			}
 
 			// Creates a new db manager when replication starts
-			dbDir := path.Join(dir, publication)
-			winSize := time.Duration(cfg.Publications[publication].WindowSize) * time.Second
-			uploader := app.NewBasinUploader(ns, rel, bp, privateKey)
+			dbDir := path.Join(dir, vault)
+			winSize := time.Duration(cfg.Vaults[vault].WindowSize) * time.Second
+			uploader := app.NewVaultsUploader(ns, rel, bp, privateKey)
 			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
 
 			// Before starting replication, upload the remaining data
@@ -253,8 +256,8 @@ func newPublicationStartCommand() *cli.Command {
 				return fmt.Errorf("upload all: %s", err)
 			}
 
-			basinStreamer := app.NewBasinStreamer(ns, r, dbm)
-			if err := basinStreamer.Run(cCtx.Context); err != nil {
+			vaultsStreamer := app.NewVaultsStreamer(ns, r, dbm)
+			if err := vaultsStreamer.Run(cCtx.Context); err != nil {
 				return fmt.Errorf("run: %s", err)
 			}
 
@@ -263,37 +266,47 @@ func newPublicationStartCommand() *cli.Command {
 	}
 }
 
-func newPublicationUploadCommand() *cli.Command {
-	var privateKey, publicationName string
+func newWriteCommand() *cli.Command {
+	var privateKey, vaultName string
 	var timestamp string
 
 	return &cli.Command{
-		Name:  "upload",
-		Usage: "upload a Parquet file",
+		Name:      "write",
+		Usage:     "Write a Parquet file",
+		ArgsUsage: "<file_path>",
+		Description: "A Parquet file can be pushed directly to the vault, as an \n" +
+			"alternative to continuous Postgres data streaming.\n\n" +
+			"EXAMPLE:\n\nvaults write --vault my.vault --private-key 0x1234abcd /path/to/file.parquet",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "private-key",
+				Aliases:     []string{"k"},
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
 				Required:    true,
 			},
 			&cli.StringFlag{
-				Name:        "name",
-				Usage:       "Publication name",
-				Destination: &publicationName,
+				Name:        "vault",
+				Aliases:     []string{"v"},
+				Category:    "REQUIRED:",
+				Usage:       "Vault name",
+				Destination: &vaultName,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "timestamp",
-				Usage:       "The time the file was created (default: current epoch in UTC)",
+				Category:    "OPTIONAL:",
+				Usage:       "The time the file was created",
+				DefaultText: "current epoch in UTC",
 				Destination: &timestamp,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			if cCtx.NArg() != 1 {
-				return errors.New("one argument should be provided")
+				return errors.New("must provide a file path")
 			}
-			ns, rel, err := parsePublicationName(publicationName)
+			ns, rel, err := parseVaultName(vaultName)
 			if err != nil {
 				return err
 			}
@@ -303,17 +316,17 @@ func newPublicationUploadCommand() *cli.Command {
 				return err
 			}
 
-			dir, err := defaultConfigLocation(cCtx.String("dir"))
+			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			bp := basinprovider.New(cfg.Publications[publicationName].ProviderHost)
+			bp := vaultsprovider.New(cfg.Vaults[vaultName].ProviderHost)
 
 			filepath := cCtx.Args().First()
 
@@ -332,7 +345,7 @@ func newPublicationUploadCommand() *cli.Command {
 
 			bar := progressbar.DefaultBytes(
 				fi.Size(),
-				"Uploading file...",
+				"Writing...",
 			)
 
 			if timestamp == "" {
@@ -344,8 +357,8 @@ func newPublicationUploadCommand() *cli.Command {
 				return err
 			}
 
-			basinStreamer := app.NewBasinUploader(ns, rel, bp, privateKey)
-			if err := basinStreamer.Upload(cCtx.Context, filepath, bar, ts, fi.Size()); err != nil {
+			vaultsStreamer := app.NewVaultsUploader(ns, rel, bp, privateKey)
+			if err := vaultsStreamer.Upload(cCtx.Context, filepath, bar, ts, fi.Size()); err != nil {
 				return fmt.Errorf("upload: %s", err)
 			}
 
@@ -354,40 +367,66 @@ func newPublicationUploadCommand() *cli.Command {
 	}
 }
 
-func newPublicationListCommand() *cli.Command {
-	var owner, provider string
+func newListCommand() *cli.Command {
+	var address, provider, format string
 
 	return &cli.Command{
 		Name:  "list",
-		Usage: "list publications of a given address",
+		Usage: "List vaults of a given account",
+		Description: "Listing vaults will show all vaults that have been created by the provided \n" +
+			"account's address and logged as either line delimited text or a json array.\n\n" +
+			"EXAMPLE:\n\nvaults list --account 0x1234abcd --format json",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:        "address",
+				Name:        "account",
+				Aliases:     []string{"a"},
+				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet address",
-				Destination: &owner,
+				Destination: &address,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "provider",
-				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Aliases:     []string{"p"},
+				Category:    "OPTIONAL:",
+				Usage:       "The provider's address and port (e.g., localhost:8080)",
+				DefaultText: DefaultProviderHost,
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
+			&cli.StringFlag{
+				Name:        "format",
+				Category:    "OPTIONAL:",
+				Usage:       "The output format (text or json)",
+				DefaultText: "text",
+				Destination: &format,
+				Value:       "text",
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
-			account, err := app.NewAccount(owner)
+			account, err := app.NewAccount(address)
 			if err != nil {
-				return fmt.Errorf("%s is not a valid Ethereum wallet address", owner)
+				return fmt.Errorf("%s is not a valid Ethereum wallet address", address)
 			}
 
-			bp := basinprovider.New(provider)
+			bp := vaultsprovider.New(provider)
 			vaults, err := bp.ListVaults(cCtx.Context, app.ListVaultsParams{Account: account})
 			if err != nil {
-				return fmt.Errorf("failed to list publications: %s", err)
+				return fmt.Errorf("failed to list vaults: %s", err)
 			}
 
-			for _, vault := range vaults {
-				fmt.Printf("%s\n", vault)
+			if format == "text" {
+				for _, vault := range vaults {
+					fmt.Printf("%s\n", vault)
+				}
+			} else if format == "json" {
+				jsonData, err := json.Marshal(vaults)
+				if err != nil {
+					return fmt.Errorf("error serializing events to JSON")
+				}
+				fmt.Println(string(jsonData))
+			} else {
+				return fmt.Errorf("invalid format: %s", format)
 			}
 
 			return nil
@@ -395,75 +434,97 @@ func newPublicationListCommand() *cli.Command {
 	}
 }
 
-func newPublicationDealsCommand() *cli.Command {
-	var publication, provider, before, after, at, format string
+func newListEventsCommand() *cli.Command {
+	var vault, provider, before, after, at, format string
 	var limit, offset, latest int
 
 	return &cli.Command{
-		Name:  "deals",
-		Usage: "list deals of a given publications",
+		Name:      "events",
+		Usage:     "List events of a given vault",
+		UsageText: "vaults events [command options]",
+		Description: "Vault events can be filtered by date ranges (unix, ISO 8601 date,\n" +
+			"or ISO 8601 date & time), returning the event metadata and \n" +
+			"corresponding CID.\n\n" +
+			"EXAMPLE:\n\nvaults events --vault my.vault \\\n" +
+			"--limit 10 --offset 3 \\\n--after 2023-09-01 --before 2023-12-01 \\\n" +
+			"--format json",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:        "publication",
-				Usage:       "Publication name",
-				Destination: &publication,
+				Name:        "vault",
+				Aliases:     []string{"v"},
+				Category:    "REQUIRED:",
+				Usage:       "Vault name",
+				Destination: &vault,
 				Required:    true,
 			},
 			&cli.StringFlag{
 				Name:        "provider",
-				Usage:       "The provider's address and port (e.g. localhost:8080)",
+				Aliases:     []string{"p"},
+				Category:    "OPTIONAL:",
+				Usage:       "The provider's address and port (e.g., localhost:8080)",
+				DefaultText: DefaultProviderHost,
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
 			&cli.IntFlag{
 				Name:        "limit",
+				Category:    "OPTIONAL:",
 				Usage:       "The number of deals to fetch",
+				DefaultText: "10",
 				Destination: &limit,
 				Value:       10,
 			},
 			&cli.IntFlag{
 				Name:        "latest",
+				Category:    "OPTIONAL:",
 				Usage:       "The latest N deals to fetch",
 				Destination: &latest,
 			},
 			&cli.IntFlag{
 				Name:        "offset",
+				Category:    "OPTIONAL:",
 				Usage:       "The epoch to start from",
+				DefaultText: "0",
 				Destination: &offset,
 				Value:       0,
 			},
 			&cli.StringFlag{
 				Name:        "before",
+				Category:    "OPTIONAL:",
 				Usage:       "Filter deals created before this timestamp",
 				Destination: &before,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "after",
+				Category:    "OPTIONAL:",
 				Usage:       "Filter deals created after this timestamp",
 				Destination: &after,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "at",
+				Category:    "OPTIONAL:",
 				Usage:       "Filter deals created at this timestamp",
 				Destination: &at,
 				Value:       "",
 			},
 			&cli.StringFlag{
 				Name:        "format",
+				Category:    "OPTIONAL:",
 				Usage:       "The output format (table or json)",
+				DefaultText: "table",
 				Destination: &format,
 				Value:       "table",
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
-			ns, rel, err := parsePublicationName(publication)
+			ns, rel, err := parseVaultName(vault)
 			if err != nil {
 				return err
 			}
 
-			bp := basinprovider.New(provider)
+			bp := vaultsprovider.New(provider)
 
 			b, a, err := validateBeforeAndAfter(before, after, at)
 			if err != nil {
@@ -534,19 +595,35 @@ func newPublicationDealsCommand() *cli.Command {
 	}
 }
 
-func newPublicationRetrieveCommand() *cli.Command {
+func newRetrieveCommand() *cli.Command {
+	var output string
+
 	return &cli.Command{
-		Name:  "retrieve",
-		Usage: "Retrieve files by CID",
+		Name:      "retrieve",
+		Usage:     "Retrieve an event by CID",
+		ArgsUsage: "<event_cid>",
+		Description: "Retrieving an event will download the event's CAR file into the \n" +
+			"current directory, a provided directory path, or to stdout.\n\n" +
+			"EXAMPLE:\n\nvaults retrieve --output /path/to/dir bafy...",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "output",
+				Aliases:     []string{"o"},
+				Category:    "OPTIONAL:",
+				Usage:       "Output directory path, or '-' for stdout",
+				DefaultText: "current directory",
+				Destination: &output,
+			},
+		},
 		Action: func(cCtx *cli.Context) error {
 			arg := cCtx.Args().Get(0)
 			if arg == "" {
-				return errors.New("argument is empty")
+				return errors.New("must provide an event CID")
 			}
 
 			rootCid, err := cid.Parse(arg)
 			if err != nil {
-				return errors.New("cid is invalid")
+				return errors.New("CID is invalid")
 			}
 
 			lassie, err := lassie.NewLassie(cCtx.Context)
@@ -559,7 +636,37 @@ func newPublicationRetrieveCommand() *cli.Command {
 				car.StoreIdentityCIDs(false),
 				car.UseWholeCIDs(false),
 			}
-			carWriter := deferred.NewDeferredCarWriterForPath(fmt.Sprintf("./%s.car", arg), []cid.Cid{rootCid}, carOpts...)
+
+			var carWriter *deferred.DeferredCarWriter
+			var tmpFile *os.File
+
+			if output == "-" {
+				// Create a temporary file only for writing to stdout case
+				tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s.car", arg))
+				if err != nil {
+					return fmt.Errorf("failed to create temporary file: %s", err)
+				}
+				defer func() {
+					_ = os.Remove(tmpFile.Name())
+				}()
+				carWriter = deferred.NewDeferredCarWriterForPath(tmpFile.Name(), []cid.Cid{rootCid}, carOpts...)
+			} else {
+				// Write to the provided path or current directory
+				if output == "" {
+					output = "." // Default to current directory
+				}
+				// Ensure path is a valid directory
+				info, err := os.Stat(output)
+				if err != nil {
+					return fmt.Errorf("failed to access output directory: %s", err)
+				}
+				if !info.IsDir() {
+					return fmt.Errorf("output path is not a directory: %s", output)
+				}
+				carPath := path.Join(output, fmt.Sprintf("%s.car", arg))
+				carWriter = deferred.NewDeferredCarWriterForPath(carPath, []cid.Cid{rootCid}, carOpts...)
+			}
+
 			defer func() {
 				_ = carWriter.Close()
 			}()
@@ -579,15 +686,92 @@ func newPublicationRetrieveCommand() *cli.Command {
 				return fmt.Errorf("failed to fetch: %s", err)
 			}
 
+			// Write to stdout only if the output flag is set to '-'
+			if output == "-" && tmpFile != nil {
+				_, _ = tmpFile.Seek(0, io.SeekStart)
+				_, err = io.Copy(os.Stdout, tmpFile)
+				if err != nil {
+					return fmt.Errorf("failed to write to stdout: %s", err)
+				}
+			}
+
 			return nil
 		},
 	}
 }
 
-func parsePublicationName(name string) (ns string, rel string, err error) {
-	match := pubNameRx.FindStringSubmatch(name)
+func newWalletCommand() *cli.Command {
+	return &cli.Command{
+		Name:      "account",
+		Usage:     "Account management for an Ethereum-style wallet",
+		UsageText: "vaults account <subcommand> [arguments...]",
+		Subcommands: []*cli.Command{
+			{
+				Name:      "create",
+				Usage:     "Creates a new account",
+				UsageText: "vaults account create <file_path>",
+				Description: "Create an Ethereum-style wallet (secp256k1 key pair) at a \n" +
+					"provided file path.\n\n" +
+					"EXAMPLE:\n\nvaults account create /path/to/file",
+				Action: func(cCtx *cli.Context) error {
+					filename := cCtx.Args().Get(0)
+					if filename == "" {
+						return errors.New("filename is empty")
+					}
+
+					privateKey, err := crypto.GenerateKey()
+					if err != nil {
+						return fmt.Errorf("generate key: %s", err)
+					}
+					privateKeyBytes := crypto.FromECDSA(privateKey)
+
+					if err := os.WriteFile(filename, []byte(hexutil.Encode(privateKeyBytes)[2:]), 0o644); err != nil {
+						return fmt.Errorf("writing to file %s: %s", filename, err)
+					}
+					pubk, _ := privateKey.Public().(*ecdsa.PublicKey)
+					publicKey := common.HexToAddress(crypto.PubkeyToAddress(*pubk).Hex())
+
+					fmt.Printf("Wallet address %s created\n", publicKey)
+					fmt.Printf("Private key saved in %s\n", filename)
+					return nil
+				},
+			},
+			{
+				Name:      "address",
+				Usage:     "Print the public key for an account's private key",
+				UsageText: "vaults account address <file_path>",
+				Description: "The result of the `vaults account create` command will write a private key to a file, \n" +
+					"and this lets you retrieve the public key value for use in other commands.\n\n" +
+					"EXAMPLE:\n\nvaults account address /path/to/file",
+				Action: func(cCtx *cli.Context) error {
+					filename := cCtx.Args().Get(0)
+					if filename == "" {
+						return errors.New("filename is empty")
+					}
+
+					privateKey, err := crypto.LoadECDSA(filename)
+					if err != nil {
+						return fmt.Errorf("loading key: %s", err)
+					}
+
+					pubk, _ := privateKey.Public().(*ecdsa.PublicKey)
+					publicKey := common.HexToAddress(crypto.PubkeyToAddress(*pubk).Hex())
+
+					fmt.Println(publicKey)
+					return nil
+				},
+			},
+		},
+	}
+}
+
+func parseVaultName(name string) (ns string, rel string, err error) {
+	match := vaultNameRx.FindStringSubmatch(name)
 	if len(match) != 3 {
-		return "", "", errors.New("publication name must be of the form `namespace.relation_name` using only letters, numbers, and underscores (_), where `namespace` and `relation` do not start with a number") // nolint
+		return "", "", errors.New(
+			"vault name must be of the form `namespace.relation_name` using only letters, numbers, " +
+				"and underscores (_), where `namespace` and `relation` do not start with a number",
+		) // nolint
 	}
 	ns = match[1]
 	rel = match[2]
@@ -651,21 +835,16 @@ func inspectTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, err
 	return columns, nil
 }
 
-func createPublication(
+func createVault(
 	ctx context.Context,
 	dburi string,
 	ns string,
 	rel string,
 	provider string,
-	owner string,
+	account *app.Account,
 	cacheDuration int64,
 ) (exists bool, err error) {
-	account, err := app.NewAccount(owner)
-	if err != nil {
-		return false, fmt.Errorf("not a valid account: %s", err)
-	}
-
-	bp := basinprovider.New(provider)
+	bp := vaultsprovider.New(provider)
 	req := app.CreateVaultParams{
 		Account:       account,
 		Vault:         app.Vault(fmt.Sprintf("%s.%s", ns, rel)),
