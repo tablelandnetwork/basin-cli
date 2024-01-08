@@ -642,7 +642,7 @@ func newRetrieveCommand() *cli.Command {
 
 			if output == "-" {
 				// Create a temporary file only for writing to stdout case
-				tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s.car", arg))
+				tmpFile, err = os.CreateTemp("", fmt.Sprintf("%s.car", arg))
 				if err != nil {
 					return fmt.Errorf("failed to create temporary file: %s", err)
 				}
