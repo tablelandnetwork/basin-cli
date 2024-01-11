@@ -35,7 +35,6 @@ type CacheDuration uint32
 type EventInfo struct {
 	CID         string `json:"cid"`
 	Timestamp   int64  `json:"timestamp"`
-	Size        uint32 `json:"size"`
 	IsArchived  bool   `json:"is_archived"`
 	CacheExpiry string `json:"cache_expiry"`
 }
