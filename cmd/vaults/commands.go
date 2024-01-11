@@ -565,7 +565,7 @@ func newListEventsCommand() *cli.Command {
 
 			if format == "table" {
 				table := tablewriter.NewWriter(os.Stdout)
-				table.SetHeader([]string{"CID", "Size", "Timestamp", "Archived", "Cache Expiry"})
+				table.SetHeader([]string{"CID", "Timestamp", "Archived", "Cache Expiry"})
 
 				for _, event := range events {
 					isArchived := "N"
@@ -577,7 +577,7 @@ func newListEventsCommand() *cli.Command {
 						timestamp = time.Unix(event.Timestamp, 0).Format(time.RFC3339)
 					}
 					table.Append([]string{
-						event.CID, fmt.Sprintf("%d", event.Size), timestamp, isArchived, event.CacheExpiry,
+						event.CID, timestamp, isArchived, event.CacheExpiry,
 					})
 				}
 				table.Render()

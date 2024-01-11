@@ -149,5 +149,17 @@ func (bp *VaultsProvider) WriteVaultEvent(ctx context.Context, params app.WriteV
 		_ = resp.Body.Close()
 	}()
 
+	if resp.StatusCode != http.StatusOK {
+		type response struct {
+			Error string
+		}
+		var r response
+		if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			return fmt.Errorf("failed to decode response: %s", err)
+		}
+
+		return fmt.Errorf(r.Error)
+	}
+
 	return nil
 }
