@@ -282,3 +282,10 @@ func (bp *vaultsProviderMock) WriteVaultEvent(
 	close(bp.uploaderInputs)
 	return nil
 }
+
+func (bp *vaultsProviderMock) RetrieveEvent(
+	_ context.Context, _ RetrieveEventParams, w io.Writer,
+) error {
+	_, _ = w.Write([]byte("Hello"))
+	return nil
+}
