@@ -590,6 +590,8 @@ func newListEventsCommand() *cli.Command {
 
 func newRetrieveCommand() *cli.Command {
 	var output, provider string
+	var cache bool
+	var timeout int64
 
 	return &cli.Command{
 		Name:      "retrieve",
@@ -616,6 +618,24 @@ func newRetrieveCommand() *cli.Command {
 				Destination: &provider,
 				Value:       DefaultProviderHost,
 			},
+			&cli.BoolFlag{
+				Name:        "cache",
+				Aliases:     []string{"c"},
+				Category:    "OPTIONAL:",
+				Usage:       "Retrieves from cache by setting this flag",
+				DefaultText: "current directory",
+				Destination: &cache,
+				Value:       true,
+			},
+			&cli.Int64Flag{
+				Name:        "timeout",
+				Aliases:     []string{"t"},
+				Category:    "OPTIONAL:",
+				Usage:       "Timeout for retrieval operation (seconds)",
+				DefaultText: "no timeout",
+				Destination: &timeout,
+				Value:       0,
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			arg := cCtx.Args().Get(0)
@@ -628,8 +648,8 @@ func newRetrieveCommand() *cli.Command {
 				return errors.New("CID is invalid")
 			}
 
-			retriever := app.NewRetriever(vaultsprovider.New(provider))
-			if err := retriever.Retrieve(cCtx.Context, rootCid, output, arg); err != nil {
+			retriever := app.NewRetriever(vaultsprovider.New(provider), cache, timeout)
+			if err := retriever.Retrieve(cCtx.Context, rootCid, output); err != nil {
 				return fmt.Errorf("failed to retrieve: %s", err)
 			}
 

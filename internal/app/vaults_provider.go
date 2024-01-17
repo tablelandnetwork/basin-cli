@@ -13,7 +13,7 @@ type VaultsProvider interface {
 	ListVaults(context.Context, ListVaultsParams) ([]Vault, error)
 	ListVaultEvents(context.Context, ListVaultEventsParams) ([]EventInfo, error)
 	WriteVaultEvent(context.Context, WriteVaultEventParams) error
-	RetrieveEvent(context.Context, RetrieveEventParams, io.Writer) error
+	RetrieveEvent(context.Context, RetrieveEventParams, io.Writer) (string, error)
 }
 
 // CreateVaultParams ...
@@ -41,6 +41,7 @@ type ListVaultEventsParams struct {
 type WriteVaultEventParams struct {
 	Vault       Vault
 	Signature   string
+	Filename    string
 	Timestamp   Timestamp
 	Content     io.Reader
 	ProgressBar io.Writer
@@ -49,5 +50,6 @@ type WriteVaultEventParams struct {
 
 // RetrieveEventParams ...
 type RetrieveEventParams struct {
-	CID cid.Cid
+	Timeout int64
+	CID     cid.Cid
 }

@@ -16,37 +16,48 @@ import (
 	trustlessutils "github.com/ipld/go-trustless-utils"
 )
 
+type retriever interface {
+	retrieveStdout(context.Context, cid.Cid, int64) error
+	retrieveFile(context.Context, cid.Cid, string, int64) error
+}
+
 // Retriever is responsible for retrieving file from the network.
 type Retriever struct {
-	cacheStore *cacheStore
-	coldStore  *coldStore // nolint
+	store   retriever
+	timeout int64
 }
 
 // NewRetriever creates a new Retriever.
-func NewRetriever(provider VaultsProvider) *Retriever {
-	return &Retriever{
-		cacheStore: &cacheStore{
-			provider: provider,
-		},
+func NewRetriever(provider VaultsProvider, cache bool, timeout int64) *Retriever {
+	if cache {
+		return &Retriever{
+			store: &cacheStore{
+				provider: provider,
+			},
+			timeout: timeout,
+		}
 	}
+
+	panic("cold store not implemented yet")
 }
 
 // Retrieve retrieves file from the network.
-func (r *Retriever) Retrieve(ctx context.Context, c cid.Cid, output string, name string) error {
+func (r *Retriever) Retrieve(ctx context.Context, c cid.Cid, output string) error {
 	if output == "-" {
-		return r.cacheStore.retrieveStdout(ctx, c)
+		return r.store.retrieveStdout(ctx, c, r.timeout)
 	}
 
-	return r.cacheStore.retrieveFile(ctx, c, output, name)
+	return r.store.retrieveFile(ctx, c, output, r.timeout)
 }
 
 type cacheStore struct {
 	provider VaultsProvider
 }
 
-func (cs *cacheStore) retrieveStdout(ctx context.Context, cid cid.Cid) error {
-	if err := cs.provider.RetrieveEvent(ctx, RetrieveEventParams{
-		CID: cid,
+func (cs *cacheStore) retrieveStdout(ctx context.Context, cid cid.Cid, timeout int64) error {
+	if _, err := cs.provider.RetrieveEvent(ctx, RetrieveEventParams{
+		Timeout: timeout,
+		CID:     cid,
 	}, os.Stdout); err != nil {
 		return fmt.Errorf("failed to retrieve to file: %s", err)
 	}
@@ -54,7 +65,7 @@ func (cs *cacheStore) retrieveStdout(ctx context.Context, cid cid.Cid) error {
 	return nil
 }
 
-func (cs *cacheStore) retrieveFile(ctx context.Context, cid cid.Cid, output string, name string) error {
+func (cs *cacheStore) retrieveFile(ctx context.Context, cid cid.Cid, output string, timeout int64) error {
 	// Write to the provided path or current directory
 	if output == "" {
 		output = "." // Default to current directory
@@ -68,16 +79,22 @@ func (cs *cacheStore) retrieveFile(ctx context.Context, cid cid.Cid, output stri
 		return fmt.Errorf("output path is not a directory: %s", output)
 	}
 
-	f, err := os.OpenFile(path.Join(output, name), os.O_RDWR|os.O_CREATE, 0o666)
+	f, err := os.OpenFile(path.Join(output, cid.String()), os.O_RDWR|os.O_CREATE, 0o666)
 	if err != nil {
 		return fmt.Errorf("failed to open tmp file: %s", err)
 	}
 	_, _ = f.Seek(0, io.SeekStart)
 
-	if err := cs.provider.RetrieveEvent(ctx, RetrieveEventParams{
-		CID: cid,
-	}, f); err != nil {
+	filename, err := cs.provider.RetrieveEvent(ctx, RetrieveEventParams{
+		Timeout: timeout,
+		CID:     cid,
+	}, f)
+	if err != nil {
 		return fmt.Errorf("failed to retrieve to file: %s", err)
+	}
+
+	if err := os.Rename(f.Name(), path.Join(output, fmt.Sprintf("%s-%s", cid.String(), filename))); err != nil {
+		return fmt.Errorf("failed renaming the file: %s", err)
 	}
 
 	return nil

@@ -43,7 +43,6 @@ func ParseTimestamp(ts string) (Timestamp, error) {
 	if t, err := time.Parse(time.RFC3339, ts); err == nil {
 		return Timestamp{t.UTC()}, nil
 	}
-	fmt.Println(time.Parse(time.RFC3339, ts))
 
 	return Timestamp{}, fmt.Errorf("could not parse %s", ts)
 }

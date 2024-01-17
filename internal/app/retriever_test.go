@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -12,12 +13,13 @@ import (
 )
 
 func TestRetrieverFileOutput(t *testing.T) {
-	retriever := NewRetriever(&vaultsProviderMock{})
+	retriever := NewRetriever(&vaultsProviderMock{}, true, 0)
 	output := t.TempDir()
-	err := retriever.Retrieve(context.Background(), cid.Cid{}, output, "test.txt")
+	cid := cid.Cid{}
+	err := retriever.Retrieve(context.Background(), cid, output)
 	require.NoError(t, err)
 
-	f, err := os.Open(path.Join(output, "test.txt"))
+	f, err := os.Open(path.Join(output, fmt.Sprintf("%s-%s", cid.String(), "sample.txt")))
 	require.NoError(t, err)
 
 	data, err := io.ReadAll(f)
@@ -31,9 +33,9 @@ func TestRetrieverStdoutOutput(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w // overwrite os.Stdout so we can read from it
 
-	retriever := NewRetriever(&vaultsProviderMock{})
+	retriever := NewRetriever(&vaultsProviderMock{}, true, 0)
 
-	err := retriever.Retrieve(context.Background(), cid.Cid{}, "-", "test.txt")
+	err := retriever.Retrieve(context.Background(), cid.Cid{}, "-")
 	require.NoError(t, err)
 
 	_ = w.Close()

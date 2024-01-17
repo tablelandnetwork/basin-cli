@@ -285,7 +285,7 @@ func (bp *vaultsProviderMock) WriteVaultEvent(
 
 func (bp *vaultsProviderMock) RetrieveEvent(
 	_ context.Context, _ RetrieveEventParams, w io.Writer,
-) error {
+) (string, error) {
 	_, _ = w.Write([]byte("Hello"))
-	return nil
+	return "sample.txt", nil
 }
