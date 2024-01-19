@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -131,6 +132,8 @@ func (bp *VaultsProvider) WriteVaultEvent(ctx context.Context, params app.WriteV
 		return fmt.Errorf("could not create request: %s", err)
 	}
 
+	req.Header.Add("filename", params.Filename)
+
 	q := req.URL.Query()
 	q.Add("timestamp", fmt.Sprint(params.Timestamp.Seconds()))
 	q.Add("signature", fmt.Sprint(params.Signature))
@@ -149,7 +152,7 @@ func (bp *VaultsProvider) WriteVaultEvent(ctx context.Context, params app.WriteV
 		_ = resp.Body.Close()
 	}()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		type response struct {
 			Error string
 		}
@@ -162,4 +165,51 @@ func (bp *VaultsProvider) WriteVaultEvent(ctx context.Context, params app.WriteV
 	}
 
 	return nil
+}
+
+// RetrieveEvent retrieves an event.
+func (bp *VaultsProvider) RetrieveEvent(
+	ctx context.Context, params app.RetrieveEventParams, w io.Writer,
+) (string, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		fmt.Sprintf("%s/events/%s", bp.provider, params.CID.String()),
+		nil,
+	)
+	if err != nil {
+		return "", fmt.Errorf("could not create request: %s", err)
+	}
+
+	client := &http.Client{
+		Timeout: time.Duration(params.Timeout) * time.Second,
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request to write vault event failed: %s", err)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", errors.New("not found")
+	}
+
+	re := regexp.MustCompile(`".+"`)
+	filename := re.FindString(resp.Header.Get("content-disposition"))
+	if len(filename) == 0 {
+		return "", errors.New("filename not found")
+	}
+
+	parts := strings.Split(filename[1:len(filename)-1], "-")
+	if len(parts) != 2 {
+		return "", errors.New("filename format is not correct")
+	}
+
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return "", errors.New("failed copy response body")
+	}
+	return parts[1], nil
 }

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path"
 	"regexp"
@@ -16,13 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/filecoin-project/lassie/pkg/lassie"
-	"github.com/filecoin-project/lassie/pkg/storage"
-	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-cid"
-	"github.com/ipld/go-car/v2"
-	"github.com/ipld/go-car/v2/storage/deferred"
-	trustlessutils "github.com/ipld/go-trustless-utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/olekukonko/tablewriter"
@@ -596,7 +589,9 @@ func newListEventsCommand() *cli.Command {
 }
 
 func newRetrieveCommand() *cli.Command {
-	var output string
+	var output, provider string
+	var cache bool
+	var timeout int64
 
 	return &cli.Command{
 		Name:      "retrieve",
@@ -614,6 +609,33 @@ func newRetrieveCommand() *cli.Command {
 				DefaultText: "current directory",
 				Destination: &output,
 			},
+			&cli.StringFlag{
+				Name:        "provider",
+				Aliases:     []string{"p"},
+				Category:    "OPTIONAL:",
+				Usage:       "The provider's address and port (e.g., localhost:8080)",
+				DefaultText: DefaultProviderHost,
+				Destination: &provider,
+				Value:       DefaultProviderHost,
+			},
+			&cli.BoolFlag{
+				Name:        "cache",
+				Aliases:     []string{"c"},
+				Category:    "OPTIONAL:",
+				Usage:       "Retrieves from cache by setting this flag",
+				DefaultText: "current directory",
+				Destination: &cache,
+				Value:       true,
+			},
+			&cli.Int64Flag{
+				Name:        "timeout",
+				Aliases:     []string{"t"},
+				Category:    "OPTIONAL:",
+				Usage:       "Timeout for retrieval operation (seconds)",
+				DefaultText: "no timeout",
+				Destination: &timeout,
+				Value:       0,
+			},
 		},
 		Action: func(cCtx *cli.Context) error {
 			arg := cCtx.Args().Get(0)
@@ -626,73 +648,9 @@ func newRetrieveCommand() *cli.Command {
 				return errors.New("CID is invalid")
 			}
 
-			lassie, err := lassie.NewLassie(cCtx.Context)
-			if err != nil {
-				return fmt.Errorf("failed to create lassie instance: %s", err)
-			}
-
-			carOpts := []car.Option{
-				car.WriteAsCarV1(true),
-				car.StoreIdentityCIDs(false),
-				car.UseWholeCIDs(false),
-			}
-
-			var carWriter *deferred.DeferredCarWriter
-			var tmpFile *os.File
-
-			if output == "-" {
-				// Create a temporary file only for writing to stdout case
-				tmpFile, err = os.CreateTemp("", fmt.Sprintf("%s.car", arg))
-				if err != nil {
-					return fmt.Errorf("failed to create temporary file: %s", err)
-				}
-				defer func() {
-					_ = os.Remove(tmpFile.Name())
-				}()
-				carWriter = deferred.NewDeferredCarWriterForPath(tmpFile.Name(), []cid.Cid{rootCid}, carOpts...)
-			} else {
-				// Write to the provided path or current directory
-				if output == "" {
-					output = "." // Default to current directory
-				}
-				// Ensure path is a valid directory
-				info, err := os.Stat(output)
-				if err != nil {
-					return fmt.Errorf("failed to access output directory: %s", err)
-				}
-				if !info.IsDir() {
-					return fmt.Errorf("output path is not a directory: %s", output)
-				}
-				carPath := path.Join(output, fmt.Sprintf("%s.car", arg))
-				carWriter = deferred.NewDeferredCarWriterForPath(carPath, []cid.Cid{rootCid}, carOpts...)
-			}
-
-			defer func() {
-				_ = carWriter.Close()
-			}()
-			carStore := storage.NewCachingTempStore(
-				carWriter.BlockWriteOpener(), storage.NewDeferredStorageCar(os.TempDir(), rootCid),
-			)
-			defer func() {
-				_ = carStore.Close()
-			}()
-
-			request, err := types.NewRequestForPath(carStore, rootCid, "", trustlessutils.DagScopeAll, nil)
-			if err != nil {
-				return fmt.Errorf("failed to create request: %s", err)
-			}
-
-			if _, err := lassie.Fetch(cCtx.Context, request, []types.FetchOption{}...); err != nil {
-				return fmt.Errorf("failed to fetch: %s", err)
-			}
-
-			// Write to stdout only if the output flag is set to '-'
-			if output == "-" && tmpFile != nil {
-				_, _ = tmpFile.Seek(0, io.SeekStart)
-				_, err = io.Copy(os.Stdout, tmpFile)
-				if err != nil {
-					return fmt.Errorf("failed to write to stdout: %s", err)
-				}
+			retriever := app.NewRetriever(vaultsprovider.New(provider), cache, timeout)
+			if err := retriever.Retrieve(cCtx.Context, rootCid, output); err != nil {
+				return fmt.Errorf("failed to retrieve: %s", err)
 			}
 
 			return nil

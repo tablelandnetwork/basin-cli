@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -53,10 +54,17 @@ func (bu *VaultsUploader) Upload(
 		return fmt.Errorf("signing the file: %s", err)
 	}
 
+	filename := filepath
+	if strings.Contains(filepath, "/") {
+		parts := strings.Split(filepath, "/")
+		filename = parts[len(parts)-1]
+	}
+
 	params := WriteVaultEventParams{
 		Vault:       Vault(fmt.Sprintf("%s.%s", bu.namespace, bu.relation)),
 		Timestamp:   ts,
 		Content:     f,
+		Filename:    filename,
 		ProgressBar: progress,
 		Signature:   hex.EncodeToString(signature),
 		Size:        sz,
