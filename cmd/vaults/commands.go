@@ -625,7 +625,7 @@ func newRetrieveCommand() *cli.Command {
 				Usage:       "Retrieves from cache by setting this flag",
 				DefaultText: "current directory",
 				Destination: &cache,
-				Value:       true,
+				Value:       false,
 			},
 			&cli.Int64Flag{
 				Name:        "timeout",

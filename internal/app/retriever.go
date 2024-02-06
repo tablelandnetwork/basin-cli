@@ -38,7 +38,10 @@ func NewRetriever(provider VaultsProvider, cache bool, timeout int64) *Retriever
 		}
 	}
 
-	panic("cold store not implemented yet")
+	return &Retriever{
+		store:   &coldStore{},
+		timeout: timeout,
+	}
 }
 
 // Retrieve retrieves file from the network.
@@ -100,9 +103,9 @@ func (cs *cacheStore) retrieveFile(ctx context.Context, cid cid.Cid, output stri
 	return nil
 }
 
-type coldStore struct{} // nolint
+type coldStore struct{}
 
-func (cs *coldStore) retrieve(ctx context.Context, c cid.Cid, path string) error { // nolint
+func (cs *coldStore) retrieveFile(ctx context.Context, c cid.Cid, output string, _ int64) error {
 	lassie, err := lassie.NewLassie(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create lassie instance: %s", err)
@@ -114,10 +117,20 @@ func (cs *coldStore) retrieve(ctx context.Context, c cid.Cid, path string) error
 		car.UseWholeCIDs(false),
 	}
 
-	carWriter := deferred.NewDeferredCarWriterForPath(path, []cid.Cid{c}, carOpts...)
-	defer func() {
-		_ = carWriter.Close()
-	}()
+	if output == "" {
+		output = "." // Default to current directory
+	}
+	// Ensure path is a valid directory
+	info, err := os.Stat(output)
+	if err != nil {
+		return fmt.Errorf("failed to access output directory: %s", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("output path is not a directory: %s", output)
+	}
+	carPath := path.Join(output, fmt.Sprintf("%s.car", c.String()))
+	carWriter := deferred.NewDeferredCarWriterForPath(carPath, []cid.Cid{c}, carOpts...)
+
 	carStore := storage.NewCachingTempStore(
 		carWriter.BlockWriteOpener(), storage.NewDeferredStorageCar(os.TempDir(), c),
 	)
@@ -132,6 +145,53 @@ func (cs *coldStore) retrieve(ctx context.Context, c cid.Cid, path string) error
 
 	if _, err := lassie.Fetch(ctx, request, []types.FetchOption{}...); err != nil {
 		return fmt.Errorf("failed to fetch: %s", err)
+	}
+
+	return nil
+}
+
+func (cs *coldStore) retrieveStdout(ctx context.Context, c cid.Cid, _ int64) error {
+	lassie, err := lassie.NewLassie(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create lassie instance: %s", err)
+	}
+
+	carOpts := []car.Option{
+		car.WriteAsCarV1(true),
+		car.StoreIdentityCIDs(false),
+		car.UseWholeCIDs(false),
+	}
+
+	// Create a temporary file only for writing to stdout case
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s.car", c.String()))
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file: %s", err)
+	}
+	defer func() {
+		_ = os.Remove(tmpFile.Name())
+	}()
+	carWriter := deferred.NewDeferredCarWriterForPath(tmpFile.Name(), []cid.Cid{c}, carOpts...)
+
+	carStore := storage.NewCachingTempStore(
+		carWriter.BlockWriteOpener(), storage.NewDeferredStorageCar(os.TempDir(), c),
+	)
+	defer func() {
+		_ = carStore.Close()
+	}()
+
+	request, err := types.NewRequestForPath(carStore, c, "", trustlessutils.DagScopeAll, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %s", err)
+	}
+
+	if _, err := lassie.Fetch(ctx, request, []types.FetchOption{}...); err != nil {
+		return fmt.Errorf("failed to fetch: %s", err)
+	}
+
+	_, _ = tmpFile.Seek(0, io.SeekStart)
+	_, err = io.Copy(os.Stdout, tmpFile)
+	if err != nil {
+		return fmt.Errorf("failed to write to stdout: %s", err)
 	}
 
 	return nil
