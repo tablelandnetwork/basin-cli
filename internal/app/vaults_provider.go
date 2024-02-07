@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -53,3 +54,6 @@ type RetrieveEventParams struct {
 	Timeout int64
 	CID     cid.Cid
 }
+
+// ErrNotFoundInCache is an error when file is not found in cache.
+var ErrNotFoundInCache = errors.New("not found in cache")

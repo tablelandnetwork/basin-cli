@@ -194,7 +194,7 @@ func (bp *VaultsProvider) RetrieveEvent(
 	}()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return "", errors.New("not found")
+		return "", app.ErrNotFoundInCache
 	}
 
 	re := regexp.MustCompile(`".+"`)

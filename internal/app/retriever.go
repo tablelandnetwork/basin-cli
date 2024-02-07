@@ -28,18 +28,13 @@ type Retriever struct {
 }
 
 // NewRetriever creates a new Retriever.
-func NewRetriever(provider VaultsProvider, cache bool, timeout int64) *Retriever {
-	if cache {
-		return &Retriever{
-			store: &cacheStore{
+func NewRetriever(provider VaultsProvider, timeout int64) *Retriever {
+	return &Retriever{
+		store: &coldStore{
+			retriever: &cacheStore{
 				provider: provider,
 			},
-			timeout: timeout,
-		}
-	}
-
-	return &Retriever{
-		store:   &coldStore{},
+		},
 		timeout: timeout,
 	}
 }
@@ -103,9 +98,17 @@ func (cs *cacheStore) retrieveFile(ctx context.Context, cid cid.Cid, output stri
 	return nil
 }
 
-type coldStore struct{}
+type coldStore struct {
+	retriever retriever
+}
 
-func (cs *coldStore) retrieveFile(ctx context.Context, c cid.Cid, output string, _ int64) error {
+func (cs *coldStore) retrieveFile(ctx context.Context, c cid.Cid, output string, timeout int64) error {
+	// try cache first. no matter the error try cold store
+	err := cs.retriever.retrieveFile(ctx, c, output, timeout)
+	if err == nil {
+		return nil
+	}
+
 	lassie, err := lassie.NewLassie(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create lassie instance: %s", err)
@@ -150,7 +153,13 @@ func (cs *coldStore) retrieveFile(ctx context.Context, c cid.Cid, output string,
 	return nil
 }
 
-func (cs *coldStore) retrieveStdout(ctx context.Context, c cid.Cid, _ int64) error {
+func (cs *coldStore) retrieveStdout(ctx context.Context, c cid.Cid, timeout int64) error {
+	// try cache first. no matter the error try cold store
+	err := cs.retriever.retrieveStdout(ctx, c, timeout)
+	if err == nil {
+		return nil
+	}
+
 	lassie, err := lassie.NewLassie(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create lassie instance: %s", err)
