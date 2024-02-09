@@ -13,7 +13,7 @@ import (
 )
 
 func TestRetrieverFileOutput(t *testing.T) {
-	retriever := NewRetriever(&vaultsProviderMock{}, true, 0)
+	retriever := NewRetriever(&vaultsProviderMock{}, 0)
 	output := t.TempDir()
 	cid := cid.Cid{}
 	err := retriever.Retrieve(context.Background(), cid, output)
@@ -33,7 +33,7 @@ func TestRetrieverStdoutOutput(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w // overwrite os.Stdout so we can read from it
 
-	retriever := NewRetriever(&vaultsProviderMock{}, true, 0)
+	retriever := NewRetriever(&vaultsProviderMock{}, 0)
 
 	err := retriever.Retrieve(context.Background(), cid.Cid{}, "-")
 	require.NoError(t, err)
