@@ -192,7 +192,6 @@ func (bp *VaultsProvider) RetrieveEvent(
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-
 	if resp.StatusCode == http.StatusNotFound {
 		return "", app.ErrNotFoundInCache
 	}
@@ -204,12 +203,12 @@ func (bp *VaultsProvider) RetrieveEvent(
 	}
 
 	parts := strings.Split(filename[1:len(filename)-1], "-")
-	if len(parts) != 2 {
+	if len(parts) < 2 {
 		return "", errors.New("filename format is not correct")
 	}
 
 	if _, err := io.Copy(w, resp.Body); err != nil {
 		return "", errors.New("failed copy response body")
 	}
-	return parts[1], nil
+	return strings.Join(parts[1:], "-"), nil
 }
