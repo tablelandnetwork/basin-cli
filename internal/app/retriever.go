@@ -81,6 +81,11 @@ func (cs *cacheStore) retrieveFile(ctx context.Context, cid cid.Cid, output stri
 	if err != nil {
 		return fmt.Errorf("failed to open tmp file: %s", err)
 	}
+	defer func() {
+		_ = os.Remove(f.Name())
+		_ = f.Close()
+	}()
+
 	_, _ = f.Seek(0, io.SeekStart)
 
 	filename, err := cs.provider.RetrieveEvent(ctx, RetrieveEventParams{
