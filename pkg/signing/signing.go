@@ -65,7 +65,7 @@ func (s *Signer) SignFile(filename string) ([]byte, error) {
 		return []byte{}, fmt.Errorf("failed to get file info: %s", err.Error())
 	}
 	if info.Size() == 0 {
-		return []byte{}, fmt.Errorf("error with file: %s", "content is empty")
+		return []byte{}, fmt.Errorf("error with file: content is empty")
 	}
 
 	nBytes, nChunks := int64(0), int64(0)
@@ -96,6 +96,22 @@ func (s *Signer) SignFile(filename string) ([]byte, error) {
 	signature, err := s.Sign()
 	if err != nil {
 		return []byte{}, fmt.Errorf("failed to sign [file=%v]: %s", filename, err.Error())
+	}
+
+	return signature, nil
+}
+
+// SignBytes signs the provided bytes, returning the signature as a byte slice.
+func (s *Signer) SignBytes(data []byte) ([]byte, error) {
+	if len(data) == 0 {
+		return []byte{}, fmt.Errorf("error with data: content is empty")
+	}
+
+	s.Sum(data)
+
+	signature, err := s.Sign()
+	if err != nil {
+		return []byte{}, fmt.Errorf("failed to sign data: %s", err.Error())
 	}
 
 	return signature, nil
