@@ -184,17 +184,12 @@ You can retrieve a file from a vault by running:
 vaults retrieve bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq
 ```
 
-You can also specify where to save the file:
+You can specify the file where the retrieved content will be save:
 
 ```bash
-vaults retrieve --output /path/to/dir bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq
+vaults retrieve --output filename bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq
 ```
 
-Or stream the file to stdout the `-` value (note: the short form `-o` is for `--output`), and then pipe it to something like [`car extract`](https://github.com/ipld/go-car) to unpack the CAR file's contents:
-
-```bash
-vaults retrieve -o - bafybeifr5njnrw67yyb2h2t7k6ukm3pml4fgphsxeurqcmgmeb7omc2vlq | car extract
-```
 
 ## Development
 
