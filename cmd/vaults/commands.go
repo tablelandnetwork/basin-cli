@@ -694,6 +694,8 @@ func newRetrieveCommand() *cli.Command {
 }
 
 func newWalletCommand() *cli.Command {
+	var pkString string
+
 	return &cli.Command{
 		Name:      "account",
 		Usage:     "Account management for an Ethereum-style wallet",
@@ -732,28 +734,34 @@ func newWalletCommand() *cli.Command {
 			{
 				Name:      "address",
 				Usage:     "Print the public key for an account's private key",
-				UsageText: "vaults account address <file_path|hex_string>",
+				UsageText: "vaults account address [command options] <value>",
 				Description: "The result of the `vaults account create` command will write a private key to a file, and \n" +
-					"this lets you retrieve the public key value for the file, or a private key hex string.\n\n" +
-					"EXAMPLES:\n\nvaults account address /path/to/file\nvaults account address abcd1234",
+					"this lets you retrieve the public key value for the file, or a private key hex string.\n" +
+					"If no `--string` flag is provided, then the presumption is the argument is a filepath.\n\n" +
+					"EXAMPLES:\n\nvaults account address /path/to/file\nvaults account address --string abcd1234",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "string",
+						Category:    "OPTIONAL:",
+						Usage:       "Specify if the argument is a hex string",
+						Destination: &pkString,
+					},
+				},
 				Action: func(cCtx *cli.Context) error {
-					arg := cCtx.Args().Get(0)
-					if arg == "" {
+					pkFile := cCtx.Args().Get(0)
+					if pkFile == "" && pkString == "" {
 						return errors.New("no argument provided")
 					}
 
 					var privateKey *ecdsa.PrivateKey
-					// Try loading from file path first; else, try hex string
-					if _, err := os.Stat(arg); err == nil {
-						privateKey, err = crypto.LoadECDSA(arg)
-						if err != nil {
-							return fmt.Errorf("loading key from file: %s", err)
-						}
+					var err error
+					if pkString == "" {
+						privateKey, err = crypto.LoadECDSA(pkFile)
 					} else {
-						privateKey, err = crypto.HexToECDSA(arg)
-						if err != nil {
-							return fmt.Errorf("loading key from hex string: %s", err)
-						}
+						privateKey, err = crypto.HexToECDSA(pkString)
+					}
+					if err != nil {
+						return fmt.Errorf("loading key: %s", err)
 					}
 
 					pubk, _ := privateKey.Public().(*ecdsa.PublicKey)
