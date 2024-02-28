@@ -124,7 +124,7 @@ func (s *Signer) SignBytes(data []byte) ([]byte, error) {
 	return signature, nil
 }
 
-// signatureBytesToHex converts a byte slice to a hex-encoded string.
+// SignatureBytesToHex converts a byte slice to a hex-encoded string.
 func SignatureBytesToHex(b []byte) string {
 	return hex.EncodeToString(b)
 }
