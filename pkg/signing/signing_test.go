@@ -1,6 +1,7 @@
 package signing
 
 import (
+	"crypto/ecdsa"
 	"os"
 	"testing"
 
@@ -71,7 +72,7 @@ func TestSignFile(t *testing.T) {
 	}
 }
 
-func TestSignByes(t *testing.T) {
+func TestSignBytes(t *testing.T) {
 	privateKey, _ := HexToECDSA("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
 	signer := NewSigner(privateKey)
 
@@ -113,40 +114,69 @@ func TestSignByes(t *testing.T) {
 func TestPrivateKey(t *testing.T) {
 	testCases := []struct {
 		name    string
-		setup   func() (pk string)
+		setup   func() (pk string, filename string, cleanup func())
 		wantErr string
 	}{
 		{
-			name: "should load a real private key",
-			setup: func() (pk string) {
+			name: "should load a private key string",
+			setup: func() (pk string, filename string, cleanup func()) {
 				pk = "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-				return pk
+				return pk, "", func() {}
 			},
 			wantErr: "",
 		},
 		{
-			name: "should fail to load 0x prefixed key",
-			setup: func() (pk string) {
+			name: "should load a private key file",
+			setup: func() (pk string, filename string, cleanup func()) {
+				tmpFile, _ := os.CreateTemp("", "test_file")
+				name := tmpFile.Name()
+				content := []byte("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
+				tmpFile.Write(content)
+				tmpFile.Close()
+				return pk, name, func() { os.Remove(name) }
+			},
+			wantErr: "",
+		},
+		{
+			name: "should fail to load 0x prefixed string",
+			setup: func() (pk string, filename string, cleanup func()) {
 				pk = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-				return pk
+				return pk, "", func() {}
 			},
 			wantErr: "invalid hex character 'x' in private key",
 		},
 		{
 			name: "should fail to load random string",
-			setup: func() (pk string) {
+			setup: func() (pk string, filename string, cleanup func()) {
 				pk = "1234abcd"
-				return pk
+				return pk, "", func() {}
 			},
 			wantErr: "invalid length, need 256 bits",
+		},
+		{
+			name: "should fail to load empty private key file",
+			setup: func() (pk string, filename string, cleanup func()) {
+				tmpFile, _ := os.CreateTemp("", "test_file")
+				name := tmpFile.Name()
+				tmpFile.Close()
+				return pk, name, func() { os.Remove(name) }
+			},
+			wantErr: "key file too short, want 64 hex characters",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			pk := tc.setup()
+			pk, filename, cleanup := tc.setup()
+			defer cleanup()
 
-			hex, err := HexToECDSA(pk)
+			var hex *ecdsa.PrivateKey
+			var err error
+			if filename == "" {
+				hex, err = HexToECDSA(pk)
+			} else {
+				hex, err = FileToECDSA(filename)
+			}
 			if tc.wantErr != "" {
 				require.Error(t, err, "Expected an error for %v", tc.name)
 				require.EqualErrorf(t, err, tc.wantErr, "HexToECDSA() error = %v, wantErr %v", err, tc.wantErr)

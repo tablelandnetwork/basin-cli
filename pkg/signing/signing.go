@@ -19,9 +19,16 @@ type Signer struct {
 	privateKey *ecdsa.PrivateKey
 }
 
-// HexToECDSA parses a hex encoded private key to an ECDSA private key.
+// HexToECDSA parses a hex-encoded secp256k1 private key string to an ECDSA
+// private key.
 func HexToECDSA(hexKey string) (*ecdsa.PrivateKey, error) {
 	return crypto.HexToECDSA(hexKey)
+}
+
+// FileToECDSA parses a file path to a hex-encoded secp256k1 private key to an
+// ECDSA private key.
+func FileToECDSA(hexPath string) (*ecdsa.PrivateKey, error) {
+	return crypto.LoadECDSA(hexPath)
 }
 
 // NewSigner creates a new signer.
