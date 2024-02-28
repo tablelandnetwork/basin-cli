@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -24,7 +25,7 @@ func LoadPrivateKey(hexKey string) (*ecdsa.PrivateKey, error) {
 	return crypto.HexToECDSA(hexKey)
 }
 
-// NewSigner creates a new signer with a private key and internal state.
+// NewSigner creates a new signer.
 func NewSigner(pk *ecdsa.PrivateKey) *Signer {
 	return &Signer{
 		state:      sha3.NewLegacyKeccak256().(crypto.KeccakState),
@@ -37,37 +38,39 @@ func (s *Signer) Sum(chunk []byte) {
 	s.state.Write(chunk)
 }
 
-// Sign returns the signature of the hash state.
-func (s *Signer) signState() ([]byte, error) {
+// Sign signs the internal state.
+func (s *Signer) Sign() ([]byte, error) {
 	var h common.Hash
 	_, _ = s.state.Read(h[:])
 	signature, err := crypto.Sign(h.Bytes(), s.privateKey)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to sign state: %s", err)
+		return []byte{}, fmt.Errorf("sign: %s", err)
 	}
 
 	return signature, nil
 }
 
-// SignFile returns the signature of a signed file.
-func (s *Signer) SignFile(filePath string) (string, error) {
-	file, err := os.Open(filePath)
+// SignFile signs an entire file, returning the signature as a byte slice.
+func (s *Signer) SignFile(filename string) ([]byte, error) {
+	f, err := os.Open(filename)
 	if err != nil {
-		return "", fmt.Errorf("failed to open file: %s", err.Error())
+		return []byte{}, fmt.Errorf("error to read [file=%v]: %v", filename, err.Error())
 	}
-	defer file.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	// Check if the file is empty and return an error if it is
-	info, err := file.Stat()
+	info, err := f.Stat()
 	if err != nil {
-		return "", fmt.Errorf("failed to get file info: %s", err.Error())
+		return []byte{}, fmt.Errorf("failed to get file info: %s", err.Error())
 	}
 	if info.Size() == 0 {
-		return "", fmt.Errorf("failed to create signature: %s", "file is empty")
+		return []byte{}, fmt.Errorf("failed to create signature: %s", "file is empty")
 	}
 
 	nBytes, nChunks := int64(0), int64(0)
-	r := bufio.NewReader(file)
+	r := bufio.NewReader(f)
 	buf := make([]byte, 0, 4*1024) // 4KB buffer
 	for {
 		n, err := r.Read(buf[:cap(buf)])
@@ -79,18 +82,27 @@ func (s *Signer) SignFile(filePath string) (string, error) {
 			if err == io.EOF {
 				break
 			}
-			return "", fmt.Errorf("read error: %s", err)
+			log.Fatal(err)
 		}
 		nChunks++
 		nBytes += int64(len(buf))
 
 		s.Sum(buf)
+
+		if err != nil && err != io.EOF {
+			log.Fatal(err)
+		}
 	}
 
-	signature, err := s.signState()
+	signature, err := s.Sign()
 	if err != nil {
-		return "", fmt.Errorf("failed to sign: %s", err)
+		log.Fatal("failed to sign")
 	}
 
-	return hex.EncodeToString(signature), nil
+	return signature, nil
+}
+
+// signatureBytesToHex converts a byte slice to a hex-encoded string.
+func SignatureBytesToHex(b []byte) string {
+	return hex.EncodeToString(b)
 }

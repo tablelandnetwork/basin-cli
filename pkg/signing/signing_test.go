@@ -58,7 +58,8 @@ func TestSigner(t *testing.T) {
 			filename, cleanup := tc.setup()
 			defer cleanup()
 
-			signature, err := signer.SignFile(filename)
+			signatureBytes, err := signer.SignFile(filename)
+			signature := SignatureBytesToHex(signatureBytes)
 			if tc.wantErr != "" {
 				require.Error(t, err, "Expected an error for %v", tc.name)
 				require.Contains(t, err.Error(), tc.wantErr, "SignFile() error = %v, wantErr %v", err, tc.wantErr)
