@@ -732,19 +732,28 @@ func newWalletCommand() *cli.Command {
 			{
 				Name:      "address",
 				Usage:     "Print the public key for an account's private key",
-				UsageText: "vaults account address <file_path>",
-				Description: "The result of the `vaults account create` command will write a private key to a file, \n" +
-					"and this lets you retrieve the public key value for use in other commands.\n\n" +
-					"EXAMPLE:\n\nvaults account address /path/to/file",
+				UsageText: "vaults account address <file_path|hex_string>",
+				Description: "The result of the `vaults account create` command will write a private key to a file, and \n" +
+					"this lets you retrieve the public key value for the file, or a private key hex string.\n\n" +
+					"EXAMPLES:\n\nvaults account address /path/to/file\nvaults account address abcd1234",
 				Action: func(cCtx *cli.Context) error {
-					filename := cCtx.Args().Get(0)
-					if filename == "" {
-						return errors.New("filename is empty")
+					arg := cCtx.Args().Get(0)
+					if arg == "" {
+						return errors.New("no argument provided")
 					}
 
-					privateKey, err := crypto.LoadECDSA(filename)
-					if err != nil {
-						return fmt.Errorf("loading key: %s", err)
+					var privateKey *ecdsa.PrivateKey
+					// Try loading from file path first; else, try hex string
+					if _, err := os.Stat(arg); err == nil {
+						privateKey, err = crypto.LoadECDSA(arg)
+						if err != nil {
+							return fmt.Errorf("loading key from file: %s", err)
+						}
+					} else {
+						privateKey, err = crypto.HexToECDSA(arg)
+						if err != nil {
+							return fmt.Errorf("loading key from hex string: %s", err)
+						}
 					}
 
 					pubk, _ := privateKey.Public().(*ecdsa.PublicKey)
