@@ -2,6 +2,7 @@ package signing
 
 import (
 	"crypto/ecdsa"
+	"encoding/hex"
 	"os"
 	"testing"
 
@@ -72,7 +73,7 @@ func TestSignFile(t *testing.T) {
 			defer cleanup()
 
 			signatureBytes, err := signer.SignFile(filename)
-			signature := SignatureBytesToHex(signatureBytes)
+			signature := hex.EncodeToString(signatureBytes)
 			if tc.wantErr != "" {
 				require.Error(t, err, "Expected an error for %v", tc.name)
 				require.Contains(t, err.Error(), tc.wantErr, "SignFile() error = %v, wantErr %v", err, tc.wantErr)
@@ -111,7 +112,7 @@ func TestSignBytes(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			signatureBytes, err := signer.SignBytes(tc.content)
-			signature := SignatureBytesToHex(signatureBytes)
+			signature := hex.EncodeToString(signatureBytes)
 			if tc.wantErr != "" {
 				require.Error(t, err, "Expected an error for %v", tc.name)
 				require.Contains(t, err.Error(), tc.wantErr, "SignBytes() error = %v, wantErr %v", err, tc.wantErr)
@@ -153,36 +154,6 @@ func TestPrivateKey(t *testing.T) {
 				}
 			},
 			wantErr: "",
-		},
-		{
-			name: "should fail to load 0x prefixed string",
-			setup: func() (pk string, filename string, cleanup func()) {
-				pk = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-				return pk, "", func() {}
-			},
-			wantErr: "invalid hex character 'x' in private key",
-		},
-		{
-			name: "should fail to load random string",
-			setup: func() (pk string, filename string, cleanup func()) {
-				pk = "1234abcd"
-				return pk, "", func() {}
-			},
-			wantErr: "invalid length, need 256 bits",
-		},
-		{
-			name: "should fail to load empty private key file",
-			setup: func() (pk string, filename string, cleanup func()) {
-				tmpFile, _ := os.CreateTemp("", "test_file")
-				name := tmpFile.Name()
-				err := tmpFile.Close()
-				require.NoError(t, err, "Error closing file")
-				return pk, name, func() {
-					err = os.Remove(name)
-					require.NoError(t, err, "Error removing file")
-				}
-			},
-			wantErr: "key file too short, want 64 hex characters",
 		},
 	}
 

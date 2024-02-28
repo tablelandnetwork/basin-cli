@@ -3,7 +3,6 @@ package signing
 import (
 	"bufio"
 	"crypto/ecdsa"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -122,9 +121,4 @@ func (s *Signer) SignBytes(data []byte) ([]byte, error) {
 	}
 
 	return signature, nil
-}
-
-// SignatureBytesToHex converts a byte slice to a hex-encoded string.
-func SignatureBytesToHex(b []byte) string {
-	return hex.EncodeToString(b)
 }

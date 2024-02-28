@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -45,10 +46,10 @@ func (bu *VaultsUploader) Upload(
 
 	signer := signing.NewSigner(bu.privateKey)
 	signatureBytes, err := signer.SignFile(filepath)
-	signature := signing.SignatureBytesToHex(signatureBytes)
 	if err != nil {
 		return fmt.Errorf("signing the file: %s", err)
 	}
+	signature := hex.EncodeToString(signatureBytes)
 
 	filename := filepath
 	if strings.Contains(filepath, "/") {

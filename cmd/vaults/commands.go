@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -625,7 +626,7 @@ func newSignCommand() *cli.Command {
 			if err != nil {
 				return fmt.Errorf("failed to sign file: %s", err)
 			}
-			signature := signing.SignatureBytesToHex(signatureBytes)
+			signature := hex.EncodeToString(signatureBytes)
 			fmt.Println(signature)
 
 			return nil
