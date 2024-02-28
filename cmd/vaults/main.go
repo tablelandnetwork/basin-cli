@@ -36,6 +36,7 @@ func main() {
 			newWriteCommand(),
 			newListCommand(),
 			newListEventsCommand(),
+			newSignCommand(),
 			newRetrieveCommand(),
 			newWalletCommand(),
 		},

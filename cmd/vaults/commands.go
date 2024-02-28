@@ -22,6 +22,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
+	"github.com/tablelandnetwork/basin-cli/pkg/signing"
 	"github.com/tablelandnetwork/basin-cli/pkg/vaultsprovider"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
@@ -583,6 +584,50 @@ func newListEventsCommand() *cli.Command {
 			} else {
 				return fmt.Errorf("invalid format: %s", format)
 			}
+			return nil
+		},
+	}
+}
+
+func newSignCommand() *cli.Command {
+	var privateKey string
+
+	return &cli.Command{
+		Name:      "sign",
+		Usage:     "Sign a file with a private key",
+		ArgsUsage: "<file_path>",
+		Description: "Signing a file with take a provide key and a path to the desired file\n" +
+			"to produce a hex encoded string (e.g., can be used in the HTTP API).\n\n" +
+			"EXAMPLE:\n\nvaults sign --private-key 0x1234abcd /path/to/file",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "private-key",
+				Aliases:     []string{"k"},
+				Category:    "REQUIRED:",
+				Usage:       "Ethereum wallet private key",
+				Destination: &privateKey,
+				Required:    true,
+			},
+		},
+		Action: func(cCtx *cli.Context) error {
+			if cCtx.NArg() != 1 {
+				return errors.New("must provide a file path")
+			}
+			filepath := cCtx.Args().First()
+
+			privateKey, err := crypto.HexToECDSA(privateKey)
+			if err != nil {
+				return err
+			}
+
+			signer := signing.NewSigner(privateKey)
+			signatureBytes, err := signer.SignFile(filepath)
+			if err != nil {
+				return fmt.Errorf("failed to sign file: %s", err)
+			}
+			signature := signing.SignatureBytesToHex(signatureBytes)
+			fmt.Println(signature)
+
 			return nil
 		},
 	}

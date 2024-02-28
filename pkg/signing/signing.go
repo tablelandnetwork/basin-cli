@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"log"
 	"os"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -20,8 +19,8 @@ type Signer struct {
 	privateKey *ecdsa.PrivateKey
 }
 
-// LoadPrivateKey creates an ecdsa.PrivateKey from a hex-encoded string.
-func LoadPrivateKey(hexKey string) (*ecdsa.PrivateKey, error) {
+// HexToECDSA parses a hex encoded private key to an ECDSA private key.
+func HexToECDSA(hexKey string) (*ecdsa.PrivateKey, error) {
 	return crypto.HexToECDSA(hexKey)
 }
 
@@ -54,7 +53,7 @@ func (s *Signer) Sign() ([]byte, error) {
 func (s *Signer) SignFile(filename string) ([]byte, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		return []byte{}, fmt.Errorf("error to read [file=%v]: %v", filename, err.Error())
+		return []byte{}, fmt.Errorf("error reading [file=%v]: %v", filename, err.Error())
 	}
 	defer func() {
 		_ = f.Close()
@@ -66,7 +65,7 @@ func (s *Signer) SignFile(filename string) ([]byte, error) {
 		return []byte{}, fmt.Errorf("failed to get file info: %s", err.Error())
 	}
 	if info.Size() == 0 {
-		return []byte{}, fmt.Errorf("failed to create signature: %s", "file is empty")
+		return []byte{}, fmt.Errorf("error with file: %s", "content is empty")
 	}
 
 	nBytes, nChunks := int64(0), int64(0)
@@ -82,7 +81,7 @@ func (s *Signer) SignFile(filename string) ([]byte, error) {
 			if err == io.EOF {
 				break
 			}
-			log.Fatal(err)
+			return []byte{}, fmt.Errorf("unexpected error reading file: %s", err.Error())
 		}
 		nChunks++
 		nBytes += int64(len(buf))
@@ -90,13 +89,13 @@ func (s *Signer) SignFile(filename string) ([]byte, error) {
 		s.Sum(buf)
 
 		if err != nil && err != io.EOF {
-			log.Fatal(err)
+			return []byte{}, fmt.Errorf("error in buffer: %s", err.Error())
 		}
 	}
 
 	signature, err := s.Sign()
 	if err != nil {
-		log.Fatal("failed to sign")
+		return []byte{}, fmt.Errorf("failed to sign [file=%v]: %s", filename, err.Error())
 	}
 
 	return signature, nil

@@ -8,7 +8,7 @@ import (
 )
 
 func TestSigner(t *testing.T) {
-	privateKey, _ := LoadPrivateKey("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
+	privateKey, _ := HexToECDSA("59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
 	signer := NewSigner(privateKey)
 
 	testCases := []struct {
@@ -38,7 +38,7 @@ func TestSigner(t *testing.T) {
 				tmpFile.Close()
 				return name, func() { os.Remove(name) }
 			},
-			wantErr: "failed to create signature: file is empty",
+			wantErr: "error with file: content is empty",
 		},
 		{
 			name: "should fail with non-existent file",
@@ -49,7 +49,7 @@ func TestSigner(t *testing.T) {
 				os.Remove(name)
 				return name, func() {}
 			},
-			wantErr: "failed to open file: open ",
+			wantErr: "error reading [file=",
 		},
 	}
 
@@ -107,13 +107,13 @@ func TestPrivateKey(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			pk := tc.setup()
 
-			hex, err := LoadPrivateKey(pk)
+			hex, err := HexToECDSA(pk)
 			if tc.wantErr != "" {
 				require.Error(t, err, "Expected an error for %v", tc.name)
-				require.EqualErrorf(t, err, tc.wantErr, "LoadPrivateKey() error = %v, wantErr %v", err, tc.wantErr)
+				require.EqualErrorf(t, err, tc.wantErr, "HexToECDSA() error = %v, wantErr %v", err, tc.wantErr)
 			} else {
-				require.NoError(t, err, "LoadPrivateKey() unexpected error = %v", err)
-				require.NotNil(t, hex, "LoadPrivateKey() returned nil")
+				require.NoError(t, err, "HexToECDSA() unexpected error = %v", err)
+				require.NotNil(t, hex, "HexToECDSA() returned nil")
 			}
 		})
 	}
