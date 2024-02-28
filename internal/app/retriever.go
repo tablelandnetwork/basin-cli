@@ -12,6 +12,7 @@ import (
 	"github.com/filecoin-project/lassie/pkg/types"
 	"github.com/ipfs/go-cid"
 	"github.com/ipld/go-car/v2"
+	carstorage "github.com/ipld/go-car/v2/storage"
 	"github.com/ipld/go-car/v2/storage/deferred"
 	trustlessutils "github.com/ipld/go-trustless-utils"
 )
@@ -41,7 +42,7 @@ func NewRetriever(provider VaultsProvider, timeout int64) *Retriever {
 
 // Retrieve retrieves file from the network.
 func (r *Retriever) Retrieve(ctx context.Context, c cid.Cid, output string) error {
-	if output == "-" {
+	if output == "-" || output == "" {
 		return r.store.retrieveStdout(ctx, c, r.timeout)
 	}
 
@@ -64,40 +65,21 @@ func (cs *cacheStore) retrieveStdout(ctx context.Context, cid cid.Cid, timeout i
 }
 
 func (cs *cacheStore) retrieveFile(ctx context.Context, cid cid.Cid, output string, timeout int64) error {
-	// Write to the provided path or current directory
-	if output == "" {
-		output = "." // Default to current directory
-	}
-	// Ensure path is a valid directory
-	info, err := os.Stat(output)
-	if err != nil {
-		return fmt.Errorf("failed to access output directory: %s", err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("output path is not a directory: %s", output)
-	}
-
-	f, err := os.OpenFile(path.Join(output, cid.String()), os.O_RDWR|os.O_CREATE, 0o666)
+	f, err := os.OpenFile(output, os.O_RDWR|os.O_CREATE, 0o666)
 	if err != nil {
 		return fmt.Errorf("failed to open tmp file: %s", err)
 	}
 	defer func() {
-		_ = os.Remove(f.Name())
 		_ = f.Close()
 	}()
 
 	_, _ = f.Seek(0, io.SeekStart)
-
-	filename, err := cs.provider.RetrieveEvent(ctx, RetrieveEventParams{
+	_, err = cs.provider.RetrieveEvent(ctx, RetrieveEventParams{
 		Timeout: timeout,
 		CID:     cid,
 	}, f)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve to file: %s", err)
-	}
-
-	if err := os.Rename(f.Name(), path.Join(output, fmt.Sprintf("%s-%s", cid.String(), filename))); err != nil {
-		return fmt.Errorf("failed renaming the file: %s", err)
 	}
 
 	return nil
@@ -125,18 +107,7 @@ func (cs *coldStore) retrieveFile(ctx context.Context, c cid.Cid, output string,
 		car.UseWholeCIDs(false),
 	}
 
-	if output == "" {
-		output = "." // Default to current directory
-	}
-	// Ensure path is a valid directory
-	info, err := os.Stat(output)
-	if err != nil {
-		return fmt.Errorf("failed to access output directory: %s", err)
-	}
-	if !info.IsDir() {
-		return fmt.Errorf("output path is not a directory: %s", output)
-	}
-	carPath := path.Join(output, fmt.Sprintf("%s.car", c.String()))
+	carPath := path.Join(".", fmt.Sprintf("%s.car", c.String()))
 	carWriter := deferred.NewDeferredCarWriterForPath(carPath, []cid.Cid{c}, carOpts...)
 
 	carStore := storage.NewCachingTempStore(
@@ -153,6 +124,32 @@ func (cs *coldStore) retrieveFile(ctx context.Context, c cid.Cid, output string,
 
 	if _, err := lassie.Fetch(ctx, request, []types.FetchOption{}...); err != nil {
 		return fmt.Errorf("failed to fetch: %s", err)
+	}
+
+	carFile, err := os.Open(carPath)
+	if err != nil {
+		return fmt.Errorf("opening car file: %s", err)
+	}
+	defer func() {
+		_ = os.Remove(carFile.Name())
+		_ = carFile.Close()
+	}()
+
+	rc, err := extract(carFile)
+	if err != nil {
+		return fmt.Errorf("extract: %s", err)
+	}
+
+	f, err := os.OpenFile(output, os.O_RDWR|os.O_CREATE, 0o666)
+	if err != nil {
+		return fmt.Errorf("failed to open tmp file: %s", err)
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	if _, err := io.Copy(f, rc); err != nil {
+		return fmt.Errorf("failed to write to stdout: %s", err)
 	}
 
 	return nil
@@ -203,10 +200,34 @@ func (cs *coldStore) retrieveStdout(ctx context.Context, c cid.Cid, timeout int6
 	}
 
 	_, _ = tmpFile.Seek(0, io.SeekStart)
-	_, err = io.Copy(os.Stdout, tmpFile)
+	rc, err := extract(tmpFile)
+	if err != nil {
+		return fmt.Errorf("extract: %s", err)
+	}
+
+	_, err = io.Copy(os.Stdout, rc)
 	if err != nil {
 		return fmt.Errorf("failed to write to stdout: %s", err)
 	}
 
 	return nil
+}
+
+func extract(f *os.File) (io.ReadCloser, error) {
+	store, err := carstorage.OpenReadable(f)
+	if err != nil {
+		return nil, err
+	}
+
+	blkCid, err := cid.Parse(store.Roots()[0].String())
+	if err != nil {
+		return nil, err
+	}
+
+	rc, err := store.GetStream(context.Background(), blkCid.KeyString())
+	if err != nil {
+		return nil, err
+	}
+
+	return rc, nil
 }

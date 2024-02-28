@@ -597,15 +597,15 @@ func newRetrieveCommand() *cli.Command {
 		Usage:     "Retrieve an event by CID",
 		ArgsUsage: "<event_cid>",
 		Description: "Retrieving an event will download the event's CAR file into the \n" +
-			"current directory, a provided directory path, or to stdout.\n\n" +
-			"EXAMPLE:\n\nvaults retrieve --output /path/to/dir bafy...",
+			"specified file or to stdout.\n\n" +
+			"EXAMPLE:\n\nvaults retrieve --output filename bafy...",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:        "output",
 				Aliases:     []string{"o"},
 				Category:    "OPTIONAL:",
-				Usage:       "Output directory path, or '-' for stdout",
-				DefaultText: "current directory",
+				Usage:       "The file to store the retrieved content, or '-' for stdout",
+				DefaultText: "stdout",
 				Destination: &output,
 			},
 			&cli.StringFlag{

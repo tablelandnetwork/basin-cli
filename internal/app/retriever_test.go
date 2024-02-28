@@ -2,10 +2,8 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"path"
 	"testing"
 
 	"github.com/ipfs/go-cid"
@@ -14,15 +12,14 @@ import (
 
 func TestRetrieverFileOutput(t *testing.T) {
 	retriever := NewRetriever(&vaultsProviderMock{}, 0)
-	output := t.TempDir()
+	output, err := os.CreateTemp("", "")
+	require.NoError(t, err)
 	cid := cid.Cid{}
-	err := retriever.Retrieve(context.Background(), cid, output)
+	err = retriever.Retrieve(context.Background(), cid, output.Name())
 	require.NoError(t, err)
 
-	f, err := os.Open(path.Join(output, fmt.Sprintf("%s-%s", cid.String(), "sample.txt")))
-	require.NoError(t, err)
-
-	data, err := io.ReadAll(f)
+	_, _ = output.Seek(0, 0)
+	data, err := io.ReadAll(output)
 	require.NoError(t, err)
 
 	require.Equal(t, []byte("Hello"), data)
