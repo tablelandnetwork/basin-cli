@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"github.com/tablelandnetwork/basin-cli/internal/app"
 	"github.com/tablelandnetwork/basin-cli/pkg/pgrepl"
+	"github.com/tablelandnetwork/basin-cli/pkg/signing"
 	"github.com/tablelandnetwork/basin-cli/pkg/vaultsprovider"
 	"github.com/urfave/cli/v2"
 	"gopkg.in/yaml.v3"
@@ -162,7 +164,7 @@ func newStreamCommand() *cli.Command {
 		ArgsUsage: "<vault_name>",
 		Description: "The daemon will continuously stream database changes (except deletions) \n" +
 			"to the vault, as long as the daemon is actively running.\n\n" +
-			"EXAMPLE:\n\nvaults stream --vault my.vault --private-key 0x1234abcd",
+			"EXAMPLE:\n\nvaults stream --private-key 0x1234abcd my.vault",
 
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -588,6 +590,50 @@ func newListEventsCommand() *cli.Command {
 	}
 }
 
+func newSignCommand() *cli.Command {
+	var privateKey string
+
+	return &cli.Command{
+		Name:      "sign",
+		Usage:     "Sign a file with a private key",
+		ArgsUsage: "<file_path>",
+		Description: "Signing a file with take a provide key and a path to the desired file\n" +
+			"to produce a hex encoded string (e.g., can be used in the HTTP API).\n\n" +
+			"EXAMPLE:\n\nvaults sign --private-key 0x1234abcd /path/to/file",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "private-key",
+				Aliases:     []string{"k"},
+				Category:    "REQUIRED:",
+				Usage:       "Ethereum wallet private key",
+				Destination: &privateKey,
+				Required:    true,
+			},
+		},
+		Action: func(cCtx *cli.Context) error {
+			if cCtx.NArg() != 1 {
+				return errors.New("must provide a file path")
+			}
+			filepath := cCtx.Args().First()
+
+			privateKey, err := crypto.HexToECDSA(privateKey)
+			if err != nil {
+				return err
+			}
+
+			signer := signing.NewSigner(privateKey)
+			signatureBytes, err := signer.SignFile(filepath)
+			if err != nil {
+				return fmt.Errorf("failed to sign file: %s", err)
+			}
+			signature := hex.EncodeToString(signatureBytes)
+			fmt.Println(signature)
+
+			return nil
+		},
+	}
+}
+
 func newRetrieveCommand() *cli.Command {
 	var output, provider string
 	var timeout int64
@@ -649,6 +695,8 @@ func newRetrieveCommand() *cli.Command {
 }
 
 func newWalletCommand() *cli.Command {
+	var pkString string
+
 	return &cli.Command{
 		Name:      "account",
 		Usage:     "Account management for an Ethereum-style wallet",
@@ -687,17 +735,32 @@ func newWalletCommand() *cli.Command {
 			{
 				Name:      "address",
 				Usage:     "Print the public key for an account's private key",
-				UsageText: "vaults account address <file_path>",
-				Description: "The result of the `vaults account create` command will write a private key to a file, \n" +
-					"and this lets you retrieve the public key value for use in other commands.\n\n" +
-					"EXAMPLE:\n\nvaults account address /path/to/file",
+				UsageText: "vaults account address [command options] <value>",
+				Description: "The result of the `vaults account create` command will write a private key to a file, and \n" +
+					"this lets you retrieve the public key value for the file, or a private key hex string.\n" +
+					"If no `--string` flag is provided, then the presumption is the argument is a filepath.\n\n" +
+					"EXAMPLES:\n\nvaults account address /path/to/file\nvaults account address --string abcd1234",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:        "string",
+						Category:    "OPTIONAL:",
+						Usage:       "Specify if the argument is a hex string",
+						Destination: &pkString,
+					},
+				},
 				Action: func(cCtx *cli.Context) error {
-					filename := cCtx.Args().Get(0)
-					if filename == "" {
-						return errors.New("filename is empty")
+					pkFile := cCtx.Args().Get(0)
+					if pkFile == "" && pkString == "" {
+						return errors.New("no argument provided")
 					}
 
-					privateKey, err := crypto.LoadECDSA(filename)
+					var privateKey *ecdsa.PrivateKey
+					var err error
+					if pkString == "" {
+						privateKey, err = crypto.LoadECDSA(pkFile)
+					} else {
+						privateKey, err = crypto.HexToECDSA(pkString)
+					}
 					if err != nil {
 						return fmt.Errorf("loading key: %s", err)
 					}
