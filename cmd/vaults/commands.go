@@ -162,7 +162,7 @@ func newStreamCommand() *cli.Command {
 		ArgsUsage: "<vault_name>",
 		Description: "The daemon will continuously stream database changes (except deletions) \n" +
 			"to the vault, as long as the daemon is actively running.\n\n" +
-			"EXAMPLE:\n\nvaults stream --vault my.vault --private-key 0x1234abcd",
+			"EXAMPLE:\n\nvaults stream --private-key 0x1234abcd my.vault",
 
 		Flags: []cli.Flag{
 			&cli.StringFlag{
