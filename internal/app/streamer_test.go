@@ -104,7 +104,6 @@ func TestVaultsStreamerOne(t *testing.T) {
 		// reset the db and uploader channel
 		dbm.db = nil
 		dbm.dbFname = ""
-		dbm.createdAT = time.Time{}
 		uploader.provider = &vaultsProviderMock{
 			owner:          make(map[string]string),
 			uploaderInputs: ch2,

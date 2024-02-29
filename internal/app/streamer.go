@@ -41,10 +41,7 @@ func (b *VaultsStreamer) Run(ctx context.Context) error {
 	if err := b.dbMngr.NewDB(ctx); err != nil {
 		return err
 	}
-
-	defer func() {
-		_ = b.dbMngr.Close()
-	}()
+	defer b.dbMngr.Close()
 
 	// Start replication
 	txs, _, err := b.replicator.StartReplication(ctx)
