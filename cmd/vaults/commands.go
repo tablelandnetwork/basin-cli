@@ -103,7 +103,7 @@ func newVaultCreateCommand() *cli.Command {
 				return fmt.Errorf("parse config: %s", err)
 			}
 
-			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
+			dir, err := defaultConfigLocation(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
@@ -116,7 +116,7 @@ func newVaultCreateCommand() *cli.Command {
 				_ = f.Close()
 			}()
 
-			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
@@ -187,12 +187,12 @@ func newStreamCommand() *cli.Command {
 				return err
 			}
 
-			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
+			dir, err := defaultConfigLocation(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
@@ -311,12 +311,12 @@ func newWriteCommand() *cli.Command {
 				return err
 			}
 
-			dir, _, err := defaultConfigLocationV2(cCtx.String("dir"))
+			dir, err := defaultConfigLocation(cCtx.String("dir"))
 			if err != nil {
 				return fmt.Errorf("default config location: %s", err)
 			}
 
-			cfg, err := loadConfigV2(path.Join(dir, "config.yaml"))
+			cfg, err := loadConfig(path.Join(dir, "config.yaml"))
 			if err != nil {
 				return fmt.Errorf("load config: %s", err)
 			}
