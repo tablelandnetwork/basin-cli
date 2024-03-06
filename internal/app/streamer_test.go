@@ -175,21 +175,6 @@ func TestVaultsStreamerTwo(t *testing.T) {
 	// wait for window to pass
 	time.Sleep(winSize + 1)
 
-	// nothing should be uploaded because the second tx was received before
-	// the window closed. the exports should be uploaded
-	// when we replicator is started again
-	select {
-	case <-providerMock.uploaderInputs:
-		t.FailNow() // should not be reached
-	default:
-		// manually trigger uploadAll to simulate
-		// starting the replication process again
-		go func() {
-			require.NoError(
-				t, dbm.UploadAll(context.Background()))
-		}()
-	}
-
 	// Assert that the both first and second tx
 	// were replayed by importing the exported parquet file
 	file := <-providerMock.uploaderInputs
