@@ -215,8 +215,6 @@ func newStreamCommand() *cli.Command {
 				return err
 			}
 
-			bp := vaultsprovider.New(cfg.Vaults[vault].ProviderHost)
-
 			pgxConn, err := pgx.Connect(cCtx.Context, connString)
 			if err != nil {
 				return fmt.Errorf("connect: %s", err)
@@ -241,9 +239,10 @@ func newStreamCommand() *cli.Command {
 			}
 
 			// Creates a new db manager when replication starts
+			bp := vaultsprovider.New(cfg.Vaults[vault].ProviderHost)
+			uploader := app.NewVaultsUploader(ns, rel, bp, privateKey)
 			dbDir := path.Join(dir, vault)
 			winSize := time.Duration(cfg.Vaults[vault].WindowSize) * time.Second
-			uploader := app.NewVaultsUploader(ns, rel, bp, privateKey)
 			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
 
 			// Before starting replication, upload the remaining data

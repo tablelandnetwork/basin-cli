@@ -25,7 +25,7 @@ type testRow struct {
 }
 
 func importLocalDB(t *testing.T, file *os.File) *sql.Rows {
-	db, err := sql.Open("duckdb", path.Join(t.TempDir(), "temp.db"))
+	db, err := sql.Open("duckdb", path.Join(t.TempDir(), "tmp.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
