@@ -22,13 +22,14 @@ type config struct {
 }
 
 type vault struct {
-	User         string `yaml:"user"`
-	Password     string `yaml:"password"`
-	Host         string `yaml:"host"`
-	Port         int    `yaml:"port"`
-	Database     string `yaml:"database"`
-	ProviderHost string `yaml:"provider_host"`
-	WindowSize   int64  `yaml:"window_size"`
+	User         string   `yaml:"user"`
+	Password     string   `yaml:"password"`
+	Host         string   `yaml:"host"`
+	Port         int      `yaml:"port"`
+	Database     string   `yaml:"database"`
+	Tables       []string `yaml:"tables"`
+	ProviderHost string   `yaml:"provider_host"`
+	WindowSize   int64    `yaml:"window_size"`
 }
 
 func newConfig() *config {

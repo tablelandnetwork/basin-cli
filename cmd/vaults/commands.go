@@ -32,7 +32,7 @@ import (
 var vaultNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-zA-Z0-9_]*$)`)
 
 func newVaultCreateCommand() *cli.Command {
-	var address, dburi, provider string
+	var address, provider string
 	var winSize, cache int64
 
 	return &cli.Command{
@@ -68,12 +68,6 @@ func newVaultCreateCommand() *cli.Command {
 				Destination: &cache,
 				Value:       0,
 			},
-			&cli.StringFlag{
-				Name:        "dburi",
-				Category:    "OPTIONAL:",
-				Usage:       "PostgreSQL connection string (e.g., postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres)",
-				Destination: &dburi,
-			},
 			&cli.Int64Flag{
 				Name:        "window-size",
 				Category:    "OPTIONAL:",
@@ -98,10 +92,6 @@ func newVaultCreateCommand() *cli.Command {
 			if err != nil {
 				return fmt.Errorf("not a valid account: %s", err)
 			}
-			pgConfig, err := pgconn.ParseConfig(dburi)
-			if err != nil {
-				return fmt.Errorf("parse config: %s", err)
-			}
 
 			dir, err := defaultConfigLocation(cCtx.String("dir"))
 			if err != nil {
@@ -122,11 +112,6 @@ func newVaultCreateCommand() *cli.Command {
 			}
 
 			cfg.Vaults[pub] = vault{
-				Host:         pgConfig.Host,
-				Port:         int(pgConfig.Port),
-				User:         pgConfig.User,
-				Password:     pgConfig.Password,
-				Database:     pgConfig.Database,
 				ProviderHost: provider,
 				WindowSize:   winSize,
 			}
@@ -135,14 +120,15 @@ func newVaultCreateCommand() *cli.Command {
 				return fmt.Errorf("encode: %s", err)
 			}
 
-			exists, err := createVault(cCtx.Context, dburi, ns, rel, provider, account, cache)
-			if err != nil {
-				return fmt.Errorf("failed to create vault: %s", err)
+			bp := vaultsprovider.New(provider)
+			req := app.CreateVaultParams{
+				Account:       account,
+				Vault:         app.Vault(fmt.Sprintf("%s.%s", ns, rel)),
+				CacheDuration: app.CacheDuration(cache),
 			}
 
-			if exists {
-				fmt.Printf("Vault %s.%s already exists.\n\n", ns, rel)
-				return nil
+			if err := bp.CreateVault(cCtx.Context, req); err != nil {
+				return fmt.Errorf("create vault: %s", err)
 			}
 
 			if err := os.MkdirAll(path.Join(dir, pub), 0o755); err != nil {
@@ -156,7 +142,7 @@ func newVaultCreateCommand() *cli.Command {
 }
 
 func newStreamCommand() *cli.Command {
-	var privateKey string
+	var privateKey, dburi, tables string
 
 	return &cli.Command{
 		Name:      "stream",
@@ -173,6 +159,21 @@ func newStreamCommand() *cli.Command {
 				Category:    "REQUIRED:",
 				Usage:       "Ethereum wallet private key",
 				Destination: &privateKey,
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "dburi",
+				Category:    "REQUIRED:",
+				Usage:       "PostgreSQL connection string (e.g., postgresql://postgres:[PASSWORD]@[HOST]:[PORT]/postgres)",
+				Destination: &dburi,
+				Required:    true,
+			},
+			&cli.StringFlag{
+				Name:        "tables",
+				Aliases:     []string{"t"},
+				Category:    "REQUIRED:",
+				Usage:       "PostgreSQL tables to be replicated separated by comma (e.g. tbl1,tbl2,tbl3)",
+				Destination: &tables,
 				Required:    true,
 			},
 		},
@@ -197,15 +198,25 @@ func newStreamCommand() *cli.Command {
 				return fmt.Errorf("load config: %s", err)
 			}
 
-			connString := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
-				cfg.Vaults[vault].User,
-				cfg.Vaults[vault].Password,
-				cfg.Vaults[vault].Host,
-				cfg.Vaults[vault].Port,
-				cfg.Vaults[vault].Database,
-			)
+			publication := pgrepl.Publication(strings.Replace(vault, ".", "_", -1))
+			setup, err := NewDatabaseStreamSetup(cCtx.Context, dburi, publication, tables)
+			if err != nil {
+				return fmt.Errorf("new database stream setup: %s", err)
+			}
+			defer func() {
+				_ = setup.Close(cCtx.Context)
+			}()
 
-			r, err := pgrepl.New(connString, pgrepl.Publication(rel))
+			if err := setup.CreatePublicationIfNotExists(cCtx.Context); err != nil {
+				return fmt.Errorf("failed to create database publication: %s", err)
+			}
+
+			tableSchemas, err := setup.TableSchemas(cCtx.Context)
+			if err != nil {
+				return fmt.Errorf("getting tables schemas: %s", err)
+			}
+
+			r, err := pgrepl.New(dburi, publication)
 			if err != nil {
 				return fmt.Errorf("failed to create replicator: %s", err)
 			}
@@ -215,35 +226,12 @@ func newStreamCommand() *cli.Command {
 				return err
 			}
 
-			pgxConn, err := pgx.Connect(cCtx.Context, connString)
-			if err != nil {
-				return fmt.Errorf("connect: %s", err)
-			}
-			defer func() {
-				_ = pgxConn.Close(cCtx.Context)
-			}()
-
-			tx, err := pgxConn.Begin(cCtx.Context)
-			if err != nil {
-				return fmt.Errorf("failed to begin transaction")
-			}
-			defer func() {
-				if err != nil {
-					_ = tx.Rollback(cCtx.Context)
-				}
-			}()
-
-			cols, err := inspectTable(cCtx.Context, tx, rel)
-			if err != nil {
-				return fmt.Errorf("failed to inspect source table: %s", err)
-			}
-
 			// Creates a new db manager when replication starts
 			bp := vaultsprovider.New(cfg.Vaults[vault].ProviderHost)
 			uploader := app.NewVaultsUploader(ns, rel, bp, privateKey)
 			dbDir := path.Join(dir, vault)
 			winSize := time.Duration(cfg.Vaults[vault].WindowSize) * time.Second
-			dbm := app.NewDBManager(dbDir, rel, cols, winSize, uploader)
+			dbm := app.NewDBManager(dbDir, tableSchemas, winSize, uploader)
 
 			// Before starting replication, upload the remaining data
 			if err := dbm.UploadAll(cCtx.Context); err != nil {
@@ -788,125 +776,6 @@ func parseVaultName(name string) (ns string, rel string, err error) {
 	return
 }
 
-func inspectTable(ctx context.Context, tx pgx.Tx, rel string) ([]app.Column, error) {
-	rows, err := tx.Query(ctx,
-		`
-		WITH primary_key_info AS
-			(SELECT tc.constraint_schema,
-					tc.table_name,
-					ccu.column_name
-			FROM information_schema.table_constraints tc
-			JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
-			WHERE constraint_type = 'PRIMARY KEY' ),
-			array_type_info AS
-				(SELECT c.table_name,
-						c.column_name,
-						pg_catalog.format_type(t.oid, NULL) AS full_data_type
-				FROM information_schema.columns AS c
-				JOIN pg_catalog.pg_type AS t ON c.udt_name = t.typname
-				WHERE c.data_type = 'ARRAY')
-		SELECT
-			c.column_name,
-			CASE
-			WHEN c.data_type = 'ARRAY' THEN ati.full_data_type
-			ELSE c.data_type
-			END AS data_type,
-			c.is_nullable = 'YES' AS is_nullable,
-			pki.column_name IS NOT NULL AS is_primary
-		FROM information_schema.columns AS c
-		LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
-			AND pki.table_name = c.table_name
-			AND pki.column_name = c.column_name
-		LEFT JOIN array_type_info ati ON c.table_name = ati.table_name
-    		AND c.column_name = ati.column_name
-			WHERE c.table_name = $1;
-		`, rel,
-	)
-	if err != nil {
-		return []app.Column{}, fmt.Errorf("failed to fetch schema")
-	}
-	defer rows.Close()
-
-	var colName, typ string
-	var isNull, isPrimary bool
-	var columns []app.Column
-	for rows.Next() {
-		if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
-			return []app.Column{}, fmt.Errorf("scan: %s", err)
-		}
-
-		columns = append(columns, app.Column{
-			Name:      colName,
-			Typ:       typ,
-			IsNull:    isNull,
-			IsPrimary: isPrimary,
-		})
-	}
-	return columns, nil
-}
-
-func createVault(
-	ctx context.Context,
-	dburi string,
-	ns string,
-	rel string,
-	provider string,
-	account *app.Account,
-	cacheDuration int64,
-) (exists bool, err error) {
-	bp := vaultsprovider.New(provider)
-	req := app.CreateVaultParams{
-		Account:       account,
-		Vault:         app.Vault(fmt.Sprintf("%s.%s", ns, rel)),
-		CacheDuration: app.CacheDuration(cacheDuration),
-	}
-
-	if dburi == "" {
-		if err := bp.CreateVault(ctx, req); err != nil {
-			return false, fmt.Errorf("create vault: %s", err)
-		}
-
-		return exists, nil
-	}
-
-	pgxConn, err := pgx.Connect(ctx, dburi)
-	if err != nil {
-		return false, fmt.Errorf("connect: %s", err)
-	}
-	defer func() {
-		_ = pgxConn.Close(ctx)
-	}()
-
-	tx, err := pgxConn.Begin(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to begin transaction")
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
-	if _, err := tx.Exec(
-		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", pgrepl.Publication(rel).FullName(), rel),
-	); err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			return true, nil
-		}
-		return false, fmt.Errorf("failed to create publication: %s", err)
-	}
-
-	if err := bp.CreateVault(ctx, req); err != nil {
-		return false, fmt.Errorf("create call: %s", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return false, fmt.Errorf("commit: %s", err)
-	}
-
-	return false, nil
-}
-
 func validateBeforeAndAfter(before, after, at string) (app.Timestamp, app.Timestamp, error) {
 	if !strings.EqualFold(at, "") {
 		before, after = at, at
@@ -923,4 +792,122 @@ func validateBeforeAndAfter(before, after, at string) (app.Timestamp, app.Timest
 	}
 
 	return b, a, nil
+}
+
+// DatabaseStreamSetup setups the database for streaming.
+type DatabaseStreamSetup struct {
+	publication pgrepl.Publication
+	tables      []string
+
+	// Postgres
+	pgConfig *pgconn.Config
+	pgConn   *pgx.Conn
+}
+
+// NewDatabaseStreamSetup creates new database stream setup.
+func NewDatabaseStreamSetup(
+	ctx context.Context, dburi string, publication pgrepl.Publication, tables string,
+) (*DatabaseStreamSetup, error) {
+	pgConfig, err := pgconn.ParseConfig(dburi)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dburi: %s", err)
+	}
+
+	pgConn, err := pgx.Connect(ctx, dburi)
+	if err != nil {
+		return nil, fmt.Errorf("connect: %s", err)
+	}
+
+	return &DatabaseStreamSetup{
+		publication: publication,
+		tables:      strings.Split(tables, ","),
+		pgConfig:    pgConfig,
+		pgConn:      pgConn,
+	}, nil
+}
+
+// CreatePublicationIfNotExists creates a database publication if it does not exist.
+func (s *DatabaseStreamSetup) CreatePublicationIfNotExists(ctx context.Context) error {
+	if _, err := s.pgConn.Exec(
+		ctx, fmt.Sprintf("CREATE PUBLICATION %s FOR TABLE %s", s.publication.FullName(), strings.Join(s.tables, ",")),
+	); err != nil {
+		if !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("failed to create publication: %s", err)
+		}
+	}
+
+	return nil
+}
+
+// TableSchemas returns the schema of the tables.
+func (s *DatabaseStreamSetup) TableSchemas(ctx context.Context) ([]app.TableSchema, error) {
+	schemas := []app.TableSchema{}
+
+	for _, table := range s.tables {
+		rows, err := s.pgConn.Query(ctx,
+			`
+			WITH primary_key_info AS
+				(SELECT tc.constraint_schema,
+						tc.table_name,
+						ccu.column_name
+				FROM information_schema.table_constraints tc
+				JOIN information_schema.constraint_column_usage AS ccu USING (CONSTRAINT_SCHEMA, CONSTRAINT_NAME)
+				WHERE constraint_type = 'PRIMARY KEY' ),
+				array_type_info AS
+					(SELECT c.table_name,
+							c.column_name,
+							pg_catalog.format_type(t.oid, NULL) AS full_data_type
+					FROM information_schema.columns AS c
+					JOIN pg_catalog.pg_type AS t ON c.udt_name = t.typname
+					WHERE c.data_type = 'ARRAY')
+			SELECT
+				c.column_name,
+				CASE
+				WHEN c.data_type = 'ARRAY' THEN ati.full_data_type
+				ELSE c.data_type
+				END AS data_type,
+				c.is_nullable = 'YES' AS is_nullable,
+				pki.column_name IS NOT NULL AS is_primary
+			FROM information_schema.columns AS c
+			LEFT JOIN primary_key_info pki ON c.table_schema = pki.constraint_schema
+				AND pki.table_name = c.table_name
+				AND pki.column_name = c.column_name
+			LEFT JOIN array_type_info ati ON c.table_name = ati.table_name
+				AND c.column_name = ati.column_name
+				WHERE c.table_name = $1;
+			`, table,
+		)
+		if err != nil {
+			return []app.TableSchema{}, fmt.Errorf("failed to fetch schema")
+		}
+		defer rows.Close()
+
+		var colName, typ string
+		var isNull, isPrimary bool
+		var columns []app.Column
+		for rows.Next() {
+			if err := rows.Scan(&colName, &typ, &isNull, &isPrimary); err != nil {
+				return []app.TableSchema{}, fmt.Errorf("scan: %s", err)
+			}
+
+			columns = append(columns, app.Column{
+				Name:      colName,
+				Typ:       typ,
+				IsNull:    isNull,
+				IsPrimary: isPrimary,
+			})
+		}
+
+		schemas = append(schemas, app.TableSchema{
+			Table:   table,
+			Columns: columns,
+		})
+	}
+
+	return schemas, nil
+}
+
+// Close closes db connection.
+func (s *DatabaseStreamSetup) Close(ctx context.Context) error {
+	return s.pgConn.Close(ctx)
 }

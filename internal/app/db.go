@@ -33,8 +33,7 @@ type DBManager struct {
 	db      *sql.DB
 	dbDir   string
 	dbFname string
-	table   string
-	cols    []Column
+	schemas []TableSchema
 
 	// configs
 	windowInterval time.Duration
@@ -46,14 +45,19 @@ type DBManager struct {
 	close chan struct{}
 }
 
+// TableSchema represents a table and its schema.
+type TableSchema struct {
+	Table   string
+	Columns []Column
+}
+
 // NewDBManager creates a new DBManager.
 func NewDBManager(
-	dbDir, table string, cols []Column, windowInterval time.Duration, uploader *VaultsUploader,
+	dbDir string, schemas []TableSchema, windowInterval time.Duration, uploader *VaultsUploader,
 ) *DBManager {
 	return &DBManager{
 		dbDir:          dbDir,
-		table:          table,
-		cols:           cols,
+		schemas:        schemas,
 		windowInterval: windowInterval,
 		uploader:       uploader,
 	}
@@ -122,52 +126,59 @@ func (dbm *DBManager) Replay(ctx context.Context, tx *pgrepl.Tx) error {
 }
 
 // Export exports the current db to a parquet file at the given path.
-func (dbm *DBManager) Export(ctx context.Context, exportPath string) (bool, error) {
+func (dbm *DBManager) Export(ctx context.Context, exportPath string) ([]string, error) {
 	var err error
 	db := dbm.db
 	// db is nil before replication starts.
 	// In that case, we open all existing db files
 	// and upload them.
 	if db == nil {
+		dbm.dbFname = path.Base(exportPath)
 		// convert the export path to a db path:
 		// <ts>.db.parquet -> <ts>.db
 		dbPath := strings.ReplaceAll(exportPath, ".parquet", "")
 		db, err = sql.Open("duckdb", dbPath)
 		if err != nil {
-			return true, err
+			return []string{}, err
 		}
 		defer func() {
 			if err := db.Close(); err != nil {
-				fmt.Printf("cannot close db %v \n", err)
+				slog.Error("cannot close db", "error", err)
 			}
 		}()
-		slog.Info("backing up db", "at", exportPath)
+		slog.Info("backing up db", "at", dbPath)
 	} else {
 		slog.Info("backing up current db")
 	}
-	var n int
-	if err := db.QueryRowContext(
-		ctx,
-		"select coalesce(sum(estimated_size), 0) rows_count from duckdb_tables() LIMIT 1",
-	).Scan(&n); err != nil {
-		return true, fmt.Errorf("quering row count: %s", err)
+
+	exportedFiles := []string{}
+	for _, schema := range dbm.schemas {
+		var n int
+		if err := db.QueryRowContext(
+			ctx,
+			fmt.Sprintf("select count(1) from %s LIMIT 1", schema.Table),
+		).Scan(&n); err != nil {
+			return []string{}, fmt.Errorf("querying row count: %s", err)
+		}
+
+		if n == 0 {
+			continue
+		}
+
+		exportedFileName := strings.Replace(exportPath, dbm.dbFname, fmt.Sprintf("%s-%s", schema.Table, dbm.dbFname), -1)
+		exportedFiles = append(exportedFiles, exportedFileName)
+		_, err = db.ExecContext(ctx,
+			fmt.Sprintf(
+				`INSTALL parquet;
+				 LOAD parquet;
+				 COPY (SELECT * FROM %s) TO '%s' (FORMAT PARQUET)`,
+				schema.Table, exportedFileName))
+		if err != nil {
+			return []string{}, fmt.Errorf("cannot export to parquet file: %s", err)
+		}
 	}
 
-	if n == 0 {
-		return true, nil
-	}
-
-	_, err = db.ExecContext(ctx,
-		fmt.Sprintf(
-			`INSTALL parquet;
-			 LOAD parquet;
-			 COPY (SELECT * FROM %s) TO '%s' (FORMAT PARQUET)`,
-			dbm.table, exportPath))
-	if err != nil {
-		return true, fmt.Errorf("cannot export to parquet file: %s", err)
-	}
-
-	return false, nil
+	return exportedFiles, nil
 }
 
 // UploadAt uploads a db dump at the given path.
@@ -214,13 +225,13 @@ func (dbm *DBManager) UploadAll(ctx context.Context) error {
 		if re.MatchString(fname) {
 			dbPath := path.Join(dbm.dbDir, fname)
 			exportAt := dbPath + ".parquet"
-			isEmpty, err := dbm.Export(ctx, exportAt)
+			files, err := dbm.Export(ctx, exportAt)
 			if err != nil {
 				return fmt.Errorf("export: %s", err)
 			}
 
-			if !isEmpty {
-				if err := dbm.UploadAt(ctx, exportAt); err != nil {
+			for _, file := range files {
+				if err := dbm.UploadAt(ctx, file); err != nil {
 					return fmt.Errorf("upload: %s", err)
 				}
 			}
@@ -244,14 +255,14 @@ func (dbm *DBManager) Close() {
 func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) (string, error) {
 	var columnValsStr string
 
-	// get column names
-	cols := []string{}
-	for _, c := range tx.Records[0].Columns {
-		cols = append(cols, c.Name)
-	}
-
-	recordVals := []string{}
+	// build an insert stmt for each record inside tx
+	stmts := []string{}
 	for _, r := range tx.Records {
+		cols := []string{}
+		for _, c := range r.Columns {
+			cols = append(cols, c.Name)
+		}
+
 		columnVals := []string{}
 		for _, c := range r.Columns {
 			ddbType, err := dbm.pgToDDBType(c.Type)
@@ -262,22 +273,25 @@ func (dbm *DBManager) queryFromWAL(tx *pgrepl.Tx) (string, error) {
 			columnVals = append(columnVals, columnVal)
 		}
 		columnValsStr = strings.Join(columnVals, ", ")
-		recordVals = append(
-			recordVals, fmt.Sprintf("(%s)", columnValsStr))
+		recordVals := fmt.Sprintf("(%s)", columnValsStr)
+
+		stmt := fmt.Sprintf(
+			"insert into %s (%s) values %s",
+			r.Table,
+			strings.Join(cols, ", "),
+			recordVals,
+		)
+
+		stmts = append(stmts, stmt)
 	}
 
-	return fmt.Sprintf(
-		"insert into %s (%s) values %s",
-		dbm.table,
-		strings.Join(cols, ", "),
-		strings.Join(recordVals, ", "),
-	), nil
+	return strings.Join(stmts, ";"), nil
 }
 
 func (dbm *DBManager) replace(ctx context.Context) error {
 	// Export current db to a parquet file at a given path
 	exportAt := path.Join(dbm.dbDir, dbm.dbFname) + ".parquet"
-	isEmpty, err := dbm.Export(ctx, exportAt)
+	files, err := dbm.Export(ctx, exportAt)
 	if err != nil {
 		return err
 	}
@@ -286,10 +300,10 @@ func (dbm *DBManager) replace(ctx context.Context) error {
 	slog.Info("closing current db")
 	dbm.Close()
 
-	if !isEmpty {
+	for _, file := range files {
 		// Upload the exported parquet file
-		if err := dbm.UploadAt(ctx, exportAt); err != nil {
-			fmt.Println("upload error, skipping", "err", err)
+		if err := dbm.UploadAt(ctx, file); err != nil {
+			slog.Error("upload error, skipping", "err", err)
 		}
 	}
 
@@ -345,41 +359,46 @@ func (dbm *DBManager) pgToDDBType(typ string) (duckdbType, error) {
 }
 
 func (dbm *DBManager) genCreateQuery() (string, error) {
-	var cols, pks string
-	for i, column := range dbm.cols {
-		ddbType, err := dbm.pgToDDBType(column.Typ)
-		if err != nil {
-			return "", err
-		}
-		col := fmt.Sprintf("%s %s", column.Name, ddbType.typeName)
-		if !column.IsNull {
-			col = fmt.Sprintf("%s NOT NULL", col)
-		}
-		if i == 0 {
-			cols = col
-			if column.IsPrimary {
-				pks = column.Name
+	stmts := []string{}
+	for _, schema := range dbm.schemas {
+		var cols, pks string
+		for i, column := range schema.Columns {
+			ddbType, err := dbm.pgToDDBType(column.Typ)
+			if err != nil {
+				return "", err
 			}
-		} else {
-			cols = fmt.Sprintf("%s,%s", cols, col)
-			if column.IsPrimary {
-				pks = fmt.Sprintf("%s,%s", pks, column.Name)
+			col := fmt.Sprintf("%s %s", column.Name, ddbType.typeName)
+			if !column.IsNull {
+				col = fmt.Sprintf("%s NOT NULL", col)
+			}
+			if i == 0 {
+				cols = col
+				if column.IsPrimary {
+					pks = column.Name
+				}
+			} else {
+				cols = fmt.Sprintf("%s,%s", cols, col)
+				if column.IsPrimary {
+					pks = fmt.Sprintf("%s,%s", pks, column.Name)
+				}
 			}
 		}
+
+		if pks != "" {
+			cols = fmt.Sprintf("%s,PRIMARY KEY (%s)", cols, pks)
+		}
+
+		if cols == "" {
+			return "", errors.New("schema must have at least one column")
+		}
+
+		stmt := fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s (%s)",
+			schema.Table, cols)
+		stmts = append(stmts, stmt)
 	}
 
-	if pks != "" {
-		cols = fmt.Sprintf("%s,PRIMARY KEY (%s)", cols, pks)
-	}
-
-	if cols == "" {
-		return "", errors.New("schema must have at least one column")
-	}
-
-	stmt := fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s (%s)",
-		dbm.table, cols)
-	return stmt, nil
+	return strings.Join(stmts, ";"), nil
 }
 
 func (dbm *DBManager) cleanup(dbPath string) error {

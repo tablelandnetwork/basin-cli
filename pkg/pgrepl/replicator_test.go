@@ -35,23 +35,23 @@ func TestMain(m *testing.M) {
 }
 
 func TestReplication(t *testing.T) {
-	t.Parallel()
-
 	_, err := db.ExecContext(context.Background(), `
 		create table t(id int primary key, name text);
-		create publication pub_basin_t for table t;
+		create table t2(id int primary key, name text);
+		create publication pub_basin_t for table t, t2;
 	`)
 	require.NoError(t, err)
 	replicator, err := New(uri, "t")
 	require.NoError(t, err)
 
-	feed, pubName, err := replicator.StartReplication(context.Background())
+	feed, tables, err := replicator.StartReplication(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "public.t", pubName)
+	require.Equal(t, []string{"public.t", "public.t2"}, tables)
 
 	_, err = db.ExecContext(context.Background(), `
 			insert into t values (1, 'foo');
 			insert into t values (2, 'bar');
+			insert into t2 values (4, 'foo2');
 			insert into t values (3, 'baz');
 			update t set name='quz' where id=3;
 			delete from t where id=2;
@@ -59,7 +59,7 @@ func TestReplication(t *testing.T) {
 	require.NoError(t, err)
 
 	tx := <-feed
-	require.Equal(t, 5, len(tx.Records))
+	require.Equal(t, 6, len(tx.Records))
 	require.Equal(t, tx.Records[0].Table, "t")
 	require.Equal(t, tx.Records[0].Columns, []Column{
 		{
@@ -71,6 +71,20 @@ func TestReplication(t *testing.T) {
 			Name:  "name",
 			Type:  "text",
 			Value: toJSON(t, "foo"),
+		},
+	})
+
+	require.Equal(t, tx.Records[2].Table, "t2")
+	require.Equal(t, tx.Records[2].Columns, []Column{
+		{
+			Name:  "id",
+			Type:  "integer",
+			Value: toJSON(t, 4),
+		},
+		{
+			Name:  "name",
+			Type:  "text",
+			Value: toJSON(t, "foo2"),
 		},
 	})
 

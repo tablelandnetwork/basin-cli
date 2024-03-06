@@ -111,7 +111,7 @@ func TestGenCreateQuery(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.tableName, func(t *testing.T) {
 			dbm := NewDBManager(
-				t.TempDir(), tc.tableName, tc.cols, 3*time.Second, nil)
+				t.TempDir(), []TableSchema{{tc.tableName, tc.cols}}, 3*time.Second, nil)
 			query, err := dbm.genCreateQuery()
 			require.NoError(t, err)
 
@@ -146,7 +146,7 @@ func TestGenCreateQueryUnsupported(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.tableName, func(t *testing.T) {
 			dbm := NewDBManager(
-				t.TempDir(), tc.tableName, tc.cols, 3*time.Second, nil)
+				t.TempDir(), []TableSchema{{tc.tableName, tc.cols}}, 3*time.Second, nil)
 			_, err := dbm.genCreateQuery()
 			require.EqualError(t, err, tc.expectedErr.Error())
 		})
@@ -571,7 +571,7 @@ func TestQueryFromWAL(t *testing.T) {
 					{Name: "id", Typ: tc.typ, IsNull: valIsNull, IsPrimary: false},
 				}
 				dbm := NewDBManager(
-					t.TempDir(), "t", cols, 3*time.Second, nil)
+					t.TempDir(), []TableSchema{{"t", cols}}, 3*time.Second, nil)
 				insertQuery, err := dbm.queryFromWAL(&tx)
 				require.NoError(t, err)
 				require.Equal(t, tc.expectedInsertStmts[i], insertQuery)
@@ -611,7 +611,7 @@ func TestQueryFromWALUnsupported(t *testing.T) {
 					{Name: "id", Typ: tc.typ, IsNull: valIsNull, IsPrimary: false},
 				}
 				dbm := NewDBManager(
-					t.TempDir(), "t", cols, 3*time.Second, nil)
+					t.TempDir(), []TableSchema{{"t", cols}}, 3*time.Second, nil)
 				_, err := dbm.queryFromWAL(&tx)
 				require.EqualError(t, err, tc.expectedErr.Error())
 			}
@@ -638,7 +638,7 @@ func TestReplay(t *testing.T) {
 				}
 				// use a large window for testing
 				dbm := NewDBManager(
-					t.TempDir(), "t", cols, 3*time.Hour, nil)
+					t.TempDir(), []TableSchema{{"t", cols}}, 3*time.Hour, nil)
 
 				// assert new db setup (create queries are correctly applied)
 				ctx := context.Background()
@@ -664,7 +664,7 @@ func TestReplayUnsupported(t *testing.T) {
 		{Name: "id", Typ: typ, IsNull: valIsNull, IsPrimary: false},
 	}
 	dbm := NewDBManager(
-		t.TempDir(), "t", cols, 3*time.Hour, nil)
+		t.TempDir(), []TableSchema{{"t", cols}}, 3*time.Hour, nil)
 	// assert new db setup (create queries are correctly applied)
 	ctx := context.Background()
 	err := dbm.NewDB(ctx)
