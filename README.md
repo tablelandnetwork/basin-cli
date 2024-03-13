@@ -94,10 +94,6 @@ make install
 - Log into the [Supabase](https://supabase.io/) dashboard and go to your project, or create a new one.
 - Check if logical replication is enabled. This should be the default setting, so you shouldn't have to change anything. You can do this in the `SQL Editor` section on the left hand side of the Supabase dashboard by running `SHOW wal_level;` query, which should log `logical`.
 - You can find the database connection information on the left hand side under `Project Settings` > `Database`. You will need the `Host`, `Port`, `Database`, `Username`, and `Password` to connect to your database.
-  - When you create a vault, the `--dburi` should follow this format:
-    ```sh
-    postgresql://postgres:[PASSWORD]@db.[PROJECT_ID].supabase.co:5432/postgres
-    ```
 
 ### Create a vault
 
@@ -114,7 +110,7 @@ A new private key will be written to `FILENAME`.
 The name of a vault contains a `namespace` (e.g. `my_company`) and the name of an existing database relation (e.g. `my_table`), separated by a period (`.`). Use `vaults create` to create a new vault. See `vaults create --help` for more info.
 
 ```bash
-vaults create --dburi [DBURI] --account [WALLET_ADDRESS] namespace.relation_name
+vaults create  --account [WALLET_ADDRESS] namespace.relation_name
 ```
 
 🚧 Vaults currently only replicates `INSERT` statements, which means that it only replicates append-only data (e.g., log-style data). Row updates and deletes will be ignored. 🚧
@@ -124,14 +120,18 @@ vaults create --dburi [DBURI] --account [WALLET_ADDRESS] namespace.relation_name
 Use `vaults stream` to start a daemon that will continuously push changes to the underlying table/view to the network. See `vaults stream --help` for more info.
 
 ```bash
-vaults stream --private-key [PRIVATE_KEY] namespace.relation_name
+vaults stream --dburi [DB_URI] --tables t1,t2 --private-key [PRIVATE_KEY] namespace.relation_name
+```
+
+The `--dburi` should follow this format:
+
+```sh
+postgresql://[USER]:[PASSWORD]@[HOST]:[PORT]/[DATABASE]
 ```
 
 ### Write a Parquet file
 
-Before writing a Parquet file, you need to [Create a vault](#create-a-vault), if not already created. You can omit the `--dburi` flag, in this case.
-
-Then, use `vaults write` to write a Parquet file.
+Before writing a Parquet file, you need to [Create a vault](#create-a-vault), if not already created. Then, use `vaults write` to write a Parquet file.
 
 ```bash
 vaults write --vault [namespace.relation_name] --private-key [PRIVATE_KEY] filepath
@@ -205,7 +205,7 @@ PORT=8888 ./scripts/server.sh
 ./scripts/run.sh account create pk.out
 
 # Start replicating
-./scripts/run.sh vaults stream --private-key [PRIVATE_KEY] namespace.relation_name
+./scripts/run.sh vaults stream --dburi [DB_URI] --tables t1,t2 --private-key [PRIVATE_KEY] namespace.relation_name
 ```
 
 ### Run tests

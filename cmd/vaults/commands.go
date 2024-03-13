@@ -33,7 +33,7 @@ var vaultNameRx = regexp.MustCompile(`^([a-zA-Z_][a-zA-Z0-9_]*)[.]([a-zA-Z_][a-z
 
 func newVaultCreateCommand() *cli.Command {
 	var address, provider string
-	var winSize, cache int64
+	var cache int64
 
 	return &cli.Command{
 		Name:      "create",
@@ -67,14 +67,6 @@ func newVaultCreateCommand() *cli.Command {
 				DefaultText: "0",
 				Destination: &cache,
 				Value:       0,
-			},
-			&cli.Int64Flag{
-				Name:        "window-size",
-				Category:    "OPTIONAL:",
-				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
-				DefaultText: fmt.Sprintf("%d", DefaultWindowSize),
-				Destination: &winSize,
-				Value:       DefaultWindowSize,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -113,7 +105,6 @@ func newVaultCreateCommand() *cli.Command {
 
 			cfg.Vaults[pub] = vault{
 				ProviderHost: provider,
-				WindowSize:   winSize,
 			}
 
 			if err := yaml.NewEncoder(f).Encode(cfg); err != nil {
@@ -143,6 +134,7 @@ func newVaultCreateCommand() *cli.Command {
 
 func newStreamCommand() *cli.Command {
 	var privateKey, dburi, tables string
+	var winSize int64
 
 	return &cli.Command{
 		Name:      "stream",
@@ -175,6 +167,14 @@ func newStreamCommand() *cli.Command {
 				Usage:       "PostgreSQL tables to be replicated separated by comma (e.g. tbl1,tbl2,tbl3)",
 				Destination: &tables,
 				Required:    true,
+			},
+			&cli.Int64Flag{
+				Name:        "window-size",
+				Category:    "OPTIONAL:",
+				Usage:       "Number of seconds for which WAL updates are buffered before being sent to the provider",
+				DefaultText: fmt.Sprintf("%d", DefaultWindowSize),
+				Destination: &winSize,
+				Value:       DefaultWindowSize,
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -230,8 +230,7 @@ func newStreamCommand() *cli.Command {
 			bp := vaultsprovider.New(cfg.Vaults[vault].ProviderHost)
 			uploader := app.NewVaultsUploader(ns, rel, bp, privateKey)
 			dbDir := path.Join(dir, vault)
-			winSize := time.Duration(cfg.Vaults[vault].WindowSize) * time.Second
-			dbm := app.NewDBManager(dbDir, tableSchemas, winSize, uploader)
+			dbm := app.NewDBManager(dbDir, tableSchemas, time.Duration(winSize)*time.Second, uploader)
 
 			// Before starting replication, upload the remaining data
 			if err := dbm.UploadAll(cCtx.Context); err != nil {
@@ -896,6 +895,11 @@ func (s *DatabaseStreamSetup) TableSchemas(ctx context.Context) ([]app.TableSche
 				IsNull:    isNull,
 				IsPrimary: isPrimary,
 			})
+		}
+
+		// this means that the table is not part of the publication.
+		if len(columns) == 0 {
+			continue
 		}
 
 		schemas = append(schemas, app.TableSchema{
