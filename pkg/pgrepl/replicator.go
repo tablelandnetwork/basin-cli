@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/jackc/pglogrepl"
@@ -26,7 +27,7 @@ type Publication string
 
 // FullName is the name used to create a publication in Postgres.
 func (p Publication) FullName() string {
-	return fmt.Sprintf("pub_basin_%s", p)
+	return fmt.Sprintf("pub_basin_%s", string(p))
 }
 
 // PgReplicator is a component that replicates Postgres data.
@@ -37,9 +38,9 @@ type PgReplicator struct {
 	// channel of replicated Txs.
 	feed chan *Tx
 
-	// The table that will be replicated.
+	// The tables that will be replicated.
 	// We get them by querying pg_publication.
-	table string
+	tables []string
 
 	// The commitLSN is the LSN used to start the replication.
 	// It either comes from the confirmed_flush_lsn of an existing replication slot
@@ -94,12 +95,12 @@ func New(connStr string, publication Publication) (*PgReplicator, error) {
 		return nil, fmt.Errorf("ping: %s", err)
 	}
 
-	// Check if publication exists
-	table, err := conn.GetPublicationTable(ctx, publication)
+	// Check if publications exist
+	tables, err := conn.GetPublicationTables(ctx, publication)
 	if err != nil {
 		return nil, err
 	}
-	r.table = table
+	r.tables = tables
 
 	// Fetch the confirmed flush lsn.
 	lsn, err := conn.ConfirmedFlushLSN(ctx, r.slot)
@@ -132,7 +133,7 @@ func New(connStr string, publication Publication) (*PgReplicator, error) {
 }
 
 // StartReplication starts replicattion.
-func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, string, error) {
+func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, []string, error) {
 	if err := pglogrepl.StartReplication(
 		ctx,
 		r.pgConn,
@@ -149,9 +150,9 @@ func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, string, 
 			"\"include-pk\" 'true'",
 			"\"format-version\" '2'",
 			"\"include-xids\" 'true'",
-			fmt.Sprintf("\"add-tables\" '%s'", r.table),
+			fmt.Sprintf("\"add-tables\" '%s'", strings.Join(r.tables, ",")),
 		}}); err != nil {
-		return nil, r.table, err
+		return nil, r.tables, err
 	}
 	slog.Info("Logical replication started", "slot", r.slot)
 
@@ -205,7 +206,7 @@ func (r *PgReplicator) StartReplication(ctx context.Context) (chan *Tx, string, 
 		}
 	}()
 
-	return r.feed, r.table, nil
+	return r.feed, r.tables, nil
 }
 
 // Commit send a signal to Postgres that the lsn was consumed.

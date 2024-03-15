@@ -14,7 +14,7 @@ import (
 
 // Replicator replicates Postgres txs into a channel.
 type Replicator interface {
-	StartReplication(ctx context.Context) (chan *pgrepl.Tx, string, error)
+	StartReplication(ctx context.Context) (chan *pgrepl.Tx, []string, error)
 	Commit(ctx context.Context, lsn pglogrepl.LSN) error
 	Shutdown()
 }

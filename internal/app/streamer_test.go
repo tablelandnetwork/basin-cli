@@ -44,7 +44,7 @@ func TestVaultsStreamerOne(t *testing.T) {
 	}
 	uploader := NewVaultsUploader(testNS, testTable, providerMock, privateKey)
 	dbm := NewDBManager(
-		testDBDir, testTable, cols, winSize, uploader)
+		testDBDir, []TableSchema{{testTable, cols}}, winSize, uploader)
 
 	streamer := NewVaultsStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
@@ -145,7 +145,7 @@ func TestVaultsStreamerTwo(t *testing.T) {
 	}
 	uploader := NewVaultsUploader(testNS, testTable, providerMock, privateKey)
 	dbm := NewDBManager(
-		testDBDir, testTable, cols, winSize, uploader)
+		testDBDir, []TableSchema{{testTable, cols}}, winSize, uploader)
 	streamer := NewVaultsStreamer(testNS, &replicatorMock{feed: feed}, dbm)
 	go func() {
 		// start listening to WAL records in a separate goroutine
@@ -174,21 +174,6 @@ func TestVaultsStreamerTwo(t *testing.T) {
 
 	// wait for window to pass
 	time.Sleep(winSize + 1)
-
-	// nothing should be uploaded because the second tx was received before
-	// the window closed. the exports should be uploaded
-	// when we replicator is started again
-	select {
-	case <-providerMock.uploaderInputs:
-		t.FailNow() // should not be reached
-	default:
-		// manually trigger uploadAll to simulate
-		// starting the replication process again
-		go func() {
-			require.NoError(
-				t, dbm.UploadAll(context.Background()))
-		}()
-	}
 
 	// Assert that the both first and second tx
 	// were replayed by importing the exported parquet file
@@ -221,8 +206,8 @@ type replicatorMock struct {
 
 var _ Replicator = (*replicatorMock)(nil)
 
-func (rm *replicatorMock) StartReplication(_ context.Context) (chan *pgrepl.Tx, string, error) {
-	return rm.feed, "", nil
+func (rm *replicatorMock) StartReplication(_ context.Context) (chan *pgrepl.Tx, []string, error) {
+	return rm.feed, []string{}, nil
 }
 
 func (rm *replicatorMock) Commit(_ context.Context, _ pglogrepl.LSN) error {

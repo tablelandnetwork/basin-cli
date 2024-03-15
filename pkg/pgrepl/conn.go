@@ -14,52 +14,33 @@ type Conn struct {
 	*pgx.Conn
 }
 
-// FetchPublicationTables fetches all tables that needs replication from publications.
-func (c *Conn) FetchPublicationTables(ctx context.Context) ([]string, error) {
+// GetPublicationTables checks if the publication exists for a given table.
+func (c *Conn) GetPublicationTables(ctx context.Context, p Publication) ([]string, error) {
 	rows, err := c.Query(ctx,
-		`
-			SELECT schemaname, tablename 
-			FROM pg_publication p
-			JOIN pg_publication_tables pt ON p.pubname = pt.pubname
-		`,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return []string{}, nil
-	} else if err != nil {
-		return []string{}, fmt.Errorf("query: %s", err)
-	}
-	defer rows.Close()
-
-	var tables []string
-	for rows.Next() {
-		var schema, table string
-		if err := rows.Scan(&schema, &table); err != nil {
-			return []string{}, fmt.Errorf("scan: %s", err)
-		}
-		tables = append(tables, fmt.Sprintf("%s.%s", schema, table))
-	}
-
-	return tables, nil
-}
-
-// GetPublicationTable checks if the publication exists for a given table.
-func (c *Conn) GetPublicationTable(ctx context.Context, p Publication) (string, error) {
-	var schema, table string
-	err := c.QueryRow(ctx,
 		`
 			SELECT schemaname, tablename 
 			FROM pg_publication p
 			JOIN pg_publication_tables pt ON p.pubname = pt.pubname
 			WHERE p.pubname = $1
 		`, p.FullName(),
-	).Scan(&schema, &table)
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", fmt.Errorf("publication does not exist")
+		return []string{}, fmt.Errorf("publications not found")
 	} else if err != nil {
-		return "", fmt.Errorf("query: %s", err)
+		return []string{}, fmt.Errorf("query: %s", err)
 	}
 
-	return fmt.Sprintf("%s.%s", schema, table), nil
+	tables := []string{}
+	for rows.Next() {
+		var schema, table string
+		if err := rows.Scan(&schema, &table); err != nil {
+			return []string{}, fmt.Errorf("scan: %s", err)
+		}
+
+		tables = append(tables, fmt.Sprintf("%s.%s", schema, table))
+	}
+
+	return tables, nil
 }
 
 // ConfirmedFlushLSN fetches the confirmed flush LSN.
