@@ -11,7 +11,7 @@ import (
 // VaultsProvider defines Vaults API.
 type VaultsProvider interface {
 	CreateVault(context.Context, CreateVaultParams) error
-	ListVaults(context.Context, ListVaultsParams) ([]Vault, error)
+	ListVaults(context.Context, ListVaultsParams) ([]VaultWithCacheDuration, error)
 	ListVaultEvents(context.Context, ListVaultEventsParams) ([]EventInfo, error)
 	WriteVaultEvent(context.Context, WriteVaultEventParams) error
 	RetrieveEvent(context.Context, RetrieveEventParams, io.Writer) (string, error)

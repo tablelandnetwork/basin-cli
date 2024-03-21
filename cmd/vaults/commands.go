@@ -378,10 +378,10 @@ func newListCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:        "format",
 				Category:    "OPTIONAL:",
-				Usage:       "The output format (text or json)",
-				DefaultText: "text",
+				Usage:       "The output format (table or json)",
+				DefaultText: "table",
 				Destination: &format,
-				Value:       "text",
+				Value:       "table",
 			},
 		},
 		Action: func(cCtx *cli.Context) error {
@@ -396,10 +396,19 @@ func newListCommand() *cli.Command {
 				return fmt.Errorf("failed to list vaults: %s", err)
 			}
 
-			if format == "text" {
+			if format == "table" {
+				table := tablewriter.NewWriter(os.Stdout)
+				table.SetHeader([]string{"Vault", "Cache Duration"})
 				for _, vault := range vaults {
-					fmt.Printf("%s\n", vault)
+					cacheDuration := ""
+					if vault.CacheDuration != nil {
+						cacheDuration = fmt.Sprint(*vault.CacheDuration)
+					}
+					table.Append([]string{
+						string(vault.Vault), cacheDuration,
+					})
 				}
+				table.Render()
 			} else if format == "json" {
 				jsonData, err := json.Marshal(vaults)
 				if err != nil {

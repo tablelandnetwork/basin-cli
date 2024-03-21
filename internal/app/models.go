@@ -9,6 +9,12 @@ import (
 // Vault represents a vault.
 type Vault string
 
+// VaultWithCacheDuration represents a vault with its cache.
+type VaultWithCacheDuration struct {
+	Vault         Vault          `json:"vault"`
+	CacheDuration *CacheDuration `json:"cache_duration"`
+}
+
 // Account represents an account.
 type Account struct {
 	address common.Address
