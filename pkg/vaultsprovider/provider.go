@@ -66,24 +66,24 @@ func (bp *VaultsProvider) CreateVault(ctx context.Context, params app.CreateVaul
 // ListVaults lists all vaults from a given account.
 func (bp *VaultsProvider) ListVaults(
 	ctx context.Context, params app.ListVaultsParams,
-) ([]app.Vault, error) {
+) ([]app.VaultWithCacheDuration, error) {
 	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet, fmt.Sprintf("%s/vaults/?account=%s", bp.provider, params.Account.Hex()), nil)
+		ctx, http.MethodGet, fmt.Sprintf("%s/v2/vaults/?account=%s", bp.provider, params.Account.Hex()), nil)
 	if err != nil {
-		return []app.Vault{}, fmt.Errorf("could not create request: %s", err)
+		return []app.VaultWithCacheDuration{}, fmt.Errorf("could not create request: %s", err)
 	}
 
 	resp, err := bp.client.Do(req)
 	if err != nil {
-		return []app.Vault{}, fmt.Errorf("request to list vaults failed: %s", err)
+		return []app.VaultWithCacheDuration{}, fmt.Errorf("request to list vaults failed: %s", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
-	var vaults []app.Vault
+	var vaults []app.VaultWithCacheDuration
 	if err := json.NewDecoder(resp.Body).Decode(&vaults); err != nil {
-		return []app.Vault{}, fmt.Errorf("failed to read response: %s", err)
+		return []app.VaultWithCacheDuration{}, fmt.Errorf("failed to read response: %s", err)
 	}
 	return vaults, nil
 }

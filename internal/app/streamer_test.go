@@ -230,8 +230,8 @@ func (bp *vaultsProviderMock) CreateVault(
 	return nil
 }
 
-func (bp *vaultsProviderMock) ListVaults(_ context.Context, _ ListVaultsParams) ([]Vault, error) {
-	return []Vault{}, nil
+func (bp *vaultsProviderMock) ListVaults(_ context.Context, _ ListVaultsParams) ([]VaultWithCacheDuration, error) {
+	return []VaultWithCacheDuration{}, nil
 }
 
 func (bp *vaultsProviderMock) ListVaultEvents(
