@@ -56,11 +56,15 @@ func (bp *VaultsProvider) CreateVault(ctx context.Context, params app.CreateVaul
 		_ = resp.Body.Close()
 	}()
 
-	if resp.StatusCode != http.StatusCreated {
-		return errors.New("account was not created")
+	if resp.StatusCode == http.StatusCreated {
+		return nil
 	}
 
-	return nil
+	if resp.StatusCode == http.StatusConflict {
+		return errors.New("vault already exists")
+	}
+
+	return errors.New("failed to create vault")
 }
 
 // ListVaults lists all vaults from a given account.
